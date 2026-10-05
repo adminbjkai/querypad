@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TableInfo, EditorTab, TableProfileState, TableProfile } from "@/types";
+import type { TableInfo, EditorTab, TableProfileState, TableProfile, ViewInfo, AiTurn } from "@/types";
 import type {
   Relationship,
   RelationshipDiscoveryState,
@@ -8,12 +8,17 @@ import type {
 import type { Pipeline, PipelineStep, PipelineExecutionResult } from "@/types/pipeline";
 import type { LoadedPlugin } from "@/types/plugin";
 import {
-  saveState,
-  saveFile,
-  deleteFiles,
-  loadWorkspace,
-  clearPersistedWorkspace,
+  loadSpaceIndex,
+  saveSpaceIndex,
+  loadSpace,
+  saveSpaceState,
+  saveSpaceFile,
+  deleteSpaceFiles,
+  deleteSpaceData,
+  newSpaceId,
   type FileEntry,
+  type PersistedState,
+  type SpaceMeta,
 } from "@/lib/persistence/indexeddb";
 import { getConnection } from "@/lib/duckdb/instance";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
@@ -42,6 +47,8 @@ export interface ImportSummary {
   problems: { tone: "warning" | "error"; message: string }[];
 }
 
+export type SpaceTemplate = "sample" | "empty" | "current";
+
 const IDLE_DISCOVERY: RelationshipDiscoveryState = {
   status: "idle",
   relationships: [],
@@ -50,7 +57,7 @@ const IDLE_DISCOVERY: RelationshipDiscoveryState = {
 
 const MAX_TABS = 20;
 const MAX_HISTORY = 100;
-const HISTORY_KEY = "querypad:history";
+export const PLAYGROUND_NAME = "Playground";
 
 /** Profiles being built right now, so concurrent callers share one run. */
 const profilesInFlight = new Map<string, Promise<TableProfile | null>>();
@@ -75,40 +82,76 @@ function createTab(index: number, query = ""): EditorTab {
   };
 }
 
-function loadHistory(): HistoryEntry[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_HISTORY) : [];
-  } catch {
-    return [];
-  }
+function columnSignature(table: TableInfo): string {
+  return table.columns.map((c) => `${c.name}:${c.type}`).join("|");
 }
 
-const initialTab = createTab(1);
+/** Everything that belongs to one space (reset when switching or clearing). */
+function emptySpaceData() {
+  const tab = createTab(1);
+  return {
+    tables: [] as TableInfo[],
+    views: [] as ViewInfo[],
+    fileEntries: [] as FileEntry[],
+    unrestoredFiles: [] as { name: string; fileName: string }[],
+    /** Saved views DuckDB can't currently build (their table is missing); kept, not dropped. */
+    unrestoredViews: [] as { name: string; sql: string }[],
+    tableProfiles: {} as Record<string, TableProfileState>,
+    discovery: IDLE_DISCOVERY,
+    relationshipVerdicts: {} as Record<string, RelationshipVerdict>,
+    relationshipOverrides: [] as Relationship[],
+    tabs: [tab],
+    activeTabId: tab.id,
+    history: [] as HistoryEntry[],
+    pipelines: [] as Pipeline[],
+    activePipelineId: null as string | null,
+    pipelineResults: {} as Record<string, PipelineExecutionResult>,
+    viewMode: "sql" as "sql" | "pipeline",
+    plugins: [] as LoadedPlugin[],
+  };
+}
+
+const initialSpace = emptySpaceData();
 
 interface WorkspaceState {
   dbReady: boolean;
   setDbReady: (ready: boolean) => void;
 
+  /** True once the active space is loaded; false while opening or switching spaces. */
   _hydrated: boolean;
-  restoreFromIndexedDB: () => Promise<void>;
-  /** False on /shared links so viewing someone's data never overwrites your workspace. */
+  /** Load the space index (migrating older saves) and open the active space. */
+  init: () => Promise<void>;
+  /** False on /shared links so viewing someone's data never writes to your spaces. */
   persistEnabled: boolean;
-  /** Make the current (shared) workspace yours: persist everything and keep saving. */
-  adoptAsWorkspace: () => Promise<void>;
 
-  // Tables
+  // Spaces: independent saved workspaces in this browser
+  spaceId: string | null;
+  spaces: SpaceMeta[];
+  switchSpace: (id: string) => Promise<void>;
+  /** Create a space from the sample template, empty, or as a copy of the current one. */
+  createSpace: (name: string, template: SpaceTemplate) => Promise<void>;
+  renameSpace: (id: string, name: string) => Promise<void>;
+  deleteSpace: (id: string) => Promise<void>;
+
+  // Tables and views
   tables: TableInfo[];
+  views: ViewInfo[];
   fileEntries: FileEntry[];
   /** Saved files that failed to load this session; kept in the saved index so they aren't lost. */
   unrestoredFiles: { name: string; fileName: string }[];
+  unrestoredViews: { name: string; sql: string }[];
   tableProfiles: Record<string, TableProfileState>;
   addTable: (table: TableInfo, fileName: string, data: Uint8Array) => void;
   removeTable: (name: string) => Promise<void>;
+  dropView: (name: string) => Promise<void>;
   importFiles: (files: Iterable<File>) => Promise<ImportSummary>;
   loadSampleData: () => Promise<void>;
   loadTableProfile: (name: string) => Promise<TableProfile | null>;
+  /**
+   * Reconcile the sidebar with DuckDB's catalog after SQL changed it: new or modified
+   * tables are snapshotted (so they persist), dropped ones removed, views refreshed.
+   */
+  syncCatalog: (touched?: Set<string>) => Promise<void>;
 
   // Relationship discovery + verification
   discovery: RelationshipDiscoveryState;
@@ -118,6 +161,7 @@ interface WorkspaceState {
   setRelationshipVerdict: (key: string, verdict: RelationshipVerdict | null) => void;
   editRelationship: (oldKey: string, next: Relationship) => void;
 
+  /** Remove every table, view, tab and run from the current space. */
   clearWorkspace: () => Promise<void>;
 
   // Tabs + queries
@@ -131,6 +175,8 @@ interface WorkspaceState {
   renameTab: (id: string, title: string) => void;
   /** Run `sql` (or the tab's full query) in a tab and record it in history. */
   runQuery: (tabId?: string, sql?: string) => Promise<void>;
+  appendAiTurn: (tabId: string, turn: AiTurn) => void;
+  clearAiThread: (tabId: string) => void;
 
   history: HistoryEntry[];
   clearHistory: () => void;
@@ -160,98 +206,103 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setDbReady: (ready) => set({ dbReady: ready }),
 
   _hydrated: false,
-  restoreFromIndexedDB: async () => {
+  persistEnabled: true,
+
+  init: async () => {
+    // Coming from a shared link (saving off, its tables still in DuckDB): start clean.
+    const fromShared = !get().persistEnabled;
+    set({ _hydrated: false, persistEnabled: true });
     try {
-      const persisted = await loadWorkspace();
-      if (!persisted) return;
-
-      // Plugins first: a plugin may be the file loader for some saved files.
-      if (persisted.pluginUrls?.length) {
-        const { loadPluginFromUrl } = await import("@/lib/plugins/registry");
-        for (const url of persisted.pluginUrls) {
-          try {
-            const plugin = await loadPluginFromUrl(url);
-            set((s) => ({
-              plugins: [...s.plugins.filter((p) => p.manifest.id !== plugin.manifest.id), plugin],
-            }));
-          } catch (err) {
-            console.error(`Failed to reload plugin from ${url}:`, err);
-          }
-        }
+      if (fromShared) {
+        await resetEngine();
+        set({ ...emptySpaceData() });
       }
-
-      const { loadBufferAsTable } = await import("@/lib/duckdb/files");
-      const tables: TableInfo[] = [];
-      const fileEntries: FileEntry[] = [];
-      const unrestoredFiles: { name: string; fileName: string }[] = [];
-      const loaded = new Set<string>();
-      for (const entry of persisted.fileEntries) {
-        try {
-          tables.push(await loadBufferAsTable(entry.name, entry.fileName, new Uint8Array(entry.data)));
-          fileEntries.push(entry);
-          loaded.add(entry.name);
-        } catch (err) {
-          console.error(`Failed to restore ${entry.fileName}:`, err);
-          unrestoredFiles.push({ name: entry.name, fileName: entry.fileName });
-        }
+      const index = await loadSpaceIndex();
+      if (index.spaces.length === 0) {
+        // First visit: a Playground space with the sample tables to explore right away.
+        const meta = newMeta(PLAYGROUND_NAME);
+        set({ spaces: [meta], spaceId: meta.id });
+        await saveSpaceIndex({ activeId: meta.id, spaces: [meta] });
+        await get().loadSampleData().catch((err) => console.error("Failed to load sample data:", err));
+        await persistEverything(meta.id);
+        return;
       }
-      // Index entries whose bytes are missing are kept too, rather than silently forgotten.
-      for (const f of persisted.files ?? []) {
-        if (!loaded.has(f.name) && !unrestoredFiles.some((u) => u.name === f.name)) unrestoredFiles.push(f);
-      }
-      if (unrestoredFiles.length > 0) {
-        toast(
-          `Couldn't reopen ${unrestoredFiles.map((f) => f.fileName).join(", ")}. The saved copy is kept — add the file again to replace it.`,
-          "warning"
-        );
-      }
-
-      const tabs = (persisted.tabs ?? []).map((pt) => ({
-        ...createTab(1, pt.query),
-        id: pt.id,
-        title: pt.title,
-        createdAt: pt.createdAt,
-      }));
-
-      set({
-        tables,
-        fileEntries,
-        unrestoredFiles,
-        tableProfiles: Object.fromEntries(
-          tables.map((t) => [t.name, { status: "idle", profile: null, error: null }])
-        ),
-        ...(tabs.length > 0 && {
-          tabs,
-          activeTabId: tabs.some((t) => t.id === persisted.activeTabId)
-            ? persisted.activeTabId!
-            : tabs[0].id,
-        }),
-        ...(persisted.pipelines?.length && {
-          pipelines: persisted.pipelines,
-          activePipelineId: persisted.activePipelineId ?? persisted.pipelines[0].id,
-        }),
-        viewMode: persisted.viewMode ?? "sql",
-        relationshipVerdicts: persisted.relationshipVerdicts ?? {},
-        relationshipOverrides: persisted.relationshipOverrides ?? [],
-      });
+      const active = index.spaces.find((s) => s.id === index.activeId) ?? index.spaces[0];
+      set({ spaces: index.spaces, spaceId: active.id });
+      await openSpace(active.id);
     } catch (err) {
-      console.error("Failed to restore from IndexedDB:", err);
+      console.error("Failed to open saved spaces:", err);
     } finally {
       set({ _hydrated: true });
     }
   },
 
-  persistEnabled: true,
-  adoptAsWorkspace: async () => {
-    await clearPersistedWorkspace();
-    for (const entry of get().fileEntries) await saveFile(entry);
-    await saveState(snapshotState());
-    set({ persistEnabled: true });
+  spaceId: null,
+  spaces: [],
+
+  switchSpace: async (id) => {
+    if (id === get().spaceId || !get().spaces.some((s) => s.id === id)) return;
+    await flushPendingSave();
+    await leaveRoom();
+    set({ _hydrated: false });
+    try {
+      await resetEngine();
+      set({ ...emptySpaceData(), spaceId: id });
+      await openSpace(id);
+      await saveSpaceIndex({ activeId: id, spaces: get().spaces });
+    } finally {
+      set({ _hydrated: true });
+    }
+  },
+
+  createSpace: async (name, template) => {
+    await flushPendingSave();
+    const meta = newMeta(name.trim() || "Untitled space");
+    if (template === "current") {
+      // Same tables and tabs, saved under a new space; the engine already holds the data.
+      set((s) => ({ spaces: [...s.spaces, meta], spaceId: meta.id, persistEnabled: true }));
+      await persistEverything(meta.id);
+      return;
+    }
+    await leaveRoom();
+    set({ _hydrated: false });
+    try {
+      await resetEngine();
+      set((s) => ({ ...emptySpaceData(), spaces: [...s.spaces, meta], spaceId: meta.id, persistEnabled: true }));
+      if (template === "sample") await get().loadSampleData();
+      await persistEverything(meta.id);
+    } finally {
+      set({ _hydrated: true });
+    }
+  },
+
+  renameSpace: async (id, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    set((s) => ({ spaces: s.spaces.map((sp) => (sp.id === id ? { ...sp, name: trimmed } : sp)) }));
+    await saveSpaceIndex({ activeId: get().spaceId, spaces: get().spaces });
+  },
+
+  deleteSpace: async (id) => {
+    const remaining = get().spaces.filter((s) => s.id !== id);
+    if (id === get().spaceId) {
+      if (remaining.length > 0) {
+        await get().switchSpace(remaining[0].id);
+      } else {
+        // Never leave the user without a space: start a fresh Playground.
+        await get().createSpace(PLAYGROUND_NAME, "sample");
+      }
+    }
+    set((s) => ({ spaces: s.spaces.filter((sp) => sp.id !== id) }));
+    await deleteSpaceData(id);
+    await saveSpaceIndex({ activeId: get().spaceId, spaces: get().spaces });
   },
 
   tables: [],
+  views: [],
   fileEntries: [],
   unrestoredFiles: [],
+  unrestoredViews: [],
   tableProfiles: {},
   addTable: (table, fileName, data) =>
     set((state) => ({
@@ -270,25 +321,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     })),
 
   removeTable: async (name) => {
-    set((state) => {
-      const tableProfiles = { ...state.tableProfiles };
-      delete tableProfiles[name];
-      return {
-        tables: state.tables.filter((t) => t.name !== name),
-        fileEntries: state.fileEntries.filter((f) => f.name !== name),
-        unrestoredFiles: state.unrestoredFiles.filter((f) => f.name !== name),
-        tableProfiles,
-        discovery: IDLE_DISCOVERY,
-        relationshipOverrides: state.relationshipOverrides.filter(
-          (rel) => rel.from.table !== name && rel.to.table !== name
-        ),
-      };
-    });
+    set((state) => withoutTables(state, [name]));
     try {
       const conn = await getConnection();
       await conn.query(`DROP TABLE IF EXISTS ${quoteIdent(name)}`);
     } catch (err) {
       console.error("Failed to drop table:", err);
+    }
+  },
+
+  dropView: async (name) => {
+    set((state) => ({ views: state.views.filter((v) => v.name !== name) }));
+    try {
+      const conn = await getConnection();
+      await conn.query(`DROP VIEW IF EXISTS ${quoteIdent(name)}`);
+    } catch (err) {
+      console.error("Failed to drop view:", err);
     }
   },
 
@@ -330,6 +378,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const { loadBufferAsTable } = await import("@/lib/duckdb/files");
     for (const fileName of SAMPLE_FILES) {
       const response = await fetch(`/sample/${fileName}`);
+      if (!response.ok) throw new Error(`Could not fetch sample ${fileName} (HTTP ${response.status})`);
       const data = new Uint8Array(await response.arrayBuffer());
       const name = fileName.replace(/\.[^.]+$/, "");
       const table = await loadBufferAsTable(name, fileName, new Uint8Array(data));
@@ -345,6 +394,48 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const run = buildProfile(name).finally(() => profilesInFlight.delete(name));
     profilesInFlight.set(name, run);
     return run;
+  },
+
+  syncCatalog: async (touched = new Set()) => {
+    const { readCatalog, describeRelation, snapshotTable } = await import("@/lib/duckdb/catalog");
+    const catalog = await readCatalog();
+    const present = new Set(catalog.tables);
+    const gone = get().tables.filter((t) => !present.has(t.name)).map((t) => t.name);
+    if (gone.length > 0) set((state) => withoutTables(state, gone));
+
+    for (const name of catalog.tables) {
+      const known = get().tables.find((t) => t.name === name);
+      const info = await describeRelation(name);
+      const changed =
+        !known ||
+        touched.has(name.toLowerCase()) ||
+        known.rowCount !== info.rowCount ||
+        columnSignature(known) !== columnSignature(info);
+      if (!changed) continue;
+      try {
+        get().addTable(info, `${name}.parquet`, await snapshotTable(name, info.columns));
+      } catch (err) {
+        console.error(`Could not save a snapshot of ${name}:`, err);
+        set((state) => ({ tables: [...state.tables.filter((t) => t.name !== name), info] }));
+      }
+    }
+
+    const views: ViewInfo[] = [];
+    const broken: { name: string; sql: string }[] = [];
+    for (const view of catalog.views) {
+      try {
+        views.push({ ...(await describeRelation(view.name, false)), sql: view.sql });
+      } catch (err) {
+        // e.g. its base table was dropped; keep the definition so it isn't lost on save.
+        console.error(`Could not describe view ${view.name}:`, err);
+        broken.push(view);
+      }
+    }
+    const inEngine = new Set(catalog.views.map((v) => v.name));
+    set((state) => ({
+      views,
+      unrestoredViews: [...state.unrestoredViews.filter((v) => !inEngine.has(v.name)), ...broken],
+    }));
   },
 
   discovery: IDLE_DISCOVERY,
@@ -437,37 +528,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }),
 
   clearWorkspace: async () => {
-    const currentTables = get().tables;
-    try {
-      const conn = await getConnection();
-      for (const t of currentTables) {
-        await conn.query(`DROP TABLE IF EXISTS ${quoteIdent(t.name)}`);
-      }
-    } catch (err) {
-      console.error("Failed to drop tables:", err);
-    }
-    // On a shared link the saved workspace belongs to someone else's session — leave it alone.
-    if (get().persistEnabled) await clearPersistedWorkspace();
-    const tab = createTab(1);
-    set({
-      tables: [],
-      fileEntries: [],
-      unrestoredFiles: [],
-      tableProfiles: {},
-      discovery: IDLE_DISCOVERY,
-      relationshipVerdicts: {},
-      relationshipOverrides: [],
-      tabs: [tab],
-      activeTabId: tab.id,
-      pipelines: [],
-      activePipelineId: null,
-      pipelineResults: {},
-      viewMode: "sql",
-    });
+    await flushPendingSave();
+    await resetEngine();
+    const { spaceId, persistEnabled } = get();
+    // On a shared link the saved spaces belong to this browser's owner — leave them alone.
+    if (persistEnabled && spaceId) await deleteSpaceData(spaceId);
+    set({ ...emptySpaceData() });
+    if (persistEnabled && spaceId) await persistEverything(spaceId);
   },
 
-  tabs: [initialTab],
-  activeTabId: initialTab.id,
+  tabs: initialSpace.tabs,
+  activeTabId: initialSpace.activeTabId,
 
   addTab: (query = "") => {
     const { tabs } = get();
@@ -510,7 +581,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     get().updateTab(id, { isExecuting: true, error: null });
     const started = performance.now();
-    const { executeQuery } = await import("@/lib/duckdb/queries");
+    const [{ executeQuery, splitStatements }, { isReadOnlyStatement, mutationTargets }] = await Promise.all([
+      import("@/lib/duckdb/queries"),
+      import("@/lib/duckdb/catalog-sql"),
+    ]);
+    const statements = splitStatements(text);
     let entry: HistoryEntry;
     try {
       const result = await executeQuery(text);
@@ -535,19 +610,32 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         error: message,
       };
     }
-    set((state) => {
-      // Re-running the same SQL moves it to the top instead of duplicating it.
-      const history = [entry, ...state.history.filter((h) => h.sql !== text)].slice(0, MAX_HISTORY);
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-      return { history };
-    });
+    // Re-running the same SQL moves it to the top instead of duplicating it.
+    set((state) => ({
+      history: [entry, ...state.history.filter((h) => h.sql !== text)].slice(0, MAX_HISTORY),
+    }));
+
+    // DDL/DML (even a batch that failed part-way) may have created, changed or dropped tables.
+    if (statements.some((s) => !isReadOnlyStatement(s))) {
+      try {
+        await get().syncCatalog(mutationTargets(statements));
+      } catch (err) {
+        console.error("Catalog sync failed:", err);
+      }
+    }
   },
 
-  history: loadHistory(),
-  clearHistory: () => {
-    localStorage.removeItem(HISTORY_KEY);
-    set({ history: [] });
-  },
+  appendAiTurn: (tabId, turn) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.id === tabId ? { ...t, aiThread: [...(t.aiThread ?? []), turn].slice(-30) } : t
+      ),
+    })),
+
+  clearAiThread: (tabId) => get().updateTab(tabId, { aiThread: [] }),
+
+  history: [],
+  clearHistory: () => set({ history: [] }),
 
   // Pipelines
   pipelines: [],
@@ -643,6 +731,144 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => ({ plugins: state.plugins.filter((p) => p.manifest.id !== id) })),
 }));
 
+// --- Helpers -------------------------------------------------------------------------
+
+function newMeta(name: string): SpaceMeta {
+  const now = Date.now();
+  return { id: newSpaceId(), name, createdAt: now, updatedAt: now, tableCount: 0 };
+}
+
+function withoutTables(state: WorkspaceState, names: string[]): Partial<WorkspaceState> {
+  const drop = new Set(names);
+  const tableProfiles = { ...state.tableProfiles };
+  for (const name of names) delete tableProfiles[name];
+  return {
+    tables: state.tables.filter((t) => !drop.has(t.name)),
+    fileEntries: state.fileEntries.filter((f) => !drop.has(f.name)),
+    unrestoredFiles: state.unrestoredFiles.filter((f) => !drop.has(f.name)),
+    tableProfiles,
+    discovery: IDLE_DISCOVERY,
+    relationshipOverrides: state.relationshipOverrides.filter(
+      (rel) => !drop.has(rel.from.table) && !drop.has(rel.to.table)
+    ),
+  };
+}
+
+/** Drop every user table/view from DuckDB and forget profiles in flight. */
+async function resetEngine(): Promise<void> {
+  profilesInFlight.clear();
+  const { resetDatabase } = await import("@/lib/duckdb/catalog");
+  await resetDatabase();
+}
+
+/** Spaces are per-browser; a live room is tied to the tabs of the space you started it in. */
+async function leaveRoom(): Promise<void> {
+  const { useCollaborationStore } = await import("@/stores/collaboration-store");
+  if (!useCollaborationStore.getState().roomId) return;
+  const { disconnectFromRoom } = await import("@/lib/collaboration/sync");
+  disconnectFromRoom();
+  toast("Left the live room — rooms belong to the space you started them in.", "info");
+}
+
+/** Load a saved space into DuckDB and the store. */
+async function openSpace(spaceId: string): Promise<void> {
+  const store = useWorkspaceStore;
+  const persisted = await loadSpace(spaceId);
+  if (!persisted) return;
+
+  // Plugins first: a plugin may be the file loader for some saved files.
+  if (persisted.pluginUrls?.length) {
+    const { loadPluginFromUrl } = await import("@/lib/plugins/registry");
+    for (const url of persisted.pluginUrls) {
+      try {
+        const plugin = await loadPluginFromUrl(url);
+        store.setState((s) => ({
+          plugins: [...s.plugins.filter((p) => p.manifest.id !== plugin.manifest.id), plugin],
+        }));
+      } catch (err) {
+        console.error(`Failed to reload plugin from ${url}:`, err);
+      }
+    }
+  }
+
+  const { loadBufferAsTable } = await import("@/lib/duckdb/files");
+  const tables: TableInfo[] = [];
+  const fileEntries: FileEntry[] = [];
+  const unrestoredFiles: { name: string; fileName: string }[] = [];
+  const loaded = new Set<string>();
+  for (const entry of persisted.fileEntries) {
+    try {
+      tables.push(await loadBufferAsTable(entry.name, entry.fileName, new Uint8Array(entry.data)));
+      fileEntries.push(entry);
+      loaded.add(entry.name);
+    } catch (err) {
+      console.error(`Failed to restore ${entry.fileName}:`, err);
+      unrestoredFiles.push({ name: entry.name, fileName: entry.fileName });
+    }
+  }
+  // Index entries whose bytes are missing are kept too, rather than silently forgotten.
+  for (const f of persisted.files ?? []) {
+    if (!loaded.has(f.name) && !unrestoredFiles.some((u) => u.name === f.name)) unrestoredFiles.push(f);
+  }
+
+  const views: ViewInfo[] = [];
+  const unrestoredViews: { name: string; sql: string }[] = [];
+  if (persisted.views?.length) {
+    const { restoreViews, describeRelation } = await import("@/lib/duckdb/catalog");
+    const failed = new Set((await restoreViews(persisted.views)).map((v) => v.name));
+    for (const view of persisted.views) {
+      if (failed.has(view.name)) {
+        unrestoredViews.push(view);
+        continue;
+      }
+      try {
+        views.push({ ...(await describeRelation(view.name, false)), sql: view.sql });
+      } catch {
+        // dropped by a later restore step; ignore
+      }
+    }
+    if (failed.size > 0) toast(`Couldn't recreate view${failed.size > 1 ? "s" : ""} ${[...failed].join(", ")}.`, "warning");
+  }
+
+  if (unrestoredFiles.length > 0) {
+    toast(
+      `Couldn't reopen ${unrestoredFiles.map((f) => f.fileName).join(", ")}. The saved copy is kept — add the file again to replace it.`,
+      "warning"
+    );
+  }
+
+  const tabs = (persisted.tabs ?? []).map((pt) => ({
+    ...createTab(1, pt.query),
+    id: pt.id,
+    title: pt.title,
+    createdAt: pt.createdAt,
+    aiThread: pt.aiThread ?? [],
+  }));
+
+  store.setState({
+    tables,
+    views,
+    fileEntries,
+    unrestoredFiles,
+    unrestoredViews,
+    tableProfiles: Object.fromEntries(
+      tables.map((t) => [t.name, { status: "idle", profile: null, error: null }])
+    ),
+    ...(tabs.length > 0 && {
+      tabs,
+      activeTabId: tabs.some((t) => t.id === persisted.activeTabId) ? persisted.activeTabId! : tabs[0].id,
+    }),
+    history: persisted.history ?? [],
+    ...(persisted.pipelines?.length && {
+      pipelines: persisted.pipelines,
+      activePipelineId: persisted.activePipelineId ?? persisted.pipelines[0].id,
+    }),
+    viewMode: persisted.viewMode ?? "sql",
+    relationshipVerdicts: persisted.relationshipVerdicts ?? {},
+    relationshipOverrides: persisted.relationshipOverrides ?? [],
+  });
+}
+
 /** Profile one table and record the outcome in the store. */
 async function buildProfile(name: string): Promise<TableProfile | null> {
   const store = useWorkspaceStore;
@@ -672,17 +898,21 @@ async function buildProfile(name: string): Promise<TableProfile | null> {
 }
 
 // --- Persistence -----------------------------------------------------------------
-// State (tabs, pipelines, verdicts…) is debounced; file bytes are written once when a
-// file appears and deleted when it goes away.
+// State (tabs, history, pipelines, verdicts…) is debounced; file bytes are written once
+// when a table appears or changes and deleted when it goes away. Writes always target
+// the space that was active when the change happened.
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSave: (() => Promise<void>) | null = null;
 
-function snapshotState() {
+function snapshotState(): PersistedState {
   const s = useWorkspaceStore.getState();
   return {
     files: [...s.fileEntries.map(({ name, fileName }) => ({ name, fileName })), ...s.unrestoredFiles],
-    tabs: s.tabs.map(({ id, title, query, createdAt }) => ({ id, title, query, createdAt })),
+    views: [...s.views.map(({ name, sql }) => ({ name, sql })), ...s.unrestoredViews],
+    tabs: s.tabs.map(({ id, title, query, createdAt, aiThread }) => ({ id, title, query, createdAt, aiThread })),
     activeTabId: s.activeTabId,
+    history: s.history,
     pipelines: s.pipelines,
     activePipelineId: s.activePipelineId,
     viewMode: s.viewMode,
@@ -692,23 +922,65 @@ function snapshotState() {
   };
 }
 
-useWorkspaceStore.subscribe((state, prev) => {
-  if (!state._hydrated || !state.persistEnabled || !prev.persistEnabled) return;
+/** Write the state record and refresh the space's entry (updated time, table count). */
+async function saveStateNow(spaceId: string, force = false): Promise<void> {
+  // A debounced save that fires mid-switch must not write another space's state.
+  const current = useWorkspaceStore.getState();
+  if (!force && (current.spaceId !== spaceId || !current._hydrated || !current.persistEnabled)) return;
+  await saveSpaceState(spaceId, snapshotState());
+  const tableCount = useWorkspaceStore.getState().tables.length;
+  useWorkspaceStore.setState((s) => ({
+    spaces: s.spaces.map((sp) => (sp.id === spaceId ? { ...sp, updatedAt: Date.now(), tableCount } : sp)),
+  }));
+  const { spaceId: activeId, spaces } = useWorkspaceStore.getState();
+  await saveSpaceIndex({ activeId, spaces });
+}
 
-  if (state.fileEntries !== prev.fileEntries && prev._hydrated) {
+/** Save every file plus the state under `spaceId` (new spaces, copies, adopted shares). */
+async function persistEverything(spaceId: string): Promise<void> {
+  for (const entry of useWorkspaceStore.getState().fileEntries) await saveSpaceFile(spaceId, entry);
+  await saveStateNow(spaceId, true);
+}
+
+/** Run a debounced state save immediately (before switching spaces). */
+async function flushPendingSave(): Promise<void> {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const run = pendingSave;
+  pendingSave = null;
+  if (run) await run();
+}
+
+/** Persist a shared link's data as a brand-new space and make it active. */
+export async function saveSharedAsSpace(name: string): Promise<void> {
+  const index = await loadSpaceIndex();
+  const meta = newMeta(name);
+  useWorkspaceStore.setState({ spaces: [...index.spaces, meta], spaceId: meta.id, persistEnabled: true });
+  await persistEverything(meta.id);
+}
+
+useWorkspaceStore.subscribe((state, prev) => {
+  const spaceId = state.spaceId;
+  if (!spaceId || !state._hydrated || !state.persistEnabled) return;
+  if (!prev._hydrated || !prev.persistEnabled || prev.spaceId !== spaceId) return;
+
+  if (state.fileEntries !== prev.fileEntries) {
     const prevByName = new Map(prev.fileEntries.map((f) => [f.name, f]));
     const nextNames = new Set(state.fileEntries.map((f) => f.name));
     for (const entry of state.fileEntries) {
-      if (prevByName.get(entry.name) !== entry) saveFile(entry).catch(console.error);
+      if (prevByName.get(entry.name) !== entry) saveSpaceFile(spaceId, entry).catch(console.error);
     }
-    deleteFiles([...prevByName.keys()].filter((n) => !nextNames.has(n))).catch(console.error);
+    deleteSpaceFiles(spaceId, [...prevByName.keys()].filter((n) => !nextNames.has(n))).catch(console.error);
   }
 
   if (
     state.fileEntries !== prev.fileEntries ||
     state.unrestoredFiles !== prev.unrestoredFiles ||
+    state.unrestoredViews !== prev.unrestoredViews ||
+    state.views !== prev.views ||
     state.tabs !== prev.tabs ||
     state.activeTabId !== prev.activeTabId ||
+    state.history !== prev.history ||
     state.pipelines !== prev.pipelines ||
     state.activePipelineId !== prev.activePipelineId ||
     state.viewMode !== prev.viewMode ||
@@ -717,6 +989,29 @@ useWorkspaceStore.subscribe((state, prev) => {
     state.relationshipOverrides !== prev.relationshipOverrides
   ) {
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveState(snapshotState()).catch(console.error), 400);
+    pendingSave = () => saveStateNow(spaceId).catch(console.error);
+    saveTimer = setTimeout(() => void flushPendingSave(), 400);
   }
+});
+
+// Publish the join graph inside DuckDB (querypad.relationships / querypad.keys) so it
+// can be queried with SQL and referenced by the AI assistant.
+let publishTimer: ReturnType<typeof setTimeout> | null = null;
+useWorkspaceStore.subscribe((state, prev) => {
+  if (state.discovery.status !== "ready") return;
+  if (state.discovery === prev.discovery && state.relationshipVerdicts === prev.relationshipVerdicts) return;
+  if (publishTimer) clearTimeout(publishTimer);
+  publishTimer = setTimeout(async () => {
+    try {
+      const { relationshipsSql } = await import("@/lib/duckdb/catalog-sql");
+      const s = useWorkspaceStore.getState();
+      if (s.discovery.status !== "ready") return;
+      const conn = await getConnection();
+      for (const statement of relationshipsSql(s.discovery.relationships, s.relationshipVerdicts, relationshipKey)) {
+        await conn.query(statement);
+      }
+    } catch (err) {
+      console.error("Failed to publish relationships:", err);
+    }
+  }, 150);
 });

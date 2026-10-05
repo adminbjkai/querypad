@@ -5,7 +5,7 @@ Thanks for your interest in contributing to QueryPad!
 ## Development Setup
 
 ```bash
-git clone https://github.com/vericontext/querypad.git
+git clone https://github.com/adminbjkai/querypad.git
 cd querypad
 npm install
 npm run dev
@@ -32,11 +32,14 @@ src/
   cli/             # querypad CLI: index.ts (dispatch), inspect.ts, ask.ts, explain.ts
   lib/
     discovery/     # engine-agnostic core: profile.ts, signals.ts, relationships.ts, …
-    duckdb/        # browser DuckDB-Wasm: files.ts, queries.ts, browser-runner.ts
+    duckdb/        # browser DuckDB-Wasm: files.ts, queries.ts, catalog.ts (sync, snapshots),
+                   # catalog-sql.ts (pure), validate.ts (AI compile check), browser-runner.ts
     duckdb-node/   # Node DuckDB: connection.ts, load.ts, profile.ts
-    ai/            # streaming completions, providers, BYOK key storage
+    ai/            # streaming completions, providers, BYOK keys, workspace-context.ts (AI prompt)
+    persistence/   # IndexedDB layout for spaces (+ migration from older versions)
     collaboration/ # Yjs sync (tabs, per-tab text, files) over y-websocket
-  stores/          # Zustand: workspace-store (data), ui-store (theme, panels, toasts)
+  stores/          # Zustand: workspace-store (spaces, tables, tabs, AI threads, history),
+                   # ui-store (theme, panels, toasts)
   types/           # TypeScript type definitions (incl. discovery.ts)
 collab/server.mjs  # self-hosted collaboration relay (plain Node ESM)
 test/              # Node test runner specs for discovery, AI layer, collaboration
@@ -76,7 +79,7 @@ npm run querypad -- inspect ./fixtures/data
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/vericontext/querypad/issues)
+- Use [GitHub Issues](https://github.com/adminbjkai/querypad/issues)
 - Include steps to reproduce, expected behavior, and actual behavior
 - Screenshots are helpful for UI-related issues
 

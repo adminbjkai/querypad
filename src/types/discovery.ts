@@ -32,6 +32,11 @@ export interface Relationship {
   confidence: number;
   cardinality: RelationshipCardinality;
   signals: RelationshipSignals;
+  /**
+   * "name" when the foreign table has no rows yet, so the edge rests on column name and
+   * type alone (capped at low confidence). Absent means values were compared.
+   */
+  evidence?: "values" | "name";
 }
 
 /** A named business entity derived from a table and its relationships. */

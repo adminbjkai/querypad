@@ -9,7 +9,7 @@ import { MOD } from "@/components/ui/primitives";
 
 interface Command {
   id: string;
-  group: "Actions" | "Tables" | "Tabs" | "History";
+  group: "Actions" | "Spaces" | "Tables" | "Tabs" | "History";
   label: string;
   detail?: string;
   icon: IconName;
@@ -32,6 +32,9 @@ export default function CommandPalette() {
   const tables = useWorkspaceStore((s) => s.tables);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const history = useWorkspaceStore((s) => s.history);
+  const spaces = useWorkspaceStore((s) => s.spaces);
+  const spaceId = useWorkspaceStore((s) => s.spaceId);
+  const views = useWorkspaceStore((s) => s.views);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +61,28 @@ export default function CommandPalette() {
       { id: "plugins", group: "Actions", label: "Manage plugins", icon: "puzzle", run: () => ui().setDialog("plugins") },
       { id: "keys", group: "Actions", label: "Keyboard shortcuts", icon: "keyboard", hint: "?", run: () => ui().setDialog("shortcuts") },
     ];
+    const spaceCommands: Command[] = [
+      { id: "space:menu", group: "Spaces", label: "Save as new space", detail: "duplicate copy session", icon: "copy", run: () => ui().setSpaceMenuOpen(true) },
+      { id: "space:new", group: "Spaces", label: "New space from sample data", detail: "fresh template playground", icon: "plus", run: () => ui().setSpaceMenuOpen(true) },
+      ...spaces
+        .filter((sp) => sp.id !== spaceId)
+        .map((sp) => ({
+          id: `space:${sp.id}`,
+          group: "Spaces" as const,
+          label: `Open space ${sp.name}`,
+          detail: `${sp.tableCount} tables switch`,
+          icon: "table" as const,
+          run: () => void ws().switchSpace(sp.id),
+        })),
+    ];
+    const viewCommands: Command[] = views.map((v) => ({
+      id: `preview-view:${v.name}`,
+      group: "Tables",
+      label: `Preview view ${v.name}`,
+      detail: v.columns.map((c) => c.name).join(" "),
+      icon: "table",
+      run: () => previewTable(v.name),
+    }));
     const tableCommands: Command[] = tables.flatMap((t) => [
       {
         id: `preview:${t.name}`,
@@ -95,8 +120,8 @@ export default function CommandPalette() {
       icon: "history",
       run: () => ws().addTab(h.sql),
     }));
-    return [...actions, ...tableCommands, ...tabCommands, ...historyCommands];
-  }, [tables, tabs, history]);
+    return [...actions, ...spaceCommands, ...tableCommands, ...viewCommands, ...tabCommands, ...historyCommands];
+  }, [tables, views, tabs, history, spaces, spaceId]);
 
   const visible = useMemo(() => {
     if (!query.trim()) return commands.filter((c) => c.group !== "History").slice(0, 40);

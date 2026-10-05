@@ -26,6 +26,9 @@ interface UiState {
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
 
+  spaceMenuOpen: boolean;
+  setSpaceMenuOpen: (open: boolean) => void;
+
   /** AI bar above the editor; `aiSeed` pre-fills its prompt (e.g. "fix this error"). */
   aiOpen: boolean;
   aiSeed: string | null;
@@ -80,6 +83,9 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+
+  spaceMenuOpen: false,
+  setSpaceMenuOpen: (spaceMenuOpen) => set({ spaceMenuOpen }),
 
   aiOpen: false,
   aiSeed: null,

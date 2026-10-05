@@ -19,6 +19,7 @@ const PANELS: { id: SidebarPanel; label: string }[] = [
 
 export default function Sidebar() {
   const tables = useWorkspaceStore((s) => s.tables);
+  const views = useWorkspaceStore((s) => s.views);
   const discovery = useWorkspaceStore((s) => s.discovery);
   const verdicts = useWorkspaceStore((s) => s.relationshipVerdicts);
   const open = useUiStore((s) => s.sidebarOpen);
@@ -73,6 +74,7 @@ export default function Sidebar() {
               <div className="flex items-center justify-between px-3 pb-1 pt-2.5">
                 <p className="text-[12px] text-muted">
                   {tables.length} {tables.length === 1 ? "table" : "tables"}
+                  {views.length > 0 && `, ${views.length} ${views.length === 1 ? "view" : "views"}`}
                 </p>
                 <button onClick={() => setDialog("addFiles")} className={btn.ghost}>
                   <Icon name="plus" size={14} />
@@ -89,6 +91,21 @@ export default function Sidebar() {
                     onOpenProfile={() => setProfileTable(visibleProfile === t.name ? null : t.name)}
                   />
                 ))}
+                {views.map((v) => (
+                  <TableSchema
+                    key={`view:${v.name}`}
+                    table={v}
+                    isView
+                    keyColumns={keyColumns}
+                    profileActive={false}
+                    onOpenProfile={() => undefined}
+                  />
+                ))}
+                {tables.length === 0 && views.length === 0 && (
+                  <p className="px-3 py-4 text-[13px] leading-5 text-muted">
+                    No tables yet. Add data, or create one with SQL — <code className="font-mono text-[12px]">CREATE TABLE</code> results appear here.
+                  </p>
+                )}
               </div>
             </div>
           )}

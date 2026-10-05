@@ -31,7 +31,9 @@ function reasonsFor(rel: Relationship): string[] {
   const reasons: string[] = [];
 
   reasons.push(
-    `${Math.round(s.valueOverlap * 100)}% of distinct ${from} values are present in ${to}`
+    rel.evidence === "name"
+      ? `${rel.from.table} has no rows yet, so values could not be compared`
+      : `${Math.round(s.valueOverlap * 100)}% of distinct ${from} values are present in ${to}`
   );
 
   if (s.nameSimilarity >= 0.9) {

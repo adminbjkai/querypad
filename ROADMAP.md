@@ -31,6 +31,7 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 | 4 — AI Analyst | `querypad ask`: NL → SQL (relationship-aware) → execution → insight | ✅ Built |
 | `querypad explain` | Justify each relationship from stored `RelationshipSignals` + caveats | ✅ Built |
 | UI — AI Verification | Sidebar Relationships panel: accept/reject/edit inferred joins | ✅ Built |
+| UI — Workspace | Spaces, SQL-created tables/views in the catalog, AI conversations with compile check, `querypad.keys` | ✅ Built |
 | MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Next |
 
 ## Built today
@@ -164,6 +165,18 @@ join keys and the AI assistant receives the (non-rejected) relationships as cont
 edits are keyed by `relationshipKey` and persisted to IndexedDB. The existing browser app
 (Monaco, charts, pipelines, sharing) remains the interactive-analysis surface; the
 verification view is additive.
+
+## UI — Workspace (built)
+
+The browser app treats DuckDB's catalog as the source of truth: tables and views created with
+SQL appear in the sidebar, are snapshotted for persistence, and get the same profiling and join
+discovery as loaded files. The inferred graph is published back into DuckDB as
+`querypad.relationships` / `querypad.keys`, so "how do my tables connect?" is a query.
+
+The AI assistant is a per-tab conversation. Each turn carries the workspace context (schemas
+with profile hints, joins by verdict, recent runs, editor SQL) plus earlier turns, and every
+answer is compiled against the real tables before it is shown, with one automatic repair.
+Spaces keep separate saved workspaces in the browser, with a sample-data template for fresh starts.
 
 ## Claude Code integration
 

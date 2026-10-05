@@ -1,4 +1,4 @@
-import { AiHttpError, streamComplete } from "@/lib/ai/complete";
+import { AiHttpError, streamComplete, type ChatTurn } from "@/lib/ai/complete";
 import { AI_PROVIDER_IDS, getAiProviderConfig, isAiProvider, type AiProvider } from "@/lib/ai/providers";
 
 export const runtime = "nodejs";
@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const MAX_PROMPT_CHARS = 200_000;
 const MAX_TOKENS_LIMIT = 4096;
 const DEFAULT_MAX_TOKENS = 1024;
+const MAX_HISTORY_TURNS = 40;
 
 function serverKey(provider: AiProvider): string | undefined {
   return process.env[getAiProviderConfig(provider).envKey] || undefined;
@@ -48,6 +49,20 @@ function crossSiteReason(req: Request): string | null {
   return null;
 }
 
+/** Validate optional conversation history; returns clean turns or null if malformed. */
+function parseHistory(value: unknown): ChatTurn[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MAX_HISTORY_TURNS) return null;
+  const turns: ChatTurn[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") return null;
+    const { role, content } = item as { role?: unknown; content?: unknown };
+    if ((role !== "user" && role !== "assistant") || typeof content !== "string") return null;
+    turns.push({ role, content });
+  }
+  return turns;
+}
+
 /** Stream a completion for a server-managed provider as plain-text deltas. */
 export async function POST(req: Request) {
   const rejected = crossSiteReason(req);
@@ -57,6 +72,7 @@ export async function POST(req: Request) {
     provider?: unknown;
     system?: unknown;
     input?: unknown;
+    history?: unknown;
     maxTokens?: unknown;
   } | null;
   if (!body) return text("Request body must be JSON.", 400);
@@ -68,7 +84,15 @@ export async function POST(req: Request) {
   if (typeof system !== "string" || typeof input !== "string") {
     return text("system and input must be strings.", 400);
   }
-  if (system.length + input.length > MAX_PROMPT_CHARS) {
+  const history = parseHistory(body.history);
+  if (!history) {
+    return text(
+      `history must be an array of at most ${MAX_HISTORY_TURNS} {role: "user" | "assistant", content: string} turns.`,
+      400
+    );
+  }
+  const historyChars = history.reduce((sum, turn) => sum + turn.content.length, 0);
+  if (system.length + input.length + historyChars > MAX_PROMPT_CHARS) {
     return text(`Prompt too large (max ${MAX_PROMPT_CHARS} characters).`, 413);
   }
 
@@ -86,6 +110,7 @@ export async function POST(req: Request) {
     apiKey,
     system,
     input,
+    history,
     maxTokens: clampedMaxTokens,
     signal: req.signal,
   });

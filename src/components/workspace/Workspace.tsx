@@ -24,7 +24,6 @@ const CollaborateDialog = dynamic(() => import("@/components/collaboration/Colla
 const PluginManager = dynamic(() => import("@/components/plugins/PluginManager"), { ssr: false });
 const ShortcutsDialog = dynamic(() => import("./ShortcutsDialog"), { ssr: false });
 
-const PRELOADED_KEY = "querypad:preloaded";
 const WELCOME_KEY = "querypad:welcome-dismissed";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -36,8 +35,9 @@ export default function Workspace() {
   const dbReady = useWorkspaceStore((s) => s.dbReady);
   const setDbReady = useWorkspaceStore((s) => s.setDbReady);
   const hydrated = useWorkspaceStore((s) => s._hydrated);
-  const restoreFromIndexedDB = useWorkspaceStore((s) => s.restoreFromIndexedDB);
-  const loadSampleData = useWorkspaceStore((s) => s.loadSampleData);
+  const init = useWorkspaceStore((s) => s.init);
+  const everHydrated = useRef(false);
+  if (hydrated) everHydrated.current = true;
   const tables = useWorkspaceStore((s) => s.tables);
   const viewMode = useWorkspaceStore((s) => s.viewMode);
 
@@ -47,12 +47,12 @@ export default function Workspace() {
 
   const isSharedPage = usePathname() === "/shared";
   const [dbError, setDbError] = useState<string | null>(null);
-  const [preloading, setPreloading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(
     () => typeof window !== "undefined" && localStorage.getItem(WELCOME_KEY) === "1"
   );
-  const preloadAttempted = useRef(false);
+  const initStarted = useRef(false);
+  const roomJoinAttempted = useRef(false);
   const dragDepth = useRef(0);
 
   const onlySampleTables = tables.length > 0 && tables.every((t) => SAMPLE_TABLE_NAMES.has(t.name));
@@ -63,28 +63,17 @@ export default function Workspace() {
       .catch((err) => setDbError(err instanceof Error ? err.message : String(err)));
   }, [setDbReady]);
 
+  // Open the active saved space (the shared page loads its own data instead).
   useEffect(() => {
-    if (dbReady && !hydrated) {
-      if (isSharedPage) useWorkspaceStore.setState({ _hydrated: true });
-      else void restoreFromIndexedDB();
-    }
-  }, [dbReady, hydrated, isSharedPage, restoreFromIndexedDB]);
-
-  // First visit: preload sample tables so there is something to explore immediately.
-  useEffect(() => {
-    if (!dbReady || !hydrated || isSharedPage || tables.length > 0 || preloadAttempted.current) return;
-    preloadAttempted.current = true;
-    if (localStorage.getItem(PRELOADED_KEY) === "1") return;
-    localStorage.setItem(PRELOADED_KEY, "1");
-    setPreloading(true);
-    loadSampleData()
-      .catch((err) => console.error("Failed to preload sample data:", err))
-      .finally(() => setPreloading(false));
-  }, [dbReady, hydrated, isSharedPage, tables.length, loadSampleData]);
+    if (!dbReady || isSharedPage || initStarted.current) return;
+    initStarted.current = true;
+    void init();
+  }, [dbReady, isSharedPage, init]);
 
   // Invite links (?room=<id>) join the room once the workspace is ready.
   useEffect(() => {
-    if (!hydrated || isSharedPage) return;
+    if (!hydrated || isSharedPage || roomJoinAttempted.current) return;
+    roomJoinAttempted.current = true;
     const room = new URLSearchParams(location.search).get("room");
     if (!room || !/^[A-Za-z0-9_-]{1,64}$/.test(room)) return;
     void import("@/lib/collaboration/sync").then(({ connectToRoom }) =>
@@ -178,8 +167,7 @@ export default function Workspace() {
     );
   }
   if (!dbReady) return <Splash message="Starting DuckDB" />;
-  if (!hydrated) return <Splash message="Restoring your workspace" />;
-  if (preloading) return <Splash message="Loading sample data" />;
+  if (!hydrated) return <Splash message={everHydrated.current ? "Opening space" : "Restoring your workspace"} />;
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">

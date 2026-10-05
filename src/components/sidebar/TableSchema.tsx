@@ -11,6 +11,8 @@ import { KindGlyph } from "@/components/ui/primitives";
 
 interface TableSchemaProps {
   table: TableInfo;
+  /** Views have no row count, profile, or file; removing one drops the view. */
+  isView?: boolean;
   keyColumns: Map<string, "key" | "ref">;
   profileActive: boolean;
   onOpenProfile: () => void;
@@ -20,9 +22,10 @@ function quoteIfNeeded(name: string): string {
   return /^[a-z_][a-z0-9_]*$/.test(name) ? name : `"${name.replaceAll('"', '""')}"`;
 }
 
-export default function TableSchema({ table, keyColumns, profileActive, onOpenProfile }: TableSchemaProps) {
+export default function TableSchema({ table, isView, keyColumns, profileActive, onOpenProfile }: TableSchemaProps) {
   const removeTable = useWorkspaceStore((s) => s.removeTable);
-  const [expanded, setExpanded] = useState(true);
+  const dropView = useWorkspaceStore((s) => s.dropView);
+  const [expanded, setExpanded] = useState(!isView);
 
   const insert = (text: string) => {
     if (!insertAtCursor(text)) toast("Open the SQL editor to insert names.", "info");
@@ -39,21 +42,30 @@ export default function TableSchema({ table, keyColumns, profileActive, onOpenPr
         >
           <Icon name="chevronRight" size={13} className={`text-faint transition-transform ${expanded ? "rotate-90" : ""}`} />
           <span className="truncate font-mono text-[13px] font-medium text-ink">{table.name}</span>
-          <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-faint">{table.rowCount.toLocaleString()}</span>
+          <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-faint">
+            {isView ? "view" : table.rowCount.toLocaleString()}
+          </span>
         </button>
         <div className="flex shrink-0 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/table:opacity-100">
           <button onClick={() => previewTable(table.name)} className="rounded p-1 text-muted hover:bg-sunken hover:text-ink" title="Preview rows in a new tab" aria-label={`Preview ${table.name}`}>
             <Icon name="play" size={13} />
           </button>
+          {!isView && (
+            <button
+              onClick={onOpenProfile}
+              className={`rounded p-1 hover:bg-sunken ${profileActive ? "text-accent" : "text-muted hover:text-ink"}`}
+              title="Profile columns"
+              aria-label={`Profile ${table.name}`}
+            >
+              <Icon name="profile" size={13} />
+            </button>
+          )}
           <button
-            onClick={onOpenProfile}
-            className={`rounded p-1 hover:bg-sunken ${profileActive ? "text-accent" : "text-muted hover:text-ink"}`}
-            title="Profile columns"
-            aria-label={`Profile ${table.name}`}
+            onClick={() => void (isView ? dropView(table.name) : removeTable(table.name))}
+            className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger"
+            title={isView ? "Drop view" : "Remove table"}
+            aria-label={`Remove ${table.name}`}
           >
-            <Icon name="profile" size={13} />
-          </button>
-          <button onClick={() => void removeTable(table.name)} className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger" title="Remove table" aria-label={`Remove ${table.name}`}>
             <Icon name="x" size={13} />
           </button>
         </div>

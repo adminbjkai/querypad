@@ -104,7 +104,7 @@ export function buildSummary(report: DiscoveryReport, skipped: string[]): string
     for (const rel of report.relationships) {
       const from = `${rel.from.table}.${rel.from.column}`;
       const to = `${rel.to.table}.${rel.to.column}`;
-      const overlap = `${Math.round(rel.signals.valueOverlap * 100)}%`;
+      const overlap = rel.evidence === "name" ? "n/a (empty)" : `${Math.round(rel.signals.valueOverlap * 100)}%`;
       lines.push(`| ${from} | ${to} | ${rel.confidence}% | ${rel.cardinality} | ${overlap} |`);
     }
     lines.push("");

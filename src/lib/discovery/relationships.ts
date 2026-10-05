@@ -28,6 +28,9 @@ export function relationshipKey(rel: Relationship): string {
 /** Minimum blended confidence for an edge to be reported. */
 const CONFIDENCE_FLOOR = 50;
 
+/** Ceiling for name-only edges (foreign table empty): always shown as "verify manually". */
+const NAME_ONLY_CEILING = 60;
+
 function toCount(value: unknown): number {
   if (typeof value === "bigint") return Number(value);
   if (typeof value === "number") return value;
@@ -117,6 +120,11 @@ export async function discoverRelationships(
   // 2. Run the decisive value-overlap query for each surviving candidate.
   const edges: Relationship[] = [];
   for (const candidate of candidates) {
+    if (candidate.foreignRowCount === 0) {
+      const edge = nameOnlyEdge(candidate);
+      if (edge) edges.push(edge);
+      continue;
+    }
     const overlap = await measureOverlap(candidate, runner);
     if (overlap < OVERLAP_FLOOR) continue;
 
@@ -150,6 +158,37 @@ export async function discoverRelationships(
   //    (disambiguates spurious overlaps against unrelated id ranges), then collapse
   //    mirrored one-to-one directions.
   return dedupeEdges(bestPerForeignColumn(edges));
+}
+
+/**
+ * An empty table (e.g. `CREATE TABLE … WHERE FALSE`) has no values to compare, so its
+ * columns can only be linked by an explicit name reference to an id-like key.
+ */
+function nameOnlyEdge(candidate: Candidate): Relationship | null {
+  if (candidate.nameScore < STRONG_NAME_SIMILARITY) return null;
+  if (!isIdLike(candidate.keyColumn.name, candidate.keyTable)) return null;
+  const signals = {
+    valueOverlap: 0,
+    nameSimilarity: candidate.nameScore,
+    typeMatch: typeMatchScore(
+      candidate.foreignColumn.type,
+      candidate.keyColumn.type,
+      candidate.foreignColumn.kind,
+      candidate.keyColumn.kind
+    ),
+    cardinalityShape: 1,
+  };
+  if (signals.typeMatch === 0) return null;
+  // Scale the non-value signals (max weight 0.45) into 0..NAME_ONLY_CEILING.
+  const partial = 0.25 * signals.nameSimilarity + 0.1 * signals.typeMatch + 0.1 * signals.cardinalityShape;
+  return {
+    from: { table: candidate.foreignTable, column: candidate.foreignColumn.name },
+    to: { table: candidate.keyTable, column: candidate.keyColumn.name },
+    confidence: Math.round((partial / 0.45) * NAME_ONLY_CEILING),
+    cardinality: "many-to-one",
+    signals,
+    evidence: "name",
+  };
 }
 
 /** Keep at most one edge per foreign column — the highest-confidence target. */

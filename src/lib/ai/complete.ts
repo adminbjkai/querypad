@@ -1,6 +1,12 @@
 import type { AiProvider, AiProviderConfig } from "./providers";
 import { getAiProviderConfig } from "./providers";
 
+/** One earlier conversation turn. */
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface CompleteOptions {
   provider: AiProvider;
   /**
@@ -10,8 +16,10 @@ export interface CompleteOptions {
   apiKey?: string;
   /** System prompt / instructions. */
   system: string;
-  /** User input (already-assembled prompt). */
+  /** User input (already-assembled prompt) for the current turn. */
   input: string;
+  /** Earlier conversation turns, oldest first (the current turn is `input`). */
+  history?: ChatTurn[];
   /** Max output tokens (default 1024). */
   maxTokens?: number;
   /** Cancels the in-flight HTTP request. */
@@ -131,6 +139,12 @@ function eventErrorMessage(event: Record<string, unknown>): string | null {
 
 type WireOptions = CompleteOptions & { apiKey: string };
 
+/** Earlier turns plus the current user input, as plain {role, content} messages. */
+function conversation(o: CompleteOptions): ChatTurn[] {
+  const history = (o.history ?? []).map(({ role, content }) => ({ role, content }));
+  return [...history, { role: "user", content: o.input }];
+}
+
 /** Anthropic Messages API (SSE). */
 async function* streamAnthropic(config: AiProviderConfig, o: WireOptions): AsyncGenerator<string> {
   const body = await post(
@@ -145,7 +159,7 @@ async function* streamAnthropic(config: AiProviderConfig, o: WireOptions): Async
       max_tokens: o.maxTokens ?? DEFAULT_MAX_TOKENS,
       stream: true,
       system: o.system,
-      messages: [{ role: "user", content: o.input }],
+      messages: conversation(o),
       ...config.extraBody,
     },
     o.signal
@@ -172,7 +186,7 @@ async function* streamOpenAiResponses(
     {
       model: config.model,
       instructions: o.system,
-      input: o.input,
+      input: o.history?.length ? conversation(o) : o.input,
       max_output_tokens: o.maxTokens ?? DEFAULT_MAX_TOKENS,
       reasoning: { effort: "low" },
       stream: true,
@@ -209,10 +223,7 @@ async function* streamChatCompletions(
       model: config.model,
       max_tokens: o.maxTokens ?? DEFAULT_MAX_TOKENS,
       stream: true,
-      messages: [
-        { role: "system", content: o.system },
-        { role: "user", content: o.input },
-      ],
+      messages: [{ role: "system", content: o.system }, ...conversation(o)],
       ...config.extraBody,
     },
     o.signal
@@ -238,6 +249,7 @@ async function* streamViaServer(o: CompleteOptions): AsyncGenerator<string> {
       provider: o.provider,
       system: o.system,
       input: o.input,
+      history: o.history?.length ? o.history : undefined,
       maxTokens: o.maxTokens ?? DEFAULT_MAX_TOKENS,
     }),
     signal: o.signal,

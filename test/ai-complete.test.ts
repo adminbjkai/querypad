@@ -320,3 +320,101 @@ test("route refuses cross-site and non-JSON requests", async () => {
     403
   );
 });
+
+// ---- Multi-turn history ------------------------------------------------------------------
+
+const HISTORY = [
+  { role: "user" as const, content: "u1" },
+  { role: "assistant" as const, content: "a1" },
+];
+
+const anthropicEvents = sse([{ type: "content_block_delta", delta: { type: "text_delta", text: "ok" } }], false);
+const responsesEvents = sse([{ type: "response.output_text.delta", delta: "ok" }]);
+
+async function bodiesFor(provider: "anthropic" | "openai" | "groq", events: string[]) {
+  const calls = mockFetch(() => new Response(streamOf(events)));
+  const base = { provider, apiKey: "k", system: "s", input: "now" };
+  await complete(base);
+  await complete({ ...base, history: [] });
+  await complete({ ...base, history: HISTORY });
+  return { none: calls[0].body, empty: calls[1].body, withHistory: calls[2].body };
+}
+
+test("anthropic: history precedes the current user turn; empty history is byte-identical", async () => {
+  const { none, empty, withHistory } = await bodiesFor("anthropic", anthropicEvents);
+  assert.deepEqual(none.messages, [{ role: "user", content: "now" }]);
+  assert.equal(JSON.stringify(empty), JSON.stringify(none));
+  assert.equal(withHistory.system, "s");
+  assert.deepEqual(withHistory.messages, [...HISTORY, { role: "user", content: "now" }]);
+});
+
+test("openai responses: history turns input into message items; empty keeps a plain string", async () => {
+  const { none, empty, withHistory } = await bodiesFor("openai", responsesEvents);
+  assert.equal(none.input, "now");
+  assert.equal(JSON.stringify(empty), JSON.stringify(none));
+  assert.equal(withHistory.instructions, "s");
+  assert.deepEqual(withHistory.input, [...HISTORY, { role: "user", content: "now" }]);
+});
+
+test("chat completions: [system, ...history, user]; empty history is byte-identical", async () => {
+  const { none, empty, withHistory } = await bodiesFor("groq", chatEvents);
+  assert.equal(JSON.stringify(empty), JSON.stringify(none));
+  assert.deepEqual(withHistory.messages, [{ role: "system", content: "s" }, ...HISTORY, { role: "user", content: "now" }]);
+});
+
+test("browser server-proxy path sends history in the JSON body", async () => {
+  const g = globalThis as { window?: unknown };
+  g.window = {};
+  try {
+    const calls = mockFetch(() => new Response(streamOf(["ok"])));
+    assert.equal(await complete({ provider: "xai", system: "s", input: "now", history: HISTORY }), "ok");
+    assert.equal(calls[0].url, "/api/complete");
+    assert.deepEqual(calls[0].body.history, HISTORY);
+    await complete({ provider: "xai", system: "s", input: "now" });
+    assert.ok(!("history" in calls[1].body));
+  } finally {
+    delete g.window;
+  }
+});
+
+test("POST /api/complete validates history and counts it toward the size cap", async () => {
+  await withEnv({ ...ALL_KEYS_UNSET, XAI_API_KEY: "x" }, async () => {
+    const calls = mockFetch(() => new Response(streamOf(chatEvents)));
+    const base = { provider: "xai", system: "s", input: "i" };
+    for (const history of [
+      "nope",
+      {},
+      [null],
+      [{ role: "system", content: "x" }],
+      [{ role: "user", content: 1 }],
+      [{ role: "user" }],
+      Array.from({ length: 41 }, () => ({ role: "user", content: "x" })),
+    ]) {
+      assert.equal((await POST(post({ ...base, history }))).status, 400, JSON.stringify(history).slice(0, 60));
+    }
+    // system + input = 2 chars; history pushes the total one past the 200k cap.
+    const big = [{ role: "user", content: "x".repeat(200_000 - 1) }];
+    assert.equal((await POST(post({ ...base, history: big }))).status, 413);
+    assert.equal(calls.length, 0);
+  });
+});
+
+test("POST /api/complete forwards valid history to the upstream request", async () => {
+  await withEnv({ ...ALL_KEYS_UNSET, XAI_API_KEY: "server-key" }, async () => {
+    const calls = mockFetch(() => new Response(streamOf(chatEvents)));
+    const history = [
+      { role: "user", content: "u1", extra: "dropped" },
+      { role: "assistant", content: "a1" },
+    ];
+    const res = await POST(post({ provider: "xai", system: "s", input: "i", history }));
+    assert.equal(res.status, 200);
+    assert.equal(await res.text(), "SELECT 1");
+    assert.deepEqual(calls[0].body.messages, [
+      { role: "system", content: "s" },
+      ...HISTORY,
+      { role: "user", content: "i" },
+    ]);
+    const forty = Array.from({ length: 40 }, () => ({ role: "user", content: "x" }));
+    assert.equal((await POST(post({ provider: "xai", system: "s", input: "i", history: forty }))).status, 200);
+  });
+});

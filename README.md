@@ -1,24 +1,20 @@
 # QueryPad
 
-> **Cursor for Data — a local-first AI workspace that understands your datasets, not just runs SQL on them.**
+> **A local-first data workspace that understands your datasets, not just runs SQL on them.**
 
-QueryPad points an AI at a folder of CSV/Parquet/JSON files, profiles them,
-discovers how they connect, and helps you analyze them with DuckDB — locally,
-with no server-side data processing, no account, and no install.
+Drop in CSV, Parquet, JSON or Excel files. QueryPad loads them into DuckDB right in your
+browser, profiles every column, works out which tables join to which, and lets you query
+them in SQL or plain English — with no server-side data processing and no account.
 
 The execution layer is solved (DuckDB does it well). The unsolved problem is that
 **people don't understand their data**: which tables exist, what each field means,
-how datasets connect, which join is correct. QueryPad is built to answer those
-questions first, then generate and run the SQL.
+how datasets connect, which join is correct. QueryPad answers those questions first,
+then helps you write and run the SQL.
 
-<p align="center">
-  <a href="https://querypad.io"><strong>Try the web app</strong></a> ·
-  <a href="https://github.com/vericontext/querypad">Upstream project</a>
-</p>
-
-<p align="center">
-  <video src="https://github.com/user-attachments/assets/5fa069e0-aaa2-4cc1-9735-df93b840f44d" width="100%" />
-</p>
+This repository ([adminbjkai/querypad](https://github.com/adminbjkai/querypad)) is the
+**web edition**: the browser workspace plus the `querypad` CLI. It started as a fork of
+[vericontext/querypad](https://github.com/vericontext/querypad), which has since become a
+terminal-first project; its history is kept on the `upstream-main` branch.
 
 ## Two surfaces, one understanding engine
 
@@ -92,7 +88,10 @@ distinct count, ranges, top values). It then identifies primary-key candidates
 confidence score blends four signals — value overlap (dominant), name similarity,
 type match, and cardinality shape — and competition disambiguation keeps a foreign
 column pointed at its single strongest target, so overlapping integer id ranges
-don't produce false positives.
+don't produce false positives. A table with no rows yet (for example
+`CREATE TABLE … AS SELECT … WHERE FALSE`) has no values to compare; its columns are linked
+only when their name clearly references an id key (`emp_id` → `employees.emp_id`), and the
+join is marked "name match" with a confidence capped at 60% so you verify it.
 
 ## Product layers
 
@@ -152,9 +151,8 @@ Caveats (0)
 
 ## Web app: interactive analysis
 
-The browser app is the same open-source code running client-side. DuckDB runs in your
-tab (WebAssembly); your data stays on your machine unless you explicitly share or
-collaborate.
+DuckDB runs in your tab (WebAssembly). Your data stays in your browser unless you
+explicitly share a link or join a live room.
 
 - **Drop anything** — CSV, TSV, Parquet, JSON/NDJSON, Excel; several at once, then JOIN them
 - **Understands before you ask** — every column is profiled (types, empties, distinct counts,
@@ -163,18 +161,29 @@ collaborate.
   per-signal "why"; Accept / Reject / Edit them, or insert the `JOIN … ON …` clause directly
 - **SQL with a real editor** — Monaco with table/column autocomplete; Ctrl/⌘+Enter runs the
   query, or only the selected part
-- **AI that knows your joins** — Ctrl/⌘+K: describe the result, get streamed SQL built on the
-  inferred relationships; "Fix with AI" on any failed query
+- **Tables you create with SQL are first-class** — `CREATE TABLE`, `CREATE VIEW`, `INSERT`,
+  `ALTER`, `DROP`… the sidebar follows DuckDB's catalog, and new or changed tables are saved
+  (as Parquet snapshots) so they survive reloads, travel in share links and sync to rooms
+- **An AI assistant that keeps the thread** — Ctrl/⌘+K opens a conversation per tab. Each
+  request carries your schemas with column hints, the inferred joins (accepted ones first,
+  rejected ones excluded), your recent runs and their errors, and the earlier turns, so
+  follow-ups like "now join everything" build on what came before. Every answer is compiled
+  against your tables before you see it, and fixed automatically once if it doesn't compile
+- **Keys you can query** — loaded files have no declared PRIMARY/FOREIGN KEY constraints, so
+  QueryPad publishes what it inferred as `querypad.relationships` and `querypad.keys`:
+  `SELECT * FROM querypad.keys` lists every key column and what it references
+- **Spaces** — keep several saved workspaces in the browser: save the current one as a new
+  space, start a fresh space from the sample template or empty, switch, rename, delete
 - **Results you can work with** — sort by any column, filter rows, click a cell to copy,
   one-click charts, export to CSV / JSON / Markdown / HTML / Excel / Parquet / clipboard
-- **Command palette** — Ctrl/⌘+P to run anything, jump to a tab, preview or profile a table,
-  or reopen a past query
-- **History** — your last 100 runs with row counts, timings and failures
+- **Command palette** — Ctrl/⌘+P to run anything, open a space, jump to a tab, preview or
+  profile a table, or reopen a past query
+- **History** — each space keeps its last 100 runs with row counts, timings and failures
 - **Pipelines** — chain named SQL steps that build on each other, shown as a dependency graph
 - **Live collaboration** — start a room, send the invite link, and edit the same tabs with
-  shared cursors; small files sync to everyone
+  shared cursors; files under 5 MB sync to everyone
 - **Share links** — compress data + query into one URL (no server involved); opening a link
-  never overwrites your own workspace
+  never touches your spaces ("Save as a new space" keeps a copy)
 - **Agent context** — copy schema, profiles, the current SQL and its results for Claude Code,
   Codex or any agent
 - **Light and dark themes**, keyboard-first (press `?` for shortcuts), works on phones
@@ -182,11 +191,17 @@ collaborate.
 <details>
 <summary><strong>More web app details</strong></summary>
 
-- **Persistence** — tables, tabs, pipelines and verdicts survive a refresh (IndexedDB)
+- **Persistence** — each space's tables, views, tabs, AI conversations, history, pipelines and
+  join verdicts are saved in IndexedDB. Workspaces saved by earlier versions are migrated
+  into a space called "My workspace" on first load. The first visit creates a "Playground"
+  space with two sample tables.
 - **Remote files** — load Parquet/CSV/JSON from any URL that allows cross-origin requests
 - **Plugin system** — ES-module plugins can add visualizations, exporters and file loaders
 - **Guardrails** — 100 MB per file, with a warning above 50 MB; results show the first
   10,000 rows (Parquet export writes them all)
+- **What the AI receives** — table and view schemas, column hints (value ranges and the
+  values of low-cardinality columns), joins, the last 12 runs, the editor's SQL, and up to 8
+  earlier turns. Whole rows are never sent; column hints can include a few example values.
 
 </details>
 
@@ -213,19 +228,73 @@ collaborate.
 
 In the browser you can paste your own key for any provider (kept in `localStorage`, sent
 straight to the provider). If the server has a key in its environment, the assistant uses it
-through `/api/complete` instead — the key never reaches the browser. The CLI reads the same
-environment variables.
+through `/api/complete` instead — the key never reaches the browser, and the endpoint only
+accepts same-origin JSON requests. The CLI reads the same environment variables.
+
+## Quick start
+
+**Web app (development):**
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. Your first visit creates a "Playground" space with sample data.
+
+For live collaboration in development, also run the relay and point the app at it:
+
+```bash
+npm run collab                                   # relay on ws://localhost:1999/collab
+NEXT_PUBLIC_COLLAB_URL=ws://localhost:1999/collab npm run dev
+```
+
+**CLI:**
+
+```bash
+npm install
+npm run querypad -- inspect ./fixtures/data            # profile + discover relationships
+OPENROUTER_API_KEY=... npm run querypad -- ask "payments by plan" ./fixtures/data --provider openrouter
+```
+
+## Self-hosting (Docker)
+
+```bash
+docker compose up -d --build
+```
+
+This starts two containers from one image:
+
+| Service | Listens on | Purpose |
+|---------|-----------|---------|
+| `querypad` | `127.0.0.1:8059` | Next.js standalone server (the web app and `/api/complete`) |
+| `querypad-collab` | `127.0.0.1:8061` | Yjs relay for live collaboration (`collab/server.mjs`) |
+
+Put a reverse proxy in front that sends `/collab/` (with WebSocket upgrade headers) to the
+relay and everything else to the app. Optional server-side AI keys go in `.env.server`
+(for example `OPENROUTER_API_KEY=…`); they are read at runtime and never sent to browsers.
+
+## Tech stack
+
+| Area | Technology |
+|------|-----------|
+| Query engine | DuckDB-Wasm (web), `@duckdb/node-api` (CLI) |
+| Framework | Next.js 16, React 19, TypeScript, Tailwind CSS v4 |
+| Editor | Monaco |
+| State | Zustand |
+| Persistence | IndexedDB (idb-keyval), one record set per space |
+| Charts | Recharts |
+| AI | Groq, Ollama Cloud, OpenRouter, xAI, Anthropic, OpenAI — your key or the server's |
+| Collaboration | Yjs + y-websocket, self-hosted relay |
 
 ## Releases
 
-QueryPad is a local-first tool, not a hosted SaaS. Version numbers mark GitHub
-release milestones and public product updates. See [CHANGELOG.md](CHANGELOG.md)
-for release notes.
+Version numbers mark release milestones of this repository. See
+[CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Contributing
 
-Contributions are welcome! Feel free to open issues and pull requests. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
@@ -233,4 +302,5 @@ MIT
 
 ---
 
-Built by [@vericontext](https://x.com/vericontext)
+Originally created by [@vericontext](https://x.com/vericontext); the web edition is maintained
+at [adminbjkai/querypad](https://github.com/adminbjkai/querypad).

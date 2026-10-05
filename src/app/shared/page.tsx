@@ -20,7 +20,7 @@ function SharedLoader() {
     let cancelled = false;
     (async () => {
       try {
-        // Viewing a link must never overwrite the workspace saved in this browser.
+        // Viewing a link must never write to the spaces saved in this browser.
         useWorkspaceStore.setState({ persistEnabled: false });
         await getDB();
         const shared = decodeShare(encoded);

@@ -144,7 +144,7 @@ test.describe("QueryPad", () => {
   test("clears the workspace and reloads sample data", async ({ page }) => {
     await openWithSamples(page);
     await page.getByRole("button", { name: "More" }).click();
-    await page.getByRole("menuitem", { name: "Clear workspace" }).click();
+    await page.getByRole("menuitem", { name: "Clear this space" }).click();
     await page.getByRole("button", { name: "More" }).click();
     await page.getByRole("menuitem", { name: "Click to confirm clear" }).click();
     await expect(page.getByText("Drop in your data files.")).toBeVisible({ timeout: 10_000 });
@@ -166,7 +166,7 @@ test.describe("QueryPad", () => {
     await viewer.getByRole("button", { name: "Remove employees" }).click({ force: true });
     // Even clearing everything in the shared view must leave the owner's data alone.
     await viewer.getByRole("button", { name: "More" }).click();
-    await viewer.getByRole("menuitem", { name: "Clear workspace" }).click();
+    await viewer.getByRole("menuitem", { name: "Clear this space" }).click();
     await viewer.getByRole("button", { name: "More" }).click();
     await viewer.getByRole("menuitem", { name: "Click to confirm clear" }).click();
     await expect(viewer.getByText("Drop in your data files.")).toBeVisible({ timeout: 10_000 });
@@ -190,11 +190,12 @@ test.describe("QueryPad", () => {
 
     const ctxB = await browser.newContext();
     const b = await ctxB.newPage();
-    await b.addInitScript(() => localStorage.setItem("querypad:preloaded", "1"));
     await b.goto(invite);
-    // B starts empty; the room shares A's tables and query tabs.
-    await expect(b.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(b.getByRole("button", { name: "Leave" })).toBeVisible();
+    await expect(b.getByRole("button", { name: "Leave" })).toBeVisible({ timeout: 30_000 });
+    // Files added in the room reach everyone in it.
+    await a.getByRole("button", { name: "Add data" }).click();
+    await a.getByLabel("Choose data files").setInputFiles(["fixtures/data/users.csv"]);
+    await expect(b.getByRole("button", { name: "users", exact: true })).toBeVisible({ timeout: 15_000 });
 
     await a.locator(".monaco-editor").click();
     await a.keyboard.press(`${MOD}+End`);

@@ -64,6 +64,7 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
         </span>
         <span className="font-medium tabular-nums text-ink">{rel.confidence}%</span>
         <span>{rel.cardinality}</span>
+        {rel.evidence === "name" && <span title="This table has no rows yet, so only column names and types were compared">name match</span>}
         {edited && <span className="text-accent">edited</span>}
         {verdict === "accepted" && <span className="ml-auto text-ok">accepted</span>}
       </div>

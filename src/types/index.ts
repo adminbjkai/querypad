@@ -69,6 +69,23 @@ export interface ChartConfig {
   yColumns: string[];
 }
 
+/** One exchange with the AI assistant, kept per tab so follow-ups have context. */
+export interface AiTurn {
+  id: string;
+  prompt: string;
+  /** The SQL the assistant produced (after any automatic repair). */
+  sql: string;
+  at: number;
+  /** Result of compiling the SQL against the current tables before showing it. */
+  check: "ok" | "failed" | "skipped";
+  checkError?: string;
+}
+
+/** A view created with SQL; restored from its CREATE statement. */
+export interface ViewInfo extends TableInfo {
+  sql: string;
+}
+
 export interface EditorTab {
   id: string;
   title: string;
@@ -78,6 +95,8 @@ export interface EditorTab {
   isExecuting: boolean;
   /** The SQL that produced `result`/`error` (may be a selection, or since-edited text). */
   lastRunSql?: string;
+  /** Conversation with the AI assistant in this tab. */
+  aiThread?: AiTurn[];
   createdAt: number;
 }
 

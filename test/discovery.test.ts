@@ -156,3 +156,26 @@ test("a coincidentally unique price column is not a join target", async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("an empty table (CREATE TABLE … WHERE FALSE) is linked by name, flagged as name-only", async () => {
+  const db = await createNodeDb();
+  try {
+    await db.runner("CREATE TABLE employees AS SELECT i AS emp_id, 'n' || i AS name FROM range(1, 13) t(i)");
+    await db.runner(
+      "CREATE TABLE employee_bio AS SELECT emp_id, CAST(NULL AS VARCHAR) AS birth_country, CAST(NULL AS DATE) AS birth_date FROM employees WHERE FALSE"
+    );
+    const profiles = [];
+    for (const name of ["employees", "employee_bio"]) {
+      const columns = (await db.runner(`DESCRIBE ${name}`)).map((r) => ({ name: String(r.column_name), type: String(r.column_type) }));
+      const rowCount = Number((await db.runner(`SELECT COUNT(*) AS n FROM ${name}`))[0].n);
+      profiles.push(await profileTable({ name, columns, rowCount }, db.runner, 1));
+    }
+    const rels = await discoverRelationships(profiles, db.runner);
+    assert.equal(rels.length, 1, JSON.stringify(rels));
+    assert.equal(relationshipKey(rels[0]), "employee_bio.emp_id->employees.emp_id");
+    assert.equal(rels[0].evidence, "name");
+    assert.ok(rels[0].confidence >= 50 && rels[0].confidence <= 60, `confidence ${rels[0].confidence}`);
+  } finally {
+    db.close();
+  }
+});

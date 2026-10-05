@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useWorkspaceStore, saveSharedAsSpace } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { shareWorkspace, copyAgentContext } from "@/lib/workspace-actions";
@@ -11,6 +11,7 @@ import RoomBar from "@/components/collaboration/RoomBar";
 import { Icon, GithubMark } from "@/components/ui/icons";
 import { Kbd, Menu, MOD, btn } from "@/components/ui/primitives";
 import { BrandMark } from "./BrandMark";
+import SpaceSwitcher from "./SpaceSwitcher";
 
 const REPO_URL = "https://github.com/adminbjkai/querypad";
 
@@ -21,7 +22,6 @@ export default function Header() {
   const setViewMode = useWorkspaceStore((s) => s.setViewMode);
   const hasTables = useWorkspaceStore((s) => s.tables.length > 0);
   const persistEnabled = useWorkspaceStore((s) => s.persistEnabled);
-  const adoptAsWorkspace = useWorkspaceStore((s) => s.adoptAsWorkspace);
   const clearWorkspace = useWorkspaceStore((s) => s.clearWorkspace);
   const roomId = useCollaborationStore((s) => s.roomId);
   const theme = useUiStore((s) => s.theme);
@@ -36,12 +36,12 @@ export default function Header() {
   const askClear = () => {
     if (!confirmClear) {
       setConfirmClear(true);
-      toast("Open the menu and choose Clear again within 5 seconds to remove all tables and tabs.", "warning");
+      toast("Open the menu and choose Clear again within 5 seconds to remove this space's tables, tabs and history.", "warning");
       setTimeout(() => setConfirmClear(false), 5000);
       return;
     }
     setConfirmClear(false);
-    void clearWorkspace().then(() => toast("Workspace cleared."));
+    void clearWorkspace().then(() => toast("Space cleared."));
   };
 
   return (
@@ -60,6 +60,12 @@ export default function Header() {
         <BrandMark />
         <span className="hidden text-[15px] font-semibold tracking-tight sm:inline">QueryPad</span>
       </Link>
+      {!isSharedPage && (
+        <>
+          <span className="text-line-strong max-sm:hidden" aria-hidden="true">/</span>
+          <SpaceSwitcher />
+        </>
+      )}
 
       {hasTables && (
         <div className="ml-1 flex rounded-lg bg-sunken p-0.5" role="tablist" aria-label="Mode">
@@ -84,15 +90,15 @@ export default function Header() {
           <span className="rounded-md bg-join-soft px-2 py-1 text-[12px] font-medium text-join">Shared link</span>
           <button
             onClick={() =>
-              void adoptAsWorkspace().then(() => {
-                toast("Saved — this is now your workspace.", "success");
+              void saveSharedAsSpace("Shared link").then(() => {
+                toast("Saved as a new space called Shared link. Your other spaces are untouched.", "success");
                 router.replace("/");
               })
             }
             className={btn.ghost}
-            title="Replaces the workspace saved in this browser"
+            title="Keeps a copy as a new space in this browser"
           >
-            Make this my workspace
+            Save as a new space
           </button>
         </div>
       )}
@@ -148,7 +154,7 @@ export default function Header() {
           { label: "Source on GitHub", icon: "file", onSelect: () => window.open(REPO_URL, "_blank", "noopener") },
           "divider",
           {
-            label: confirmClear ? "Click to confirm clear" : "Clear workspace",
+            label: confirmClear ? "Click to confirm clear" : "Clear this space",
             icon: "trash",
             danger: true,
             disabled: !hasTables,

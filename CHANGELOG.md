@@ -7,6 +7,64 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.8.0 — Spaces, SQL-created tables, and an AI that keeps the thread
+
+### Spaces
+
+- Keep several saved workspaces in the browser. The space menu (next to the logo, or the
+  command palette) can save the current space as a new one, start a fresh space from the
+  sample-data template or empty, switch, rename and delete
+- Each space has its own tables, views, tabs, AI conversations, run history, pipelines,
+  plugins and join verdicts; switching leaves a live room (rooms belong to one space)
+- Saved data from earlier versions is migrated into a space called "My workspace"; first-time
+  visitors get a "Playground" space with the two sample tables
+- Shared links: "Save as a new space" keeps a copy without touching your other spaces
+
+### Tables you create with SQL
+
+- The sidebar now follows DuckDB's catalog: after `CREATE TABLE`, `CREATE VIEW`, `INSERT`,
+  `UPDATE`, `DELETE`, `ALTER` or `DROP`, new and changed tables appear (with row counts and
+  columns) and dropped ones disappear
+- New or changed tables are saved as Parquet snapshots, so they survive reloads, travel in
+  share links, and sync to collaborators like any loaded file
+- Views are listed (marked "view"), recreated from their SQL when a space opens, and can be
+  dropped from the sidebar
+- Joins are re-discovered for SQL-created tables like for loaded files. Empty tables
+  (`CREATE TABLE … WHERE FALSE`) are linked by an explicit id-name reference
+  (`employee_bio.emp_id` → `employees.emp_id`), marked "name match" and capped at 60%
+  confidence; the CLI's `relationships.md` shows their overlap as "n/a (empty)"
+- `WITH … INSERT/UPDATE/DELETE` statements are recognised as writes, so their changes are saved
+- Snapshots keep exact types where Parquet can't: 128-bit integers (e.g. `SUM` results) are
+  stored as `DECIMAL(38,0)` and `UNION` columns as text
+- Saved views whose table can't be reopened (or was dropped) are kept, not silently deleted
+
+### AI assistant
+
+- Conversations: each tab keeps its thread (saved with the space). Follow-ups are sent with
+  the earlier requests and the SQL produced, so "now select everything, properly linked"
+  builds on the previous answer. "New conversation" starts over
+- Richer context on every request: column hints from profiles (value ranges, the values of
+  low-cardinality columns, uniqueness), views, empty tables, joins ordered by verdict
+  (rejected joins are named as off-limits, name-only joins are labelled), the last 12 runs
+  with their errors, and the editor's SQL
+- Compile check: each answer is tried against your real tables on a separate connection in
+  a transaction that is always rolled back — queries are only planned (EXPLAIN), changes are
+  undone. Batches with transaction control (`BEGIN`/`COMMIT`…), file, extension or setting
+  statements aren't test-run and are labelled "not checked". If it doesn't compile, the
+  model gets DuckDB's error and one chance to fix it; the result is labelled "compiles" or
+  shows the error
+- Inferred keys are queryable: `querypad.relationships` and `querypad.keys` are kept up to
+  date in DuckDB, and the assistant uses them for questions about keys and relationships
+  (files have no declared constraints, so `information_schema` can't answer those)
+- Multi-turn requests work with every provider (Anthropic, OpenAI, and the OpenAI-compatible
+  ones) and through the server-key proxy, which validates the history it forwards
+
+### Fixes and cleanup
+
+- README: restored the Quick start, self-hosting and tech-stack sections lost in v0.7.0;
+  repository links now point to adminbjkai/querypad
+- Removed the unused `generateSql` helper (the CLI keeps its prompt helpers)
+
 ## v0.7.0 — Workspace redesign
 
 ### Redesigned web app

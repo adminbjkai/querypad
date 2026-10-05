@@ -25,6 +25,19 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   y-protocols and lib0 (plus lib0's dependency isomorphic.js); the Docker image copies
   just those modules for it — update the Dockerfile if the relay gains an import.
 
+## Browser data model
+
+- **Spaces** (`src/lib/persistence/indexeddb.ts`): `querypad-spaces` index, one
+  `querypad-space:<id>` state record and `querypad-space-file:<id>:<table>` byte records per
+  space. Older layouts are migrated in `migrateLegacy`. Store writes always target the space
+  that was active when the change happened; switching flushes the debounced save first.
+- **Catalog sync**: after any non-read-only statement, `syncCatalog` reconciles the store with
+  `duckdb_tables()`/`duckdb_views()` (main schema only); new/changed tables are snapshotted to
+  Parquet file entries. The `querypad` schema (relationships/keys) is internal and never listed.
+- **AI**: the web assistant uses `WORKSPACE_SQL_SYSTEM_PROMPT` + `buildWorkspaceContext`
+  (`src/lib/ai/workspace-context.ts`) and checks answers with `checkSql`
+  (`src/lib/duckdb/validate.ts`). The CLI keeps its own prompt in `generate-sql.ts`.
+
 ## UI conventions
 
 - Colors come from semantic tokens in `src/app/globals.css` (light + `[data-theme="dark"]`);
