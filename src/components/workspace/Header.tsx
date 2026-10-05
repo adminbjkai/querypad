@@ -1,0 +1,164 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useUiStore } from "@/stores/ui-store";
+import { useCollaborationStore } from "@/stores/collaboration-store";
+import { shareWorkspace, copyAgentContext } from "@/lib/workspace-actions";
+import RoomBar from "@/components/collaboration/RoomBar";
+import { Icon, GithubMark } from "@/components/ui/icons";
+import { Kbd, Menu, MOD, btn } from "@/components/ui/primitives";
+import { BrandMark } from "./BrandMark";
+
+const REPO_URL = "https://github.com/adminbjkai/querypad";
+
+export default function Header() {
+  const router = useRouter();
+  const isSharedPage = usePathname() === "/shared";
+  const viewMode = useWorkspaceStore((s) => s.viewMode);
+  const setViewMode = useWorkspaceStore((s) => s.setViewMode);
+  const hasTables = useWorkspaceStore((s) => s.tables.length > 0);
+  const persistEnabled = useWorkspaceStore((s) => s.persistEnabled);
+  const adoptAsWorkspace = useWorkspaceStore((s) => s.adoptAsWorkspace);
+  const clearWorkspace = useWorkspaceStore((s) => s.clearWorkspace);
+  const roomId = useCollaborationStore((s) => s.roomId);
+  const theme = useUiStore((s) => s.theme);
+  const toggleTheme = useUiStore((s) => s.toggleTheme);
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
+  const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
+  const setDialog = useUiStore((s) => s.setDialog);
+  const toast = useUiStore((s) => s.toast);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const askClear = () => {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      toast("Open the menu and choose Clear again within 5 seconds to remove all tables and tabs.", "warning");
+      setTimeout(() => setConfirmClear(false), 5000);
+      return;
+    }
+    setConfirmClear(false);
+    void clearWorkspace().then(() => toast("Workspace cleared."));
+  };
+
+  return (
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-2 sm:px-3">
+      {hasTables && (
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className={btn.icon}
+          aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          title={`Toggle sidebar (${MOD}+B)`}
+        >
+          <Icon name="sidebar" />
+        </button>
+      )}
+      <Link href="/" className="flex items-center gap-2 rounded-md px-1 py-1" aria-label="QueryPad home">
+        <BrandMark />
+        <span className="hidden text-[15px] font-semibold tracking-tight sm:inline">QueryPad</span>
+      </Link>
+
+      {hasTables && (
+        <div className="ml-1 flex rounded-lg bg-sunken p-0.5" role="tablist" aria-label="Mode">
+          {(["sql", "pipeline"] as const).map((mode) => (
+            <button
+              key={mode}
+              role="tab"
+              aria-selected={viewMode === mode}
+              onClick={() => setViewMode(mode)}
+              className={`h-7 rounded-md px-2.5 text-[13px] transition-colors ${
+                viewMode === mode ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink"
+              }`}
+            >
+              {mode === "sql" ? "SQL" : "Pipeline"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isSharedPage && !persistEnabled && (
+        <div className="ml-2 hidden items-center gap-2 md:flex">
+          <span className="rounded-md bg-join-soft px-2 py-1 text-[12px] font-medium text-join">Shared link</span>
+          <button
+            onClick={() =>
+              void adoptAsWorkspace().then(() => {
+                toast("Saved — this is now your workspace.", "success");
+                router.replace("/");
+              })
+            }
+            className={btn.ghost}
+            title="Replaces the workspace saved in this browser"
+          >
+            Make this my workspace
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-1 justify-center px-2">
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className="flex h-8 w-full max-w-sm items-center gap-2 rounded-lg border border-line bg-raised px-2.5 text-[13px] text-faint transition-colors hover:border-line-strong hover:text-muted"
+          aria-label="Open command palette"
+        >
+          <Icon name="search" size={14} />
+          <span className="hidden flex-1 text-left sm:inline">Jump to a table, run a command…</span>
+          <span className="hidden gap-0.5 sm:flex">
+            <Kbd>{MOD}</Kbd>
+            <Kbd>P</Kbd>
+          </span>
+        </button>
+      </div>
+
+      {roomId ? (
+        <RoomBar />
+      ) : (
+        <button onClick={() => setDialog("collaborate")} className={`${btn.ghost} max-md:hidden`}>
+          <Icon name="users" size={15} />
+          Collaborate
+        </button>
+      )}
+      <button
+        onClick={toggleTheme}
+        className={`${btn.icon} max-sm:hidden`}
+        aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        title="Toggle theme"
+      >
+        <Icon name={theme === "dark" ? "sun" : "moon"} />
+      </button>
+      <button onClick={() => void shareWorkspace()} className={btn.secondary} disabled={!hasTables}>
+        <Icon name="link" size={15} />
+        <span className="hidden sm:inline">Share</span>
+      </button>
+      <Menu
+        label="More"
+        trigger={({ toggle, open }) => (
+          <button onClick={toggle} className={btn.icon} aria-label="More" aria-expanded={open}>
+            <Icon name="more" size={18} />
+          </button>
+        )}
+        items={[
+          { label: "Copy context for an agent", icon: "copy", onSelect: () => void copyAgentContext() },
+          { label: "Collaborate", icon: "users", onSelect: () => setDialog("collaborate") },
+          { label: "Plugins", icon: "puzzle", onSelect: () => setDialog("plugins") },
+          { label: theme === "dark" ? "Light theme" : "Dark theme", icon: theme === "dark" ? "sun" : "moon", onSelect: toggleTheme },
+          { label: "Keyboard shortcuts", icon: "keyboard", hint: "?", onSelect: () => setDialog("shortcuts") },
+          { label: "Source on GitHub", icon: "file", onSelect: () => window.open(REPO_URL, "_blank", "noopener") },
+          "divider",
+          {
+            label: confirmClear ? "Click to confirm clear" : "Clear workspace",
+            icon: "trash",
+            danger: true,
+            disabled: !hasTables,
+            onSelect: askClear,
+          },
+        ]}
+      />
+      <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className={`${btn.icon} max-lg:hidden`} aria-label="GitHub">
+        <GithubMark />
+      </a>
+    </header>
+  );
+}

@@ -21,12 +21,14 @@ interface CollaborationState {
   roomId: string | null;
   connected: boolean;
   connecting: boolean;
+  /** Last connection error (e.g. relay unreachable), cleared on the next attempt. */
+  error: string | null;
 
   // Peers
   localPeer: PeerInfo;
   remotePeers: PeerInfo[];
 
-  // Y.js doc & provider (stored as any to avoid importing yjs at module level)
+  // Y.Doc & y-websocket WebsocketProvider (stored as any to avoid importing yjs at module level)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ydoc: any | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,6 +38,7 @@ interface CollaborationState {
   setRoom: (roomId: string | null) => void;
   setConnected: (connected: boolean) => void;
   setConnecting: (connecting: boolean) => void;
+  setError: (error: string | null) => void;
   setRemotePeers: (peers: PeerInfo[]) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setYDoc: (doc: any) => void;
@@ -48,6 +51,7 @@ export const useCollaborationStore = create<CollaborationState>((set) => ({
   roomId: null,
   connected: false,
   connecting: false,
+  error: null,
   localPeer: {
     id: crypto.randomUUID(),
     name: randomName(),
@@ -60,6 +64,7 @@ export const useCollaborationStore = create<CollaborationState>((set) => ({
   setRoom: (roomId) => set({ roomId }),
   setConnected: (connected) => set({ connected }),
   setConnecting: (connecting) => set({ connecting }),
+  setError: (error) => set({ error }),
   setRemotePeers: (remotePeers) => set({ remotePeers }),
   setYDoc: (ydoc) => set({ ydoc }),
   setProvider: (provider) => set({ provider }),
@@ -68,6 +73,7 @@ export const useCollaborationStore = create<CollaborationState>((set) => ({
       roomId: null,
       connected: false,
       connecting: false,
+      error: null,
       remotePeers: [],
       ydoc: null,
       provider: null,

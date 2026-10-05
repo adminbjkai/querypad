@@ -4,17 +4,8 @@ import { Component, type ReactNode } from "react";
 import type { QueryResult } from "@/types";
 import type { PluginExtension } from "@/types/plugin";
 
-interface ErrorBoundaryProps {
-  children: ReactNode;
-  pluginName: string;
-}
-
-interface ErrorBoundaryState {
-  error: Error | null;
-}
-
-class PluginErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { error: null };
+class PluginErrorBoundary extends Component<{ children: ReactNode; pluginName: string }, { error: Error | null }> {
+  state = { error: null as Error | null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
@@ -24,13 +15,9 @@ class PluginErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
     if (this.state.error) {
       return (
         <div className="p-4">
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm font-medium text-red-800">
-              Plugin &quot;{this.props.pluginName}&quot; crashed
-            </p>
-            <pre className="mt-1 text-xs text-red-600 whitespace-pre-wrap font-mono">
-              {this.state.error.message}
-            </pre>
+          <div className="rounded-lg border border-danger/40 bg-danger-soft/50 p-3">
+            <p className="text-[13px] font-semibold text-danger">The {this.props.pluginName} plugin crashed</p>
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-[12px] text-ink">{this.state.error.message}</pre>
           </div>
         </div>
       );
@@ -39,21 +26,21 @@ class PluginErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-interface PluginVisualizationProps {
-  extension: Extract<PluginExtension, { type: "visualization" }>;
-  pluginName: string;
-  result: QueryResult;
-}
-
 export default function PluginVisualization({
   extension,
   pluginName,
   result,
-}: PluginVisualizationProps) {
-  const VisComponent = extension.component;
+}: {
+  extension: Extract<PluginExtension, { type: "visualization" }>;
+  pluginName: string;
+  result: QueryResult;
+}) {
+  const View = extension.component;
   return (
     <PluginErrorBoundary pluginName={pluginName}>
-      <VisComponent result={result} />
+      <div className="h-full overflow-auto">
+        <View result={result} />
+      </div>
     </PluginErrorBoundary>
   );
 }

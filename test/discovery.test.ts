@@ -124,3 +124,35 @@ test("inspect fixtures yields exactly the two true relationships", async () => {
     db.close();
   }
 });
+
+// ---- non-id join targets (ported from upstream 22078d0) ----------------------------
+
+test("a coincidentally unique price column is not a join target", async () => {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const dir = await mkdtemp(path.join(tmpdir(), "querypad-fk-target-"));
+  // A small price list has unique prices, so it passes the unique + non-null key test.
+  await writeFile(path.join(dir, "price_list.csv"), "id,sku,list_amt\n1,A,10.00\n2,B,20.00\n3,C,30.00\n4,D,40.00\n");
+  // line_amt holds the same values by coincidence. It is a measure, not a key.
+  await writeFile(
+    path.join(dir, "sales.csv"),
+    "id,sku,line_amt\n1,A,10.00\n2,B,20.00\n3,A,10.00\n4,C,30.00\n5,D,40.00\n6,B,20.00\n"
+  );
+
+  const db = await createNodeDb();
+  try {
+    const { tables } = await loadFolder(dir, db.runner);
+    const profiles = [];
+    for (const table of tables) profiles.push(await profileTable(table, db.runner, 1));
+    const keys = (await discoverRelationships(profiles, db.runner)).map(relationshipKey);
+
+    assert.ok(keys.includes("sales.sku->price_list.sku"), `expected the natural-key join, got ${keys}`);
+    assert.ok(
+      !keys.includes("sales.line_amt->price_list.list_amt"),
+      `value overlap alone must not make a price a join target, got ${keys}`
+    );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});

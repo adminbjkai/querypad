@@ -1,8 +1,8 @@
 import { loadBufferAsTable } from "./files";
+import { SUPPORTED_EXTENSIONS } from "../constants";
 import { fileExtension, sanitizeTableName } from "../utils";
 import type { TableInfo } from "@/types";
 
-const SUPPORTED_EXTENSIONS = ["parquet", "csv", "tsv", "json", "jsonl", "ndjson", "xlsx"];
 
 export async function loadRemoteFileAsTable(url: string): Promise<{
   table: TableInfo;
@@ -36,7 +36,7 @@ export async function loadRemoteFileAsTable(url: string): Promise<{
 
   const buffer = new Uint8Array(await response.arrayBuffer());
   const tableName = sanitizeTableName(fileName);
-  const table = await loadBufferAsTable(tableName, fileName, buffer);
+  const table = await loadBufferAsTable(tableName, fileName, new Uint8Array(buffer));
 
-  return { table, fileName, data: new Uint8Array(buffer) };
+  return { table, fileName, data: buffer };
 }

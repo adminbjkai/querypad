@@ -1,105 +1,61 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getDB } from "@/lib/duckdb/instance";
 import { decodeShare } from "@/lib/sharing/decode";
 import { loadBufferAsTable } from "@/lib/duckdb/files";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import Splash from "@/components/workspace/Splash";
 
-const Workspace = dynamic(() => import("@/components/workspace/Workspace"), {
-  ssr: false,
-});
+const Workspace = dynamic(() => import("@/components/workspace/Workspace"), { ssr: false });
 
 function SharedLoader() {
-  const searchParams = useSearchParams();
-  const encoded = searchParams.get("s");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const addTable = useWorkspaceStore((s) => s.addTable);
-  const updateTab = useWorkspaceStore((s) => s.updateTab);
-  const activeTabId = useWorkspaceStore((s) => s.activeTabId);
-  const setDbReady = useWorkspaceStore((s) => s.setDbReady);
+  const encoded = useSearchParams().get("s");
+  const [state, setState] = useState<"loading" | "ready" | string>(encoded ? "loading" : "missing");
 
   useEffect(() => {
     if (!encoded) return;
-
+    let cancelled = false;
     (async () => {
       try {
+        // Viewing a link must never overwrite the workspace saved in this browser.
+        useWorkspaceStore.setState({ persistEnabled: false });
         await getDB();
-        setDbReady(true);
-
         const shared = decodeShare(encoded);
-
+        const ws = useWorkspaceStore.getState();
         for (const entry of shared.tables) {
-          const bufferCopy = new Uint8Array(entry.data);
-          const table = await loadBufferAsTable(entry.name, entry.fileName, entry.data);
-          addTable(table, entry.fileName, bufferCopy);
+          const table = await loadBufferAsTable(entry.name, entry.fileName, new Uint8Array(entry.data));
+          ws.addTable(table, entry.fileName, entry.data);
         }
-
-        if (shared.query) updateTab(activeTabId, { query: shared.query });
-        setLoading(false);
+        if (shared.query) ws.updateTab(ws.activeTabId, { query: shared.query });
+        useWorkspaceStore.setState({ dbReady: true, _hydrated: true });
+        if (!cancelled) setState("ready");
       } catch (err) {
         console.error("Failed to load shared data:", err);
-        setError(err instanceof Error ? err.message : "Failed to decode shared data");
-        setLoading(false);
+        if (!cancelled) setState(err instanceof Error ? err.message : "The link could not be decoded.");
       }
     })();
-  }, [encoded, addTable, updateTab, activeTabId, setDbReady]);
+    return () => {
+      cancelled = true;
+    };
+  }, [encoded]);
 
-  if (!encoded) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <div className="text-center">
-          <p className="text-red-600 font-medium">Failed to load shared data</p>
-          <p className="text-sm text-gray-500 mt-1">No shared data found in URL</p>
-          <Link href="/" className="text-sm text-blue-600 hover:underline mt-4 inline-block">
-            Go to QueryPad
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <div className="text-center">
-          <p className="text-red-600 font-medium">Failed to load shared data</p>
-          <p className="text-sm text-gray-500 mt-1">{error}</p>
-          <Link href="/" className="text-sm text-blue-600 hover:underline mt-4 inline-block">
-            Go to QueryPad
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Loading shared workspace...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return <Workspace />;
+  if (state === "ready") return <Workspace />;
+  if (state === "loading") return <Splash message="Opening shared workspace" />;
+  return (
+    <Splash
+      tone="error"
+      message="This share link could not be opened."
+      detail={state === "missing" ? "The link has no data in it. Ask for a fresh link." : `${state}. The link may be truncated — copy it again in full.`}
+    />
+  );
 }
 
 export default function SharedPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center h-screen bg-white">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      }
-    >
+    <Suspense fallback={<Splash message="Opening shared workspace" />}>
       <SharedLoader />
     </Suspense>
   );

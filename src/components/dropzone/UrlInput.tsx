@@ -1,59 +1,59 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { loadRemoteFileAsTable } from "@/lib/duckdb/remote";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { toast } from "@/stores/ui-store";
+import { Spinner, btn, input } from "@/components/ui/primitives";
 
-export default function UrlInput() {
+/** Load a file from a public URL (the server must allow cross-origin requests). */
+export default function UrlInput({ onAdded }: { onAdded?: () => void }) {
   const [url, setUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const addTable = useWorkspaceStore((s) => s.addTable);
 
-  const handleLoad = useCallback(async () => {
+  const load = async () => {
     const trimmed = url.trim();
     if (!trimmed) return;
-
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     try {
       const { table, fileName, data } = await loadRemoteFileAsTable(trimmed);
       addTable(table, fileName, data);
+      toast(`Added table ${table.name}.`, "success");
       setUrl("");
+      onAdded?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [url, addTable]);
+  };
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
+    <div>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void load();
+        }}
+      >
         <input
-          type="text"
+          type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleLoad()}
           placeholder="https://example.com/data.parquet"
-          className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={isLoading}
+          className={input}
+          disabled={loading}
+          aria-label="File URL"
         />
-        <button
-          onClick={handleLoad}
-          disabled={isLoading || !url.trim()}
-          className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-        >
-          {isLoading ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            "Load"
-          )}
+        <button type="submit" disabled={loading || !url.trim()} className={btn.secondary}>
+          {loading ? <Spinner /> : "Load"}
         </button>
-      </div>
-      {error && (
-        <p className="text-xs text-red-600">{error}</p>
-      )}
+      </form>
+      {error && <p className="mt-1.5 text-[12px] text-danger">{error}</p>}
     </div>
   );
 }

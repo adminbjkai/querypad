@@ -41,6 +41,16 @@ export function singularize(word: string): string {
   return lower;
 }
 
+/**
+ * True for id-named columns (surrogate keys). Deliberately name-based, not
+ * uniqueness-based: a unique, non-null column like `amount` is a value, not a key.
+ * (Ported from upstream vericontext/querypad 22078d0.)
+ */
+export function isIdLike(name: string, table: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === "id" || lower.endsWith("_id") || lower === `${singularize(table)}_id`;
+}
+
 function jaccard(a: string[], b: string[]): number {
   if (a.length === 0 || b.length === 0) return 0;
   const setA = new Set(a);

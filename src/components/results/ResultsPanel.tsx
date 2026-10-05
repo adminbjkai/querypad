@@ -3,79 +3,71 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useUiStore } from "@/stores/ui-store";
+import { MAX_RESULT_ROWS } from "@/lib/duckdb/queries";
+import { detectChartConfig, type ChartConfig } from "@/lib/charts/detect";
+import type { QueryResult } from "@/types";
 import DataTable from "./DataTable";
-import ExportButton from "./ExportButton";
-import ChartConfigPanel from "./ChartConfig";
-import { detectChartConfig } from "@/lib/charts/detect";
-import type { ChartConfig } from "@/lib/charts/detect";
+import ExportMenu from "./ExportMenu";
 import PluginVisualization from "@/components/plugins/PluginVisualization";
+import { Icon } from "@/components/ui/icons";
+import { Kbd, MOD, btn } from "@/components/ui/primitives";
 
 const ChartPanel = dynamic(() => import("./ChartPanel"), { ssr: false });
 
-type Tab = "table" | "chart" | string; // string for plugin viz tabs
+type View = "table" | "chart" | string;
 
 export default function ResultsPanel() {
-  const activeTab = useWorkspaceStore((s) =>
-    s.tabs.find((t) => t.id === s.activeTabId)
-  );
+  const tab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const plugins = useWorkspaceStore((s) => s.plugins);
-  const result = activeTab?.result ?? null;
-  const error = activeTab?.error ?? null;
-  const isExecuting = activeTab?.isExecuting ?? false;
+  const openAi = useUiStore((s) => s.openAi);
+  const result = tab?.result ?? null;
+  const error = tab?.error ?? null;
+  const isExecuting = tab?.isExecuting ?? false;
 
-  const [selectedView, setSelectedView] = useState<{
-    result: typeof result;
-    tab: Tab;
-  }>({ result: null, tab: "table" });
-  const [chartConfigEdit, setChartConfigEdit] = useState<{
-    result: typeof result;
-    config: ChartConfig;
-  } | null>(null);
+  // View/filter/chart choices reset whenever a new result arrives.
+  const [viewState, setViewState] = useState<{ result: QueryResult | null; view: View; filter: string; chart: ChartConfig | null }>({
+    result: null,
+    view: "table",
+    filter: "",
+    chart: null,
+  });
+  const current = viewState.result === result ? viewState : { result, view: "table", filter: "", chart: null };
+  const patch = (next: Partial<typeof viewState>) => setViewState({ ...current, ...next, result });
 
-  const detectedChartConfig = useMemo(
-    () => (result ? detectChartConfig(result) : null),
-    [result]
-  );
-  const chartConfig =
-    chartConfigEdit?.result === result
-      ? chartConfigEdit.config
-      : detectedChartConfig;
-  const viewTab = selectedView.result === result ? selectedView.tab : "table";
-  const setViewTab = (tab: Tab) => setSelectedView({ result, tab });
-  const setChartConfig = (config: ChartConfig) =>
-    setChartConfigEdit({ result, config });
+  const detected = useMemo(() => (result ? detectChartConfig(result) : null), [result]);
+  const chartConfig = current.chart ?? detected;
 
-  // Collect plugin visualizations
-  const pluginVizTabs = plugins.flatMap((p) =>
+  const pluginViews = plugins.flatMap((p) =>
     p.manifest.extensions
       .filter((ext) => ext.type === "visualization")
       .map((ext) => ({
         key: `plugin-${p.manifest.id}`,
         label: p.manifest.name,
-        pluginName: p.manifest.name,
         extension: ext as Extract<typeof ext, { type: "visualization" }>,
       }))
   );
+  const activePlugin = pluginViews.find((v) => v.key === current.view);
 
-  if (isExecuting) {
-    return (
-      <div className="flex items-center justify-center h-full bg-white">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          Executing query...
-        </div>
-      </div>
-    );
-  }
+  const scanLine = isExecuting && (
+    <div className="absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden bg-accent-soft">
+      <span className="qp-scan absolute inset-y-0 left-0 w-1/3 bg-accent" />
+    </div>
+  );
 
-  if (error) {
+  if (error && !isExecuting) {
     return (
-      <div className="p-4 h-full bg-white">
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm font-medium text-red-800">Query Error</p>
-          <pre className="mt-1 text-xs text-red-600 whitespace-pre-wrap font-mono">
-            {error.message}
-          </pre>
+      <div className="h-full overflow-auto bg-surface p-4">
+        <div className="max-w-3xl rounded-lg border border-danger/40 bg-danger-soft/50 p-3">
+          <p className="flex items-center gap-2 text-[13px] font-semibold text-danger">
+            <Icon name="alert" size={15} />
+            The query failed
+          </p>
+          <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-ink">{error.message}</pre>
+          <button onClick={() => openAi("Fix the current query so it runs.")} className={`${btn.secondary} mt-3`}>
+            <Icon name="wand" size={14} />
+            Fix with AI
+          </button>
         </div>
       </div>
     );
@@ -83,90 +75,78 @@ export default function ResultsPanel() {
 
   if (!result) {
     return (
-      <div className="flex items-center justify-center h-full bg-white text-sm text-gray-400">
-        Run a query to see results
+      <div className="relative flex h-full items-center justify-center bg-surface p-6 text-center">
+        {scanLine}
+        {isExecuting ? (
+          <p className="text-[13px] text-muted">Running…</p>
+        ) : (
+          <div className="text-[13px] leading-6 text-muted">
+            <p>Results appear here.</p>
+            <p>
+              Run with <Kbd>{MOD}</Kbd> <Kbd>Enter</Kbd>, ask AI with <Kbd>{MOD}</Kbd> <Kbd>K</Kbd>, or press <Kbd>?</Kbd> for shortcuts.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
 
-  const activePluginViz = pluginVizTabs.find((t) => t.key === viewTab);
+  const truncated = result.rowCount > result.rows.length;
+  const viewButton = (view: View, label: string, disabled = false) => (
+    <button
+      key={view}
+      role="tab"
+      aria-selected={current.view === view}
+      disabled={disabled}
+      onClick={() => patch({ view })}
+      className={`h-7 rounded-md px-2.5 text-[13px] transition-colors disabled:opacity-35 ${
+        current.view === view ? "bg-sunken font-medium text-ink" : "text-muted hover:text-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-200 text-xs text-gray-500">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setViewTab("table")}
-            className={`px-2 py-0.5 rounded transition-colors ${
-              viewTab === "table"
-                ? "bg-gray-200 text-gray-800 font-medium"
-                : "hover:bg-gray-100"
-            }`}
-          >
-            Table
-          </button>
-          <button
-            onClick={() => chartConfig && setViewTab("chart")}
-            disabled={!chartConfig}
-            className={`px-2 py-0.5 rounded transition-colors ${
-              viewTab === "chart"
-                ? "bg-gray-200 text-gray-800 font-medium"
-                : chartConfig
-                ? "hover:bg-gray-100"
-                : "opacity-40 cursor-not-allowed"
-            }`}
-          >
-            Chart
-          </button>
-          {pluginVizTabs.map((pvt) => (
-            <button
-              key={pvt.key}
-              onClick={() => setViewTab(pvt.key)}
-              className={`px-2 py-0.5 rounded transition-colors ${
-                viewTab === pvt.key
-                  ? "bg-purple-100 text-purple-800 font-medium"
-                  : "hover:bg-gray-100"
-              }`}
-            >
-              {pvt.label}
-            </button>
-          ))}
-          <span className="text-gray-300">|</span>
-          <span>{result.rowCount.toLocaleString()} rows</span>
-          <span className="text-gray-300">|</span>
-          <span>{result.executionTimeMs}ms</span>
-          {result.rowCount > 10000 && (
-            <>
-              <span className="text-gray-300">|</span>
-              <span className="text-amber-600">
-                Showing first 10,000 rows
-              </span>
-            </>
+    <div className="relative flex h-full flex-col bg-surface">
+      {scanLine}
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-2 py-1">
+        <div className="flex items-center gap-0.5" role="tablist" aria-label="Result view">
+          {viewButton("table", "Table")}
+          {viewButton("chart", "Chart", !chartConfig)}
+          {pluginViews.map((v) => viewButton(v.key, v.label))}
+        </div>
+        <p className="flex items-center gap-3 text-[12px] tabular-nums text-muted">
+          <span>
+            <span className="font-medium text-ink">{result.rowCount.toLocaleString()}</span> {result.rowCount === 1 ? "row" : "rows"}
+          </span>
+          <span>{result.executionTimeMs} ms</span>
+          {truncated && <span className="text-warn">showing first {MAX_RESULT_ROWS.toLocaleString()}</span>}
+        </p>
+        <div className="ml-auto flex items-center gap-1.5">
+          {current.view === "table" && (
+            <label className="relative">
+              <Icon name="filter" size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
+              <input
+                value={current.filter}
+                onChange={(e) => patch({ filter: e.target.value })}
+                placeholder="Filter rows"
+                className="h-7 w-36 rounded-md border border-line bg-surface pl-7 pr-2 text-[12px] text-ink outline-none placeholder:text-faint focus:w-52 focus:border-accent transition-[width]"
+                aria-label="Filter rows"
+              />
+            </label>
           )}
+          <ExportMenu result={result} query={tab?.lastRunSql ?? tab?.query ?? ""} />
         </div>
-        <ExportButton />
       </div>
-      {viewTab === "chart" && chartConfig && (
-        <div className="border-b border-gray-200">
-          <ChartConfigPanel
-            config={chartConfig}
-            columns={result.columns}
-            onConfigChange={setChartConfig}
-          />
-        </div>
-      )}
-      <div className="flex-1 min-h-0">
-        {viewTab === "table" ? (
-          <DataTable result={result} />
-        ) : viewTab === "chart" && chartConfig ? (
-          <ChartPanel result={result} config={chartConfig} />
-        ) : activePluginViz ? (
-          <PluginVisualization
-            extension={activePluginViz.extension}
-            pluginName={activePluginViz.pluginName}
-            result={result}
-          />
-        ) : null}
+      <div className={`min-h-0 flex-1 transition-opacity ${isExecuting ? "opacity-50" : ""}`}>
+        {current.view === "chart" && chartConfig ? (
+          <ChartPanel result={result} config={chartConfig} onConfigChange={(chart) => patch({ chart })} />
+        ) : activePlugin ? (
+          <PluginVisualization extension={activePlugin.extension} pluginName={activePlugin.label} result={result} />
+        ) : (
+          <DataTable result={result} filter={current.filter} />
+        )}
       </div>
     </div>
   );

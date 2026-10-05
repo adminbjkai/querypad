@@ -1,0 +1,25 @@
+services:
+  querypad:
+    build: .
+    image: querypad:latest
+    container_name: querypad
+    restart: unless-stopped
+    env_file:
+      - .env.server
+    ports:
+      - "127.0.0.1:8059:3000"
+    mem_limit: 384m
+
+  # Real-time collaboration relay, proxied by nginx at /collab/.
+  collab:
+    image: querypad:latest
+    container_name: querypad-collab
+    restart: unless-stopped
+    command: ["node", "collab/server.mjs"]
+    environment:
+      - PORT=1999
+    ports:
+      - "127.0.0.1:8061:1999"
+    mem_limit: 192m
+    depends_on:
+      - querypad

@@ -5,12 +5,14 @@ export const SQL_SYSTEM_PROMPT = `You are a DuckDB SQL expert. Generate only val
 
 interface GenerateSqlOptions {
   provider: AiProvider;
-  apiKey: string;
+  /** Omit in the browser to use the server-managed key via /api/complete. */
+  apiKey?: string;
   prompt: string;
   schema: string;
+  signal?: AbortSignal;
 }
 
-/** Build the user-message body shared by both providers. */
+/** Build the user-message body shared by all providers. */
 export function buildSqlInput(schema: string, prompt: string): string {
   return `Table schema:\n${schema || "No tables loaded."}\n\nRequest: ${prompt}`;
 }
@@ -20,11 +22,13 @@ export async function* generateSql({
   apiKey,
   prompt,
   schema,
+  signal,
 }: GenerateSqlOptions): AsyncGenerator<string> {
   yield* streamComplete({
     provider,
     apiKey,
     system: SQL_SYSTEM_PROMPT,
     input: buildSqlInput(schema, prompt),
+    signal,
   });
 }

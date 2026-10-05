@@ -1,4 +1,5 @@
 #!/usr/bin/env -S npx tsx
+import { AI_PROVIDER_OPTIONS, DEFAULT_AI_PROVIDER } from "../lib/ai/providers";
 import { runAsk } from "./ask";
 import { runExplain } from "./explain";
 import { runInspect } from "./inspect";
@@ -16,10 +17,14 @@ Usage:
   querypad help                    Show this help
 
 Options for ask:
-  --provider <anthropic|openai>    AI provider (default: anthropic, or QUERYPAD_AI_PROVIDER)
+  --provider <name>                AI provider (default: QUERYPAD_AI_PROVIDER, else ${DEFAULT_AI_PROVIDER})
   --show-sql                       Print the generated SQL without executing
 
-Environment: ANTHROPIC_API_KEY or OPENAI_API_KEY for the chosen provider.
+AI providers (the API key is read from the listed environment variable):
+${AI_PROVIDER_OPTIONS.map(
+  (p) => `  ${p.id.padEnd(12)}${p.envKey.padEnd(21)}${p.label} — ${p.modelLabel} (${p.model})`
+).join("\n")}
+
 Supported file types: .parquet, .csv, .tsv, .json, .jsonl, .ndjson
 `;
 

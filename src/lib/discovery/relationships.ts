@@ -5,6 +5,7 @@ import {
   NAME_SIMILARITY_FLOOR,
   OVERLAP_FLOOR,
   STRONG_NAME_SIMILARITY,
+  isIdLike,
   cardinalityShapeScore,
   confidence,
   isTypeCompatible,
@@ -90,6 +91,14 @@ export async function discoverRelationships(
             isKeyCandidate(foreignColumn, foreignProfile.rowCount) &&
             nameScore < STRONG_NAME_SIMILARITY
           ) {
+            continue;
+          }
+
+          // Uniqueness alone does not make a column a key: a small price list has
+          // unique prices, so any money column that happens to match them would be
+          // "explained" as a foreign key into it. A non-id target is only credible
+          // when the foreign column names it outright (sku -> sku, region_cd -> region_cd).
+          if (!isIdLike(keyColumn.name, keyProfile.tableName) && nameScore < STRONG_NAME_SIMILARITY) {
             continue;
           }
           candidates.push({

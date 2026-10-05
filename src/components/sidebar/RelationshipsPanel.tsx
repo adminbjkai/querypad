@@ -2,18 +2,29 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { toast } from "@/stores/ui-store";
 import { relationshipKey } from "@/lib/discovery/relationships";
 import { buildExplanation } from "@/lib/discovery/explain";
+import { quoteIdent } from "@/lib/duckdb/sql-utils";
+import { insertAtCursor } from "@/lib/editor-bridge";
 import type { TableInfo } from "@/types";
 import type { Relationship, RelationshipVerdict } from "@/types/discovery";
+import { Icon } from "@/components/ui/icons";
+import { Spinner, btn } from "@/components/ui/primitives";
 
-function confidenceClasses(confidence: number): string {
-  if (confidence >= 85) return "text-green-700 bg-green-50";
-  if (confidence >= 60) return "text-amber-700 bg-amber-50";
-  return "text-gray-600 bg-gray-100";
+function columnsOf(tables: TableInfo[], table: string): string[] {
+  return tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? [];
 }
 
-interface RelationshipCardProps {
+const select =
+  "min-w-0 flex-1 rounded-md border border-line bg-surface px-1.5 py-1 font-mono text-[12px] text-ink outline-none focus:border-accent";
+
+function joinClause(rel: Relationship): string {
+  const to = quoteIdent(rel.to.table);
+  return `JOIN ${to} ON ${quoteIdent(rel.from.table)}.${quoteIdent(rel.from.column)} = ${to}.${quoteIdent(rel.to.column)}`;
+}
+
+interface CardProps {
   rel: Relationship;
   tables: TableInfo[];
   tableNames: string[];
@@ -23,19 +34,7 @@ interface RelationshipCardProps {
   onEdit: (next: Relationship) => void;
 }
 
-function columnsOf(tables: TableInfo[], table: string): string[] {
-  return tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? [];
-}
-
-function RelationshipCard({
-  rel,
-  tables,
-  tableNames,
-  verdict,
-  edited,
-  onVerdict,
-  onEdit,
-}: RelationshipCardProps) {
+function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict, onEdit }: CardProps) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [fromColumn, setFromColumn] = useState(rel.from.column);
@@ -43,112 +42,74 @@ function RelationshipCard({
   const [toColumn, setToColumn] = useState(rel.to.column);
 
   const reasons = useMemo(
-    () => buildExplanation([rel], tableNames).relationships[0]?.reasons ?? [],
-    [rel, tableNames]
+    () => (expanded ? buildExplanation([rel], tableNames).relationships[0]?.reasons ?? [] : []),
+    [expanded, rel, tableNames]
   );
 
-  const from = `${rel.from.table}.${rel.from.column}`;
-  const to = `${rel.to.table}.${rel.to.column}`;
-
-  const startEdit = () => {
-    setFromColumn(rel.from.column);
-    setToTable(rel.to.table);
-    setToColumn(rel.to.column);
-    setEditing(true);
-  };
-
-  const saveEdit = () => {
-    onEdit({
-      from: { table: rel.from.table, column: fromColumn },
-      to: { table: toTable, column: toColumn },
-      confidence: 100,
-      cardinality: rel.cardinality,
-      signals: rel.signals,
-    });
-    setEditing(false);
-  };
-
-  const ring =
-    verdict === "accepted"
-      ? "border-green-300 bg-green-50/40"
-      : verdict === "rejected"
-        ? "border-gray-200 bg-gray-50 opacity-60"
-        : "border-gray-200";
+  const tone =
+    verdict === "accepted" ? "border-ok/50 bg-ok-soft/40" : verdict === "rejected" ? "border-line opacity-55" : "border-line";
 
   return (
-    <div className={`mx-2 my-1.5 rounded-lg border px-3 py-2 ${ring}`}>
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <p
-            className={`font-mono text-xs text-gray-800 break-all ${
-              verdict === "rejected" ? "line-through" : ""
-            }`}
-          >
-            {from} ↳ {to}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className={`rounded px-1.5 py-0.5 font-medium ${confidenceClasses(rel.confidence)}`}>
-              {rel.confidence}%
-            </span>
-            <span className="text-gray-400">{rel.cardinality}</span>
-            {edited && <span className="text-blue-500">edited</span>}
-          </div>
-        </div>
+    <li className={`rounded-lg border bg-surface px-2.5 py-2 ${tone}`}>
+      <p className={`font-mono text-[12px] leading-[18px] text-ink [overflow-wrap:anywhere] ${verdict === "rejected" ? "line-through" : ""}`}>
+        <span className="block">{rel.from.table}.{rel.from.column}</span>
+        <span className="block">
+          <span className="pr-1 text-join">↳</span>
+          {rel.to.table}.{rel.to.column}
+        </span>
+      </p>
+      <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
+        <span className="relative h-1 w-14 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
+          <span className="absolute inset-y-0 left-0 rounded-full bg-join" style={{ width: `${rel.confidence}%` }} />
+        </span>
+        <span className="font-medium tabular-nums text-ink">{rel.confidence}%</span>
+        <span>{rel.cardinality}</span>
+        {edited && <span className="text-accent">edited</span>}
+        {verdict === "accepted" && <span className="ml-auto text-ok">accepted</span>}
       </div>
 
       {editing ? (
         <div className="mt-2 space-y-1.5">
-          <div className="flex items-center gap-1 text-[11px] text-gray-500">
-            <span className="font-mono text-gray-700">{rel.from.table}.</span>
-            <select
-              value={fromColumn}
-              onChange={(e) => setFromColumn(e.target.value)}
-              className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-1 py-0.5 font-mono text-gray-800"
-              aria-label="Foreign column"
-            >
+          <div className="flex items-center gap-1 text-[12px]">
+            <span className="font-mono text-muted">{rel.from.table}.</span>
+            <select value={fromColumn} onChange={(e) => setFromColumn(e.target.value)} className={select} aria-label="Foreign column">
               {columnsOf(tables, rel.from.table).map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c}>{c}</option>
               ))}
             </select>
-            <span className="text-gray-400">↳</span>
           </div>
-          <div className="flex items-center gap-1 text-[11px]">
+          <div className="flex items-center gap-1 text-[12px]">
+            <span className="text-join">↳</span>
             <select
               value={toTable}
               onChange={(e) => {
                 setToTable(e.target.value);
                 setToColumn(columnsOf(tables, e.target.value)[0] ?? "");
               }}
-              className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-1 py-0.5 font-mono text-gray-800"
+              className={select}
               aria-label="Referenced table"
             >
               {tableNames.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t}>{t}</option>
               ))}
             </select>
-            <span className="text-gray-400">.</span>
-            <select
-              value={toColumn}
-              onChange={(e) => setToColumn(e.target.value)}
-              className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-1 py-0.5 font-mono text-gray-800"
-              aria-label="Referenced column"
-            >
+            <select value={toColumn} onChange={(e) => setToColumn(e.target.value)} className={select} aria-label="Referenced column">
               {columnsOf(tables, toTable).map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c}>{c}</option>
               ))}
             </select>
           </div>
           <div className="flex gap-1.5 pt-0.5">
             <button
-              onClick={saveEdit}
-              className="rounded bg-blue-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-blue-700 transition-colors"
+              onClick={() => {
+                onEdit({ ...rel, from: { table: rel.from.table, column: fromColumn }, to: { table: toTable, column: toColumn }, confidence: 100 });
+                setEditing(false);
+              }}
+              className={`${btn.primary} h-7`}
             >
-              Save
+              Save join
             </button>
-            <button
-              onClick={() => setEditing(false)}
-              className="rounded px-2 py-0.5 text-[11px] text-gray-500 hover:bg-gray-100 transition-colors"
-            >
+            <button onClick={() => setEditing(false)} className={btn.ghost}>
               Cancel
             </button>
           </div>
@@ -156,63 +117,62 @@ function RelationshipCard({
       ) : (
         <>
           {expanded && reasons.length > 0 && (
-            <ul className="mt-1.5 space-y-0.5 text-[11px] text-gray-600">
+            <ul className="mt-2 space-y-1 border-l-2 border-join/40 pl-2 text-[12px] leading-[17px] text-muted">
               {reasons.map((reason, i) => (
-                <li key={i}>• {reason}</li>
+                <li key={i}>{reason}</li>
               ))}
             </ul>
           )}
-          <div className="mt-2 flex items-center gap-1.5">
+          <div className="mt-2 flex flex-wrap items-center gap-0.5">
             <button
               onClick={() => onVerdict(verdict === "accepted" ? null : "accepted")}
-              className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                verdict === "accepted"
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "text-green-700 hover:bg-green-50"
-              }`}
+              className={`h-6 rounded px-2 text-[12px] font-medium ${verdict === "accepted" ? "bg-ok text-surface" : "text-ok hover:bg-ok-soft"}`}
             >
               Accept
             </button>
             <button
               onClick={() => onVerdict(verdict === "rejected" ? null : "rejected")}
-              className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                verdict === "rejected"
-                  ? "bg-gray-600 text-white hover:bg-gray-700"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
+              className={`h-6 rounded px-2 text-[12px] font-medium ${verdict === "rejected" ? "bg-muted text-surface" : "text-muted hover:bg-sunken"}`}
             >
               Reject
             </button>
             <button
-              onClick={startEdit}
-              className="rounded px-2 py-0.5 text-[11px] text-gray-500 hover:bg-gray-100 transition-colors"
+              onClick={() => {
+                setFromColumn(rel.from.column);
+                setToTable(rel.to.table);
+                setToColumn(rel.to.column);
+                setEditing(true);
+              }}
+              className="h-6 rounded px-2 text-[12px] text-muted hover:bg-sunken hover:text-ink"
             >
               Edit
             </button>
             <button
-              onClick={() => setExpanded((v) => !v)}
-              className="ml-auto rounded px-2 py-0.5 text-[11px] text-gray-400 hover:bg-gray-100 transition-colors"
+              onClick={() => {
+                if (!insertAtCursor(`${joinClause(rel)}\n`)) toast("Open the SQL editor to insert the join.", "info");
+              }}
+              className="h-6 rounded px-2 text-[12px] text-muted hover:bg-sunken hover:text-ink"
+              title={joinClause(rel)}
             >
+              Insert JOIN
+            </button>
+            <button onClick={() => setExpanded((v) => !v)} className="ml-auto h-6 rounded px-2 text-[12px] text-muted hover:bg-sunken hover:text-ink">
               {expanded ? "Hide" : "Why?"}
             </button>
           </div>
         </>
       )}
-    </div>
+    </li>
   );
 }
 
-interface RelationshipsPanelProps {
-  onClose: () => void;
-}
-
-export default function RelationshipsPanel({ onClose }: RelationshipsPanelProps) {
+export default function RelationshipsPanel() {
   const discovery = useWorkspaceStore((s) => s.discovery);
   const tables = useWorkspaceStore((s) => s.tables);
   const verdicts = useWorkspaceStore((s) => s.relationshipVerdicts);
   const overrides = useWorkspaceStore((s) => s.relationshipOverrides);
   const discoverRelationships = useWorkspaceStore((s) => s.discoverRelationships);
-  const setRelationshipVerdict = useWorkspaceStore((s) => s.setRelationshipVerdict);
+  const setVerdict = useWorkspaceStore((s) => s.setRelationshipVerdict);
   const editRelationship = useWorkspaceStore((s) => s.editRelationship);
 
   useEffect(() => {
@@ -220,89 +180,73 @@ export default function RelationshipsPanel({ onClose }: RelationshipsPanelProps)
   }, [discovery.status, discoverRelationships]);
 
   const tableNames = useMemo(() => tables.map((t) => t.name), [tables]);
-  const overrideKeys = useMemo(
-    () => new Set(overrides.map((rel) => relationshipKey(rel))),
-    [overrides]
+  const overrideKeys = useMemo(() => new Set(overrides.map(relationshipKey)), [overrides]);
+  const sorted = useMemo(
+    () => [...discovery.relationships].sort((a, b) => b.confidence - a.confidence),
+    [discovery.relationships]
   );
 
   return (
-    <aside className="w-80 max-w-[42vw] shrink-0 border-r border-gray-200 bg-white flex flex-col h-full">
-      <div className="px-3 py-2 border-b border-gray-200 flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-xs font-semibold text-gray-800">Relationships</h2>
-          <p className="text-[11px] text-gray-400">
-            {discovery.status === "ready"
-              ? `${discovery.relationships.length} inferred — verify below`
-              : "Inferred joins across your tables"}
-          </p>
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-start gap-2 px-3 pb-2 pt-2.5">
+        <h2 className="sr-only">Relationships</h2>
+        <p className="flex-1 text-[12px] leading-[17px] text-muted">
+          {discovery.status === "ready"
+            ? sorted.length > 0
+              ? `${sorted.length} inferred from your data. Accept the right ones — AI uses them for joins.`
+              : "No joins found yet."
+            : "Finding joins by comparing key values across tables…"}
+        </p>
         <button
-          onClick={() => discoverRelationships()}
+          onClick={() => void discoverRelationships()}
           disabled={discovery.status === "loading"}
-          className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-40 rounded transition-colors"
-          title="Re-discover relationships"
+          className={btn.icon}
+          title="Discover again"
           aria-label="Re-discover relationships"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 14A7 7 0 0018 17.5M18.5 10A7 7 0 006 6.5" />
-          </svg>
-        </button>
-        <button
-          onClick={onClose}
-          className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
-          title="Close relationships"
-          aria-label="Close relationships"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <Icon name="refresh" size={14} />
         </button>
       </div>
-
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {discovery.status === "loading" && (
-          <div className="flex items-center gap-2 px-3 py-4 text-xs text-gray-500">
-            <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            Discovering relationships...
-          </div>
+          <p className="flex items-center gap-2 px-1 py-3 text-[13px] text-muted">
+            <Spinner className="size-3.5 text-join" /> Comparing columns…
+          </p>
         )}
-
         {discovery.status === "error" && (
-          <div className="px-3 py-4 text-xs">
-            <p className="font-medium text-red-700">Discovery failed</p>
-            <p className="mt-1 text-red-600 whitespace-pre-wrap">{discovery.error}</p>
-            <button
-              onClick={() => discoverRelationships()}
-              className="mt-3 px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
-            >
-              Retry
+          <div className="px-1 py-3 text-[13px]">
+            <p className="font-medium text-danger">Discovery failed</p>
+            <p className="mt-1 whitespace-pre-wrap text-muted">{discovery.error}</p>
+            <button onClick={() => void discoverRelationships()} className={`${btn.secondary} mt-3`}>
+              Try again
             </button>
           </div>
         )}
-
-        {discovery.status === "ready" && discovery.relationships.length === 0 && (
-          <p className="px-3 py-4 text-xs text-gray-400 text-center">
-            No relationships inferred. Load at least two related tables.
+        {discovery.status === "ready" && sorted.length === 0 && (
+          <p className="px-1 py-3 text-[13px] leading-5 text-muted">
+            Load at least two tables that share a key — for example orders.customer_id and customers.id.
           </p>
         )}
-
-        {discovery.status === "ready" &&
-          discovery.relationships.map((rel) => {
-            const key = relationshipKey(rel);
-            return (
-              <RelationshipCard
-                key={key}
-                rel={rel}
-                tables={tables}
-                tableNames={tableNames}
-                verdict={verdicts[key]}
-                edited={overrideKeys.has(key)}
-                onVerdict={(verdict) => setRelationshipVerdict(key, verdict)}
-                onEdit={(next) => editRelationship(key, next)}
-              />
-            );
-          })}
+        {discovery.status === "ready" && sorted.length > 0 && (
+          <ul className="space-y-2">
+            {sorted.map((rel) => {
+              const key = relationshipKey(rel);
+              return (
+                <RelationshipCard
+                  key={key}
+                  rel={rel}
+                  tables={tables}
+                  tableNames={tableNames}
+                  verdict={verdicts[key]}
+                  edited={overrideKeys.has(key)}
+                  onVerdict={(verdict) => setVerdict(key, verdict)}
+                  onEdit={(next) => editRelationship(key, next)}
+                />
+              );
+            })}
+          </ul>
+        )}
       </div>
-    </aside>
+    </div>
   );
 }

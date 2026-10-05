@@ -1,9 +1,10 @@
 import pako from "pako";
 
 function toBase64Url(bytes: Uint8Array): string {
+  // Chunked to avoid quadratic string growth and call-stack limits on large payloads.
   let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   }
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }

@@ -1,68 +1,18 @@
 import { getDB, getConnection } from "./instance";
+import { quoteIdent } from "./sql-utils";
 import { fileExtension, sanitizeTableName } from "../utils";
 import type { TableInfo, ColumnInfo } from "@/types";
 
-export async function loadFileAsTable(
-  file: File
-): Promise<TableInfo> {
-  const db = await getDB();
-  const conn = await getConnection();
-  const ext = fileExtension(file.name);
-  const tableName = sanitizeTableName(file.name);
-  const buffer = new Uint8Array(await file.arrayBuffer());
-
-  const virtualPath = `/${file.name}`;
-
-  let readFn: string;
-  switch (ext) {
-    case "xlsx": {
-      const { xlsxToCsv } = await import("@/lib/xlsx/parse");
-      const csvBuffer = xlsxToCsv(buffer);
-      const csvPath = `/${file.name}.csv`;
-      await db.registerFileBuffer(csvPath, csvBuffer);
-      readFn = `read_csv_auto('${csvPath}')`;
-      break;
-    }
-    default: {
-      await db.registerFileBuffer(virtualPath, buffer);
-      switch (ext) {
-        case "parquet":
-          readFn = `read_parquet('${virtualPath}')`;
-          break;
-        case "csv":
-        case "tsv":
-          readFn = `read_csv_auto('${virtualPath}')`;
-          break;
-        case "json":
-        case "jsonl":
-        case "ndjson":
-          readFn = `read_json_auto('${virtualPath}')`;
-          break;
-        default: {
-          // Check plugin file loaders
-          const sql = await tryPluginFileLoader(ext, buffer, file.name);
-          if (sql) {
-            await conn.query(`CREATE OR REPLACE TABLE "${tableName}" AS ${sql}`);
-            const columns = await describeTable(tableName);
-            const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${tableName}"`);
-            const rowCount = Number(countResult.toArray()[0]?.cnt ?? 0);
-            return { name: tableName, columns, rowCount };
-          }
-          throw new Error(`Unsupported file type: .${ext}`);
-        }
-      }
-    }
-  }
-
-  await conn.query(`CREATE OR REPLACE TABLE "${tableName}" AS SELECT * FROM ${readFn}`);
-
-  const columns = await describeTable(tableName);
-  const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${tableName}"`);
-  const rowCount = Number(countResult.toArray()[0]?.cnt ?? 0);
-
-  return { name: tableName, columns, rowCount };
+function sqlString(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
+/**
+ * Materialize a file's bytes as a DuckDB table named `name`.
+ * The bytes are registered as a virtual file only for the duration of the load and
+ * dropped afterwards — the table holds the data, so keeping the buffer would double memory.
+ * `buffer` is transferred to the DuckDB worker; pass a copy if you still need it.
+ */
 export async function loadBufferAsTable(
   name: string,
   fileName: string,
@@ -71,46 +21,57 @@ export async function loadBufferAsTable(
   const db = await getDB();
   const conn = await getConnection();
   const ext = fileExtension(fileName);
-  const virtualPath = `/${fileName}`;
+  const table = quoteIdent(name);
 
+  let virtualPath = `/${crypto.randomUUID()}-${fileName}`;
   let readFn: string;
   switch (ext) {
     case "xlsx": {
       const { xlsxToCsv } = await import("@/lib/xlsx/parse");
-      const csvBuffer = xlsxToCsv(buffer);
-      const csvPath = `/${fileName}.csv`;
-      await db.registerFileBuffer(csvPath, csvBuffer);
-      readFn = `read_csv_auto('${csvPath}')`;
+      virtualPath += ".csv";
+      await db.registerFileBuffer(virtualPath, xlsxToCsv(buffer));
+      readFn = `read_csv_auto(${sqlString(virtualPath)})`;
       break;
     }
-    default: {
+    case "parquet":
       await db.registerFileBuffer(virtualPath, buffer);
-      switch (ext) {
-        case "parquet":
-          readFn = `read_parquet('${virtualPath}')`;
-          break;
-        case "csv":
-        case "tsv":
-          readFn = `read_csv_auto('${virtualPath}')`;
-          break;
-        case "json":
-        case "jsonl":
-        case "ndjson":
-          readFn = `read_json_auto('${virtualPath}')`;
-          break;
-        default:
-          throw new Error(`Unsupported file type: .${ext}`);
-      }
+      readFn = `read_parquet(${sqlString(virtualPath)})`;
+      break;
+    case "csv":
+    case "tsv":
+      await db.registerFileBuffer(virtualPath, buffer);
+      readFn = `read_csv_auto(${sqlString(virtualPath)})`;
+      break;
+    case "json":
+    case "jsonl":
+    case "ndjson":
+      await db.registerFileBuffer(virtualPath, buffer);
+      readFn = `read_json_auto(${sqlString(virtualPath)})`;
+      break;
+    default: {
+      const sql = await tryPluginFileLoader(ext, buffer, fileName);
+      if (!sql) throw new Error(`Unsupported file type: .${ext}`);
+      await conn.query(`CREATE OR REPLACE TABLE ${table} AS ${sql}`);
+      return describeTable(name);
     }
   }
 
-  await conn.query(`CREATE OR REPLACE TABLE "${name}" AS SELECT * FROM ${readFn}`);
+  try {
+    await conn.query(`CREATE OR REPLACE TABLE ${table} AS SELECT * FROM ${readFn}`);
+  } finally {
+    await db.dropFile(virtualPath).catch(() => undefined);
+  }
+  return describeTable(name);
+}
 
-  const columns = await describeTable(name);
-  const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${name}"`);
-  const rowCount = Number(countResult.toArray()[0]?.cnt ?? 0);
-
-  return { name, columns, rowCount };
+/** Load a browser File; returns the table plus an untouched copy of the bytes for persistence. */
+export async function loadFileAsTable(
+  file: File,
+  name = sanitizeTableName(file.name)
+): Promise<{ table: TableInfo; data: Uint8Array }> {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const table = await loadBufferAsTable(name, file.name, new Uint8Array(data));
+  return { table, data };
 }
 
 async function tryPluginFileLoader(
@@ -118,31 +79,26 @@ async function tryPluginFileLoader(
   buffer: Uint8Array,
   fileName: string
 ): Promise<string | null> {
-  try {
-    const { useWorkspaceStore } = await import("@/stores/workspace-store");
-    const plugins = useWorkspaceStore.getState().plugins;
-    for (const plugin of plugins) {
-      for (const extension of plugin.manifest.extensions) {
-        if (
-          extension.type === "fileLoader" &&
-          extension.extensions.includes(ext)
-        ) {
-          return await extension.load(buffer, fileName);
-        }
+  const { useWorkspaceStore } = await import("@/stores/workspace-store");
+  for (const plugin of useWorkspaceStore.getState().plugins) {
+    for (const extension of plugin.manifest.extensions) {
+      if (extension.type === "fileLoader" && extension.extensions.includes(ext)) {
+        return extension.load(buffer, fileName);
       }
     }
-  } catch {
-    // Plugin system not available, ignore
   }
   return null;
 }
 
-async function describeTable(tableName: string): Promise<ColumnInfo[]> {
+async function describeTable(name: string): Promise<TableInfo> {
   const conn = await getConnection();
-  const result = await conn.query(`DESCRIBE "${tableName}"`);
-  const rows = result.toArray();
-  return rows.map((row: Record<string, unknown>) => ({
+  const table = quoteIdent(name);
+  const described = await conn.query(`DESCRIBE ${table}`);
+  const columns: ColumnInfo[] = described.toArray().map((row: Record<string, unknown>) => ({
     name: String(row.column_name),
     type: String(row.column_type),
   }));
+  const counted = await conn.query(`SELECT COUNT(*) AS cnt FROM ${table}`);
+  const rowCount = Number(counted.toArray()[0]?.cnt ?? 0);
+  return { name, columns, rowCount };
 }

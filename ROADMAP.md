@@ -50,7 +50,7 @@ Wrote artifacts to ./data/.querypad
 ```
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-... querypad ask "payments by plan" ./data
+OPENROUTER_API_KEY=... querypad ask "payments by plan" ./data --provider openrouter
 ```
 
 ```text
@@ -64,11 +64,12 @@ Insight: All payments come from paid-plan users.
 Architecture (engine-agnostic core, two DuckDB bindings):
 
 ```text
-src/lib/discovery/     signals.ts · relationships.ts · semantic-model.ts · explain.ts · sql-safety.ts
-src/lib/ai/            complete.ts (shared streaming) · generate-sql.ts · providers.ts
-src/lib/duckdb-node/   connection.ts · load.ts · profile.ts   (native @duckdb/node-api)
-src/lib/duckdb/        sql-utils.ts (shared) · profile.ts      (browser DuckDB-Wasm)
+src/lib/discovery/     profile.ts · signals.ts · relationships.ts · semantic-model.ts · explain.ts · sql-safety.ts
+src/lib/ai/            complete.ts (one streaming layer, 6 providers) · generate-sql.ts · providers.ts
+src/lib/duckdb-node/   connection.ts · load.ts · profile.ts (thin wrapper)   (native @duckdb/node-api)
+src/lib/duckdb/        sql-utils.ts (shared) · browser-runner.ts · profile.ts (thin wrapper)   (DuckDB-Wasm)
 src/cli/               index.ts (dispatch) · inspect.ts · ask.ts · explain.ts · artifacts.ts
+collab/server.mjs      self-hosted Yjs relay for live collaboration
 ```
 
 Relationship discovery: profile each table → find primary-key candidates (unique,
@@ -124,8 +125,9 @@ querypad ask "show 7-day retention for paid users" ./data
 Question → inferred relationships as context → SQL generation → DuckDB execution → insight
 ```
 
-- Reuses the AI layer (`src/lib/ai/complete.ts`, Claude + OpenAI). CLI keys come from
-  `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`; provider via `--provider`.
+- Reuses the AI layer (`src/lib/ai/complete.ts`: Groq, Ollama Cloud, OpenRouter, xAI,
+  Anthropic, OpenAI). CLI keys come from the provider's env var (e.g. `OPENROUTER_API_KEY`);
+  provider via `--provider` or `QUERYPAD_AI_PROVIDER`.
 - Feeds the inferred relationships and the semantic model's entities (`buildAskContext`)
   so generated SQL joins on the right keys and is reasoned in domain terms.
 - Generated SQL is read-only-gated (`isReadOnlyQuery`) and code-fence stripped before
@@ -142,7 +144,7 @@ with no inferred relationships. Pure consumer of artifacts (no DuckDB / AI); run
 
 ## UI — AI Verification (built)
 
-The browser app has a **Relationships panel** in the sidebar — its purpose is
+The browser app has a **Joins panel** in the sidebar — its purpose is
 **AI verification**, not dashboard building. It runs the same discovery engine in the
 browser (DuckDB-Wasm via `createBrowserQueryRunner`) and lets the user validate the
 AI's assumptions:
@@ -152,6 +154,10 @@ Detected relationship
   payments.user_id ↳ users.id     Confidence 100%
   [Accept]  [Reject]  [Edit]   (Why? → per-signal justification)
 ```
+
+Discovery runs in the background as soon as two tables are loaded, so the table tree marks
+join keys and the AI assistant receives the (non-rejected) relationships as context.
+"Insert JOIN" writes the clause for an edge straight into the editor.
 
 `RelationshipsPanel.tsx` reuses the shared `src/lib/discovery` core (`discoverRelationships`,
 `buildExplanation`) — the same edges the CLI emits — so no logic is duplicated. Verdicts and

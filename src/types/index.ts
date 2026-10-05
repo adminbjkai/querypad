@@ -76,6 +76,8 @@ export interface EditorTab {
   result: QueryResult | null;
   error: QueryError | null;
   isExecuting: boolean;
+  /** The SQL that produced `result`/`error` (may be a selection, or since-edited text). */
+  lastRunSql?: string;
   createdAt: number;
 }
 

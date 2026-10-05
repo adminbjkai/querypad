@@ -12,7 +12,8 @@ how datasets connect, which join is correct. QueryPad is built to answer those
 questions first, then generate and run the SQL.
 
 <p align="center">
-  <a href="https://querypad.io"><strong>Try the web app</strong></a>
+  <a href="https://querypad.io"><strong>Try the web app</strong></a> ·
+  <a href="https://github.com/vericontext/querypad">Upstream project</a>
 </p>
 
 <p align="center">
@@ -32,7 +33,7 @@ DuckDB binding differs (native `@duckdb/node-api` for the CLI, DuckDB-Wasm for t
                  │  → semantic model        │
                  └───────────┬─────────────┘
                   CLI (Node) │ Web (Wasm)
-                 querypad    │ querypad.io
+                 querypad    │ browser app
                  inspect     │ drop & query
 ```
 
@@ -107,8 +108,8 @@ See [ROADMAP.md](ROADMAP.md) for the full plan.
 ## CLI: ask a question
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...        # or OPENAI_API_KEY with --provider openai
-querypad ask "total payment amount by user plan" ./data
+export OPENROUTER_API_KEY=...               # any provider in the table below
+querypad ask "total payment amount by user plan" ./data --provider openrouter
 ```
 
 `ask` builds context from the inferred relationships (so the generated SQL joins on the
@@ -151,66 +152,69 @@ Caveats (0)
 
 ## Web app: interactive analysis
 
-The browser app at [querypad.io](https://querypad.io) is the same OSS app running
-client-side. Your data stays on your machine unless you explicitly share or collaborate.
+The browser app is the same open-source code running client-side. DuckDB runs in your
+tab (WebAssembly); your data stays on your machine unless you explicitly share or
+collaborate.
 
-- **Drag & drop anything** — CSV, Parquet, JSON, Excel — drop multiple formats at once and JOIN them
-- **DuckDB-Wasm SQL** — Full analytical SQL in the browser (JOIN, GROUP BY, window functions, …)
-- **Data profiles** — Column-level nulls, distinct counts, ranges, averages, and top values
-- **Relationship verification** — Discover inferred joins in-browser; Accept / Reject / Edit each with a per-signal "why" (verdicts persist)
-- **Agent context** — Copy schema, profiles, active SQL, and latest results for Claude Code or Codex
-- **AI SQL assistant** — Cmd+K for natural language to SQL with Claude or OpenAI BYOK
-- **Inline charts** — One-click Bar, Line, Scatter, Pie from query results
-- **URL sharing** — Compress data + query into a single shareable link
-- **Sample data on first visit** — Start exploring immediately, drop your own files when ready
+- **Drop anything** — CSV, TSV, Parquet, JSON/NDJSON, Excel; several at once, then JOIN them
+- **Understands before you ask** — every column is profiled (types, empties, distinct counts,
+  ranges, top values) and joins between tables are inferred in the background
+- **Verify the joins** — the Joins panel lists inferred relationships with confidence and a
+  per-signal "why"; Accept / Reject / Edit them, or insert the `JOIN … ON …` clause directly
+- **SQL with a real editor** — Monaco with table/column autocomplete; Ctrl/⌘+Enter runs the
+  query, or only the selected part
+- **AI that knows your joins** — Ctrl/⌘+K: describe the result, get streamed SQL built on the
+  inferred relationships; "Fix with AI" on any failed query
+- **Results you can work with** — sort by any column, filter rows, click a cell to copy,
+  one-click charts, export to CSV / JSON / Markdown / HTML / Excel / Parquet / clipboard
+- **Command palette** — Ctrl/⌘+P to run anything, jump to a tab, preview or profile a table,
+  or reopen a past query
+- **History** — your last 100 runs with row counts, timings and failures
+- **Pipelines** — chain named SQL steps that build on each other, shown as a dependency graph
+- **Live collaboration** — start a room, send the invite link, and edit the same tabs with
+  shared cursors; small files sync to everyone
+- **Share links** — compress data + query into one URL (no server involved); opening a link
+  never overwrites your own workspace
+- **Agent context** — copy schema, profiles, the current SQL and its results for Claude Code,
+  Codex or any agent
+- **Light and dark themes**, keyboard-first (press `?` for shortcuts), works on phones
 
 <details>
-<summary><strong>More web app features</strong></summary>
+<summary><strong>More web app details</strong></summary>
 
-- **Monaco Editor** — Table/column autocomplete, syntax highlighting, Cmd+Enter to run
-- **Virtualized table** — Smooth rendering up to 10,000 rows
-- **IndexedDB persistence** — Data and queries survive page refresh
-- **Multi-tab editor** — IDE-style tabs with independent queries and results
-- **Export anywhere** — CSV, JSON, Markdown, HTML, Excel, Parquet, clipboard
-- **S3/HTTP loading** — Load remote Parquet/CSV/JSON files by URL
-- **Transform pipelines** — Chain queries with DAG visualization
-- **Plugin system** — Extend with visualizations, exporters, file loaders, SQL macros
-- **Real-time collaboration** — PartyKit + Y.js CRDT with remote cursors
-- **File size guardrails** — 100 MB per file limit with clear warnings
+- **Persistence** — tables, tabs, pipelines and verdicts survive a refresh (IndexedDB)
+- **Remote files** — load Parquet/CSV/JSON from any URL that allows cross-origin requests
+- **Plugin system** — ES-module plugins can add visualizations, exporters and file loaders
+- **Guardrails** — 100 MB per file, with a warning above 50 MB; results show the first
+  10,000 rows (Parquet export writes them all)
 
 </details>
 
-## Quick Start
+### Keyboard shortcuts
 
-**Web app:**
+| Action | Keys |
+|--------|------|
+| Run query (or the selection) | Ctrl/⌘ + Enter |
+| Ask AI to write SQL | Ctrl/⌘ + K |
+| Command palette | Ctrl/⌘ + P |
+| Toggle sidebar | Ctrl/⌘ + B |
+| Shortcut list | ? |
 
-```bash
-npm install
-npm run dev
-```
+### AI providers
 
-Open `http://localhost:3000`. Sample data is automatically loaded on first visit.
+| Provider | Model | Key |
+|----------|-------|-----|
+| Groq | `openai/gpt-oss-120b` | `GROQ_API_KEY` |
+| Ollama Cloud | `deepseek-v4.1-flash` | `OLLAMA_API_KEY` |
+| OpenRouter | `deepseek/deepseek-v4.1-flash` | `OPENROUTER_API_KEY` |
+| xAI | `grok-4.7` | `XAI_API_KEY` |
+| Anthropic | `claude-sonnet-5-5` | `ANTHROPIC_API_KEY` |
+| OpenAI | `gpt-5.5` | `OPENAI_API_KEY` |
 
-**CLI:**
-
-```bash
-npm install
-npm run querypad -- inspect ./fixtures/data            # discover relationships
-ANTHROPIC_API_KEY=sk-ant-... npm run querypad -- ask "payments by plan" ./fixtures/data
-```
-
-## Tech Stack
-
-| Area | Technology |
-|------|-----------|
-| Query Engine | DuckDB-Wasm (web) · `@duckdb/node-api` (CLI) |
-| Framework | Next.js + TypeScript + Tailwind CSS v4 |
-| AI | Anthropic Claude + OpenAI BYOK |
-| Editor | Monaco Editor |
-| State | Zustand |
-| Charts | Recharts |
-| Persistence | IndexedDB (idb-keyval) |
-| Collaboration | PartyKit + Y.js (optional) |
+In the browser you can paste your own key for any provider (kept in `localStorage`, sent
+straight to the provider). If the server has a key in its environment, the assistant uses it
+through `/api/complete` instead — the key never reaches the browser. The CLI reads the same
+environment variables.
 
 ## Releases
 

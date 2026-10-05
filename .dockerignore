@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.querypad
+**/.querypad
+test-results
+playwright-report
+e2e
+test
+Dockerfile
+docker-compose.yml
+aiprompt.md
+PROGRESS.md
+.env*
+*.png

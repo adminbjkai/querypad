@@ -11,6 +11,7 @@ import {
 import dagre from "@dagrejs/dagre";
 import { extractEdges } from "@/lib/pipeline/graph";
 import type { PipelineStep, PipelineExecutionResult } from "@/types/pipeline";
+import { useUiStore } from "@/stores/ui-store";
 import "@xyflow/react/dist/style.css";
 
 interface PipelineDagProps {
@@ -57,25 +58,19 @@ export default function PipelineDag({
   selectedStepId,
   onSelectStep,
 }: PipelineDagProps) {
+  const theme = useUiStore((s) => s.theme);
   const { nodes, edges } = useMemo(() => {
     const rawEdges = extractEdges(steps);
 
     const nodes: Node[] = steps.map((step) => {
       const r = results[step.id];
-      let bg = "#fff";
-      let border = "#d1d5db";
+      let bg = "var(--surface)";
+      let border = "var(--line-strong)";
       if (r) {
-        if (r.error) {
-          bg = "#fef2f2";
-          border = "#f87171";
-        } else {
-          bg = "#f0fdf4";
-          border = "#4ade80";
-        }
+        bg = r.error ? "var(--danger-soft)" : "var(--ok-soft)";
+        border = r.error ? "var(--danger)" : "var(--ok)";
       }
-      if (step.id === selectedStepId) {
-        border = "#3b82f6";
-      }
+      if (step.id === selectedStepId) border = "var(--accent)";
 
       return {
         id: step.id,
@@ -83,12 +78,13 @@ export default function PipelineDag({
         position: { x: 0, y: 0 },
         style: {
           background: bg,
-          border: `2px solid ${border}`,
+          border: `1.5px solid ${border}`,
           borderRadius: 8,
-          padding: "8px 16px",
-          fontSize: 13,
-          fontFamily: "monospace",
+          padding: "8px 14px",
+          fontSize: 12,
+          fontFamily: "var(--font-code), monospace",
           fontWeight: 500,
+          color: "var(--ink)",
           cursor: "pointer",
           width: NODE_WIDTH,
         },
@@ -100,7 +96,7 @@ export default function PipelineDag({
       source,
       target,
       animated: true,
-      style: { stroke: "#94a3b8", strokeWidth: 2 },
+      style: { stroke: "var(--join)", strokeWidth: 1.75 },
     }));
 
     return getLayoutedElements(nodes, edges);
@@ -115,8 +111,8 @@ export default function PipelineDag({
 
   if (steps.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-gray-400">
-        Add steps to see the DAG
+      <div className="flex h-full items-center justify-center text-[13px] text-muted">
+        Steps and their dependencies appear here as a graph.
       </div>
     );
   }
@@ -128,11 +124,12 @@ export default function PipelineDag({
         edges={edges}
         onNodeClick={onNodeClick}
         fitView
+        colorMode={theme}
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false}
         nodesConnectable={false}
       >
-        <Background color="#e5e7eb" gap={16} />
+        <Background color="var(--line)" gap={18} />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>

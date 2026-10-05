@@ -2,7 +2,8 @@ import { getConnection } from "./instance";
 import type { QueryResult } from "@/types";
 import { DataType, Decimal } from "apache-arrow";
 
-const MAX_ROWS = 10_000;
+/** Rows materialized into JS for display; the full count is still reported. */
+export const MAX_RESULT_ROWS = 10_000;
 
 function isDateType(type: DataType): boolean {
   return DataType.isDate(type);
@@ -29,7 +30,7 @@ function formatTimestampValue(val: unknown): string | unknown {
 /**
  * Split SQL text into individual statements, respecting string literals and comments.
  */
-function splitStatements(sql: string): string[] {
+export function splitStatements(sql: string): string[] {
   const statements: string[] = [];
   let current = "";
   let i = 0;
@@ -141,8 +142,10 @@ export async function executeQuery(sql: string): Promise<QueryResult> {
     DataType.isDecimal(f.type) ? (f.type as Decimal).scale : -1
   );
 
-  const allRows = result.toArray();
-  const rows = allRows.slice(0, MAX_ROWS).map((row: Record<string, unknown>) => {
+  // Only convert the displayed slice to JS objects; large results stay in Arrow memory.
+  const rowCount = result.numRows;
+  const visible = rowCount > MAX_RESULT_ROWS ? result.slice(0, MAX_RESULT_ROWS) : result;
+  const rows = visible.toArray().map((row: Record<string, unknown>) => {
     const obj: Record<string, unknown> = {};
     for (let i = 0; i < columns.length; i++) {
       const col = columns[i];
@@ -174,7 +177,7 @@ export async function executeQuery(sql: string): Promise<QueryResult> {
     columns,
     columnTypes,
     rows,
-    rowCount: allRows.length,
+    rowCount,
     executionTimeMs,
   };
 }

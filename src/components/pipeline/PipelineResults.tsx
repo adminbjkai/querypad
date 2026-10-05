@@ -1,62 +1,39 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import type { PipelineExecutionResult } from "@/types/pipeline";
+import DataTable from "@/components/results/DataTable";
+import { Icon } from "@/components/ui/icons";
 
-const DataTable = dynamic(() => import("@/components/results/DataTable"), {
-  ssr: false,
-});
-
-interface PipelineResultsProps {
-  stepName: string;
-  result: PipelineExecutionResult | null;
-}
-
-export default function PipelineResults({
-  stepName,
-  result,
-}: PipelineResultsProps) {
+export default function PipelineResults({ stepName, result }: { stepName: string; result: PipelineExecutionResult | null }) {
   if (!result) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-gray-400">
-        Run the pipeline to see results
-      </div>
+      <p className="flex h-full items-center justify-center bg-surface p-6 text-center text-[13px] text-muted">
+        Run the pipeline, then pick a step to see its rows.
+      </p>
     );
   }
-
   if (result.error) {
     return (
-      <div className="p-4 h-full">
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm font-medium text-red-800">
-            Step &quot;{stepName}&quot; Error
+      <div className="h-full bg-surface p-4">
+        <div className="rounded-lg border border-danger/40 bg-danger-soft/50 p-3">
+          <p className="flex items-center gap-2 text-[13px] font-semibold text-danger">
+            <Icon name="alert" size={15} />
+            Step <span className="font-mono">{stepName}</span> failed
           </p>
-          <pre className="mt-1 text-xs text-red-600 whitespace-pre-wrap font-mono">
-            {result.error.message}
-          </pre>
+          <pre className="mt-2 whitespace-pre-wrap font-mono text-[12px] text-ink">{result.error.message}</pre>
         </div>
       </div>
     );
   }
-
-  if (!result.result) {
-    return (
-      <div className="flex items-center justify-center h-full text-sm text-gray-400">
-        No results
-      </div>
-    );
-  }
-
+  if (!result.result) return <p className="p-4 text-[13px] text-muted">No rows.</p>;
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 px-3 py-1.5 border-b border-gray-200 text-xs text-gray-500">
-        <span className="font-mono font-medium text-gray-700">{stepName}</span>
-        <span className="text-gray-300">|</span>
+    <div className="flex h-full flex-col bg-surface">
+      <p className="flex shrink-0 items-center gap-3 border-b border-line px-3 py-1.5 text-[12px] tabular-nums text-muted">
+        <span className="font-mono font-medium text-ink">{stepName}</span>
         <span>{result.result.rowCount.toLocaleString()} rows</span>
-        <span className="text-gray-300">|</span>
-        <span>{result.executionTimeMs}ms</span>
-      </div>
-      <div className="flex-1 min-h-0">
+        <span>{result.executionTimeMs} ms</span>
+      </p>
+      <div className="min-h-0 flex-1">
         <DataTable result={result.result} />
       </div>
     </div>

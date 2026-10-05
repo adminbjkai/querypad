@@ -1,54 +1,85 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+const MOD = process.platform === "darwin" ? "Meta" : "Control";
+
+async function openWithSamples(page: Page) {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 30_000 });
+}
+
+async function runSample(page: Page) {
+  await page.getByRole("button", { name: /^Run/ }).click();
+  await expect(page.getByRole("columnheader", { name: /dept_name/ })).toBeVisible({ timeout: 15_000 });
+}
 
 test.describe("QueryPad", () => {
-  test("loads with sample data and shows workspace", async ({ page }) => {
-    await page.goto("/");
-
-    // Wait for DuckDB to initialize and sample data to load
-    await expect(page.locator("text=QueryPad")).toBeVisible({ timeout: 15000 });
-
-    // Sidebar should show sample tables
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 10000 });
+  test("loads sample data and shows the welcome note", async ({ page }) => {
+    await openWithSamples(page);
     await expect(page.getByRole("button", { name: "departments", exact: true })).toBeVisible();
+    await expect(page.getByText("You're exploring two sample tables.")).toBeVisible();
   });
 
-  test("executes sample SQL query and shows results", async ({ page }) => {
-    await page.goto("/");
+  test("runs the sample query and records it in history", async ({ page }) => {
+    await openWithSamples(page);
+    await runSample(page);
+    await expect(page.getByRole("columnheader", { name: /avg_salary/ })).toBeVisible();
+    await expect(page.getByText("Engineering")).toBeVisible();
 
-    // Wait for workspace to load with sample data
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
+    await page.getByRole("tab", { name: "History" }).click();
+    await expect(page.getByText("SELECT d.dept_name").first()).toBeVisible();
+  });
 
-    // The sample query should be prefilled — click Run button
-    await page.getByRole("button", { name: "Run" }).click();
+  test("sorts and filters result rows", async ({ page }) => {
+    await openWithSamples(page);
+    await runSample(page);
+    const firstCell = page.getByRole("row").nth(1).getByRole("gridcell").first();
 
-    // Results table should appear with data rows
-    await expect(page.getByText("dept_name", { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText("avg_salary", { exact: true }).last()).toBeVisible();
+    await page.getByRole("columnheader", { name: /dept_name/ }).click();
+    await expect(firstCell).toHaveText("Design");
+    await page.getByRole("columnheader", { name: /dept_name/ }).click();
+    await expect(firstCell).toHaveText("Sales");
+
+    await page.getByLabel("Filter rows").fill("market");
+    await expect(page.getByRole("row")).toHaveCount(2); // header + Marketing
+    await expect(firstCell).toHaveText("Marketing");
   });
 
   test("shows a data profile for a sample table", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
+    await openWithSamples(page);
+    await page.getByRole("button", { name: "Profile employees" }).click({ force: true });
+    await expect(page.getByText("employees profile")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/\d+(\.\d)?% empty/).first()).toBeVisible();
+    await expect(page.getByText(/\d+ distinct/).first()).toBeVisible();
+    // Dates render as calendar dates, not epoch numbers.
+    await expect(page.getByText(/2018-\d\d-\d\d to 20\d\d-\d\d-\d\d/)).toBeVisible();
+  });
 
-    await page.getByRole("button", { name: "Profile employees" }).click();
+  test("discovers, explains, and accepts relationships", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("tab", { name: /Joins/ }).click();
+    await expect(page.getByText(/inferred from your data/)).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Why?" }).first().click();
+    await expect(page.getByText(/values are present in/).first()).toBeVisible();
+    await page.getByRole("button", { name: "Accept" }).first().click();
+    await expect(page.getByText("accepted", { exact: true })).toBeVisible();
+  });
 
-    await expect(page.getByText("employees profile")).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText("salary", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(/Null \d/).first()).toBeVisible();
-    await expect(page.getByText(/Distinct/).first()).toBeVisible();
+  test("command palette previews a table in a new tab", async ({ page }) => {
+    await openWithSamples(page);
+    await page.keyboard.press(`${MOD}+p`);
+    await page.getByPlaceholder("Type a command, table, or past query").fill("preview depart");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("tab", { name: /Query 2/ })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: /budget/ })).toBeVisible({ timeout: 15_000 });
   });
 
   test("copies agent context with schema and query state", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
-
-    await page.getByRole("button", { name: "Run" }).click();
-    await expect(page.getByText("dept_name", { exact: true }).first()).toBeVisible({ timeout: 10000 });
-
-    await page.getByRole("button", { name: "Copy context" }).click();
+    await openWithSamples(page);
+    await runSample(page);
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Copy context for an agent" }).click();
     const copied = await page.evaluate(() => navigator.clipboard.readText());
-
     expect(copied).toContain("# QueryPad Context");
     expect(copied).toContain("### employees");
     expect(copied).toContain("### departments");
@@ -56,79 +87,128 @@ test.describe("QueryPad", () => {
     expect(copied).toContain("## Latest Result");
   });
 
-  test("discovers and verifies relationships", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
-
-    // Open the relationships verification panel
-    await page.getByRole("button", { name: "Relationships" }).click();
-    await expect(page.getByRole("heading", { name: "Relationships" })).toBeVisible();
-
-    // Discovery completes (ready subtitle shows the inferred count)
-    await expect(page.getByText(/inferred/)).toBeVisible({ timeout: 15000 });
-
-    // Sample data has an employees -> departments relationship
-    const accept = page.getByRole("button", { name: "Accept" }).first();
-    await expect(accept).toBeVisible({ timeout: 10000 });
-
-    // "Why?" reveals the signal-based justification (reused buildExplanation)
-    await page.getByRole("button", { name: "Why?" }).first().click();
-    await expect(page.getByText(/values are present in/).first()).toBeVisible();
-
-    // Accept the relationship
-    await accept.click();
-    await expect(page.getByRole("button", { name: "Accept" }).first()).toBeVisible();
-  });
-
-  test("can switch AI SQL assistant provider", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
-
-    await page.getByRole("button", { name: /AI/ }).click();
+  test("AI assistant lets you switch providers", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("button", { name: /Ask AI/ }).click();
+    const provider = page.getByLabel("AI provider");
+    await provider.selectOption("anthropic");
     await expect(page.getByPlaceholder("Enter your Anthropic API key (sk-ant-...)")).toBeVisible();
-
-    await page.getByRole("button", { name: "Use OpenAI" }).click();
+    await provider.selectOption("openai");
     await expect(page.getByPlaceholder("Enter your OpenAI API key (sk-...)")).toBeVisible();
-
-    await page.getByRole("button", { name: "Use Claude" }).click();
-    await expect(page.getByPlaceholder("Enter your Anthropic API key (sk-ant-...)")).toBeVisible();
   });
 
-  test("can switch between SQL and Pipeline mode", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
-
-    // Click Pipeline button
-    await page.locator("button", { hasText: "Pipeline" }).click();
-
-    // Pipeline editor should appear
-    await expect(page.locator("text=Pipeline 1")).toBeVisible();
-
-    // Switch back to SQL
-    await page.locator("button", { hasText: "SQL" }).click();
-    await expect(page.locator("text=employees")).toBeVisible();
+  test("failed queries offer a fix with AI", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("button", { name: "New tab" }).click();
+    await page.locator(".monaco-editor").click();
+    await page.keyboard.type("SELECT nope FROM employees");
+    await page.keyboard.press(`${MOD}+Enter`);
+    await expect(page.getByText("The query failed")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Fix with AI" }).click();
+    await expect(page.getByLabel("Describe the query")).toHaveValue(/Fix the current query/);
   });
 
-  test("shows welcome banner with sample data", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
-
-    // Welcome banner should be visible
-    await expect(
-      page.locator("text=Exploring with sample data")
-    ).toBeVisible();
+  test("switches between SQL and pipeline mode", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("tab", { name: "Pipeline" }).click();
+    await expect(page.getByRole("tab", { name: "Pipeline 1" })).toBeVisible();
+    await page.getByRole("button", { name: "Add the first step" }).click();
+    await expect(page.getByLabel("Step name (becomes a table name)")).toHaveValue("step_1");
+    await page.getByRole("tab", { name: "SQL" }).click();
+    await expect(page.getByRole("tab", { name: /Query 1/ })).toBeVisible();
   });
 
-  test("can clear workspace", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15000 });
+  test("keeps tabs and theme across reloads", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("button", { name: "Switch to dark theme" }).click();
+    await page.getByRole("button", { name: "New tab" }).click();
+    await page.locator(".monaco-editor").click();
+    await page.keyboard.type("SELECT 42 AS answer");
+    await page.waitForTimeout(800); // debounced save
+    await page.reload();
+    await expect(page.getByRole("tab", { name: /Query 2/ })).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.getByRole("button", { name: /^Run/ }).click();
+    await expect(page.getByRole("columnheader", { name: /answer/ })).toBeVisible({ timeout: 10_000 });
+  });
 
-    // Click Clear button
-    await page.locator("button", { hasText: "Clear" }).click();
+  test("imports a file and replaces the sample tables", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("button", { name: "Add data" }).click();
+    await page.getByLabel("Choose data files").setInputFiles(["fixtures/data/users.csv", "fixtures/data/payments.csv"]);
+    await expect(page.getByRole("button", { name: "users", exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "payments", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "employees", exact: true })).toHaveCount(0);
+  });
 
-    // Should show the drop zone (empty state)
-    await expect(
-      page.getByRole("button", { name: "employees", exact: true })
-    ).not.toBeVisible({ timeout: 5000 });
+  test("clears the workspace and reloads sample data", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Clear workspace" }).click();
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Click to confirm clear" }).click();
+    await expect(page.getByText("Drop in your data files.")).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Try sample data" }).click();
+    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("opens a share link without touching the saved workspace", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openWithSamples(page);
+    await page.getByRole("button", { name: /^Share/ }).click();
+    const url = await page.evaluate(() => navigator.clipboard.readText());
+    expect(url).toContain("/shared?s=");
+
+    const viewer = await context.newPage();
+    await viewer.goto(url);
+    await expect(viewer.getByText("Shared link")).toBeVisible({ timeout: 30_000 });
+    await expect(viewer.getByRole("button", { name: "employees", exact: true })).toBeVisible();
+    await viewer.getByRole("button", { name: "Remove employees" }).click({ force: true });
+    // Even clearing everything in the shared view must leave the owner's data alone.
+    await viewer.getByRole("button", { name: "More" }).click();
+    await viewer.getByRole("menuitem", { name: "Clear workspace" }).click();
+    await viewer.getByRole("button", { name: "More" }).click();
+    await viewer.getByRole("menuitem", { name: "Click to confirm clear" }).click();
+    await expect(viewer.getByText("Drop in your data files.")).toBeVisible({ timeout: 10_000 });
+    await viewer.waitForTimeout(800);
+
+    // The owner's saved workspace still has both tables.
+    await page.reload();
+    await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 30_000 });
+  });
+
+  test("collaborates live through the relay", async ({ browser }) => {
+    const ctxA = await browser.newContext();
+    await ctxA.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const a = await ctxA.newPage();
+    await openWithSamples(a);
+    await a.getByRole("button", { name: "Collaborate" }).click();
+    await a.getByRole("button", { name: "Start room and copy invite" }).click();
+    await expect(a.getByRole("button", { name: "Leave" })).toBeVisible({ timeout: 15_000 });
+    const invite = await a.evaluate(() => navigator.clipboard.readText());
+    expect(invite).toMatch(/\?room=[A-Za-z0-9_-]+$/);
+
+    const ctxB = await browser.newContext();
+    const b = await ctxB.newPage();
+    await b.addInitScript(() => localStorage.setItem("querypad:preloaded", "1"));
+    await b.goto(invite);
+    // B starts empty; the room shares A's tables and query tabs.
+    await expect(b.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(b.getByRole("button", { name: "Leave" })).toBeVisible();
+
+    await a.locator(".monaco-editor").click();
+    await a.keyboard.press(`${MOD}+End`);
+    await a.keyboard.type("\n-- hello from A");
+    await expect(b.locator(".monaco-editor")).toContainText("hello from A", { timeout: 10_000 });
+
+    // After switching tabs, the editor binding is re-established: B sees A's cursor.
+    await a.getByRole("button", { name: "New tab" }).click();
+    await b.getByRole("tab", { name: /Query 2/ }).click();
+    await a.locator(".monaco-editor").click();
+    await a.keyboard.type("SELECT 2");
+    await expect(b.locator(".monaco-editor")).toContainText("SELECT 2", { timeout: 10_000 });
+    await expect(b.locator('.monaco-editor [class*="yRemoteSelectionHead"]').first()).toBeAttached({ timeout: 10_000 });
+    await ctxA.close();
+    await ctxB.close();
   });
 });

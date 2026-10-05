@@ -5,6 +5,81 @@ milestones and public product updates.
 
 ## Unreleased
 
+Nothing yet.
+
+## v0.7.0 — Workspace redesign
+
+### Redesigned web app
+
+- New visual system with light and dark themes (follows your OS, toggle anytime), Schibsted
+  Grotesk + JetBrains Mono, and a column-kind color code (number, text, date, boolean)
+  used consistently in the sidebar, result headers and profiles; join keys get their own color
+- Command palette (Ctrl/⌘+P): run, ask AI, jump to tabs, preview or profile any table,
+  reopen past queries, switch theme and mode
+- Resizable editor/results split (drag, arrow keys, double-click to reset; remembered)
+- Sidebar with Tables, Joins and History panels; collapsible (Ctrl/⌘+B), overlay on phones
+- Click a column to insert its name at the cursor; join keys are marked in the table tree
+- Joins panel: "Insert JOIN" writes the correct `JOIN … ON …` clause; discovery now runs
+  automatically in the background once two tables are loaded
+- Results: click a header to sort, filter rows inline, click any cell to copy, numbers
+  right-aligned, NULLs styled, auto-sized columns
+- Query history (last 100 runs, with rows, timing and failures) — reopen or rerun
+- Run just the selected SQL with Ctrl/⌘+Enter
+- Failed queries offer "Fix with AI", which sends the query and error to the assistant
+- AI assistant: provider picker, streamed output with Stop, "Use and run", "Replace query"
+  and "Insert at cursor"; relationship-aware prompts (inferred joins are passed as context)
+- Pipelines, charts, profiles, export menu and dialogs restyled; charts follow the theme
+- Keyboard shortcuts reference (press `?`); clearer empty, loading and error states
+- Clearing the workspace now asks for confirmation
+
+### Collaboration that works out of the box
+
+- Replaced PartyKit with a small self-hosted Yjs relay (`collab/server.mjs`); the app
+  connects to `/collab` on the same origin by default
+- Invite links (`/?room=<id>`) join a room directly; starting a room copies the link
+- Fixed: a peer's edits no longer wipe your results or switch your active tab; tab lists sync
+  only when they actually change; every tab's text stays in sync, not just the visible one
+- Files under 5 MB sync automatically to everyone in the room (stored as binary, not number arrays)
+
+### AI providers
+
+- One streaming implementation shared by Groq, Ollama Cloud, OpenRouter and xAI
+  (OpenAI-compatible), plus Anthropic and OpenAI
+- Keys configured on the server are detected at runtime (`GET /api/complete`) and proxied, so
+  they never reach the browser; the assistant defaults to a provider the server can serve
+- Requests are cancellable; input size and token limits are enforced server-side
+- Fixed: the CLI could not use server-proxied providers; Groq model id corrected
+  (`openai/gpt-oss-120b`); default Claude model is now Sonnet 5.5 (`claude-sonnet-5-5`)
+
+### Faster and lighter
+
+- One profiler for browser and CLI (`src/lib/discovery/profile.ts`): column stats come from a
+  single scan per table (68 → 26 queries on the sample folder), output unchanged
+- Discovery reuses profiles you already built instead of profiling every table again
+- Query results convert only the displayed 10,000 rows out of Arrow memory
+- Imported files are released from DuckDB's virtual file system after loading
+- Saved workspaces keep file bytes in their own IndexedDB records, so typing no longer
+  rewrites every loaded file; older saves migrate automatically
+- Shared links never overwrite the workspace saved in your browser ("Make this my workspace"
+  adopts them explicitly)
+- Docker image uses the Next.js standalone server (no full `node_modules`), runs as non-root,
+  and excludes unused native image libraries
+
+### Fixes
+
+- Ctrl/⌘+Enter ran the query as it was when the editor first mounted
+- SQL autocomplete registered a new provider on every tab switch (duplicate suggestions)
+- Column-type classification treated `INTERVAL`, `STRUCT`, `LIST` and arrays as numbers
+- Profile date ranges showed epoch milliseconds in the browser
+- Parquet export failed on queries ending in `;` or with several statements
+- Dropping files on the page didn't share them with collaborators
+
+### Removed
+
+- PartyKit (`partykit`, `y-partykit`, `party/`), Vercel Analytics, the unused built-in
+  heatmap plugin, Next.js boilerplate SVGs
+
+
 ### Web: Relationship Verification
 
 - New Relationships panel in the sidebar: runs the same discovery engine in the browser
@@ -34,7 +109,6 @@ milestones and public product updates.
 
 - OpenAI BYOK support for the Cmd+K AI SQL assistant via the Responses API
 - Provider selector for Claude and OpenAI with independent browser-local keys
-- Updated the default Claude model to `claude-sonnet-4-6`
 - Added `gpt-5.5` as the default OpenAI model
 
 ### Data Profile & Agent Context

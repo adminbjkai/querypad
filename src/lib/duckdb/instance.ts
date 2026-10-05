@@ -44,10 +44,3 @@ export async function getConnection(): Promise<duckdb.AsyncDuckDBConnection> {
   connInstance = await db.connect();
   return connInstance;
 }
-
-export async function resetConnection(): Promise<void> {
-  if (connInstance) {
-    await connInstance.close();
-    connInstance = null;
-  }
-}

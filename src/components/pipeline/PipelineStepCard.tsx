@@ -1,15 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useUiStore } from "@/stores/ui-store";
+import { defineQueryPadThemes, codeFontFamily } from "@/lib/monaco-theme";
 import type { PipelineStep, PipelineExecutionResult } from "@/types/pipeline";
+import { Icon } from "@/components/ui/icons";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
-  loading: () => (
-    <div className="h-full bg-gray-50 flex items-center justify-center text-xs text-gray-400">
-      Loading...
-    </div>
-  ),
+  loading: () => <div className="h-full bg-surface" />,
 });
 
 interface PipelineStepCardProps {
@@ -22,74 +21,66 @@ interface PipelineStepCardProps {
   onRemove: () => void;
 }
 
-export default function PipelineStepCard({
-  step,
-  result,
-  isSelected,
-  onSelect,
-  onUpdateName,
-  onUpdateQuery,
-  onRemove,
-}: PipelineStepCardProps) {
-  const statusColor = result
-    ? result.error
-      ? "border-red-400 bg-red-50"
-      : "border-green-400 bg-green-50"
-    : "border-gray-200 bg-white";
+export default function PipelineStepCard({ step, result, isSelected, onSelect, onUpdateName, onUpdateQuery, onRemove }: PipelineStepCardProps) {
+  const theme = useUiStore((s) => s.theme);
+  const status = result ? (result.error ? "error" : "ok") : "idle";
 
   return (
     <div
       onClick={onSelect}
-      className={`rounded-lg border-2 transition-colors cursor-pointer ${
-        isSelected ? "border-blue-500 ring-2 ring-blue-100" : statusColor
+      className={`overflow-hidden rounded-lg border bg-surface transition-shadow ${
+        isSelected ? "border-accent ring-2 ring-accent-soft" : status === "error" ? "border-danger/50" : "border-line"
       }`}
     >
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100">
+      <div className="flex items-center gap-2 border-b border-line px-2.5 py-1.5">
+        <span className={`size-1.5 shrink-0 rounded-full ${status === "ok" ? "bg-ok" : status === "error" ? "bg-danger" : "bg-line-strong"}`} />
         <input
           value={step.name}
           onChange={(e) => onUpdateName(e.target.value.replace(/\s/g, "_"))}
           onClick={(e) => e.stopPropagation()}
-          className="text-sm font-mono font-medium bg-transparent outline-none border-b border-transparent focus:border-blue-400 w-40"
+          className="min-w-0 flex-1 bg-transparent font-mono text-[13px] font-medium text-ink outline-none focus:text-accent"
           placeholder="step_name"
+          aria-label="Step name (becomes a table name)"
         />
-        <div className="flex items-center gap-2">
-          {result && !result.error && (
-            <span className="text-[10px] text-green-600">{result.executionTimeMs}ms</span>
-          )}
-          {result?.error && (
-            <span className="text-[10px] text-red-600" title={result.error.message}>err</span>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            className="text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        {result && !result.error && <span className="text-[11px] tabular-nums text-faint">{result.executionTimeMs} ms</span>}
+        {result?.error && (
+          <span className="text-[11px] text-danger" title={result.error.message}>
+            failed
+          </span>
+        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="rounded p-0.5 text-faint hover:text-danger"
+          aria-label={`Remove step ${step.name}`}
+        >
+          <Icon name="x" size={13} />
+        </button>
       </div>
-      <div className="h-[100px]" onClick={(e) => e.stopPropagation()}>
+      <div className="h-[112px]" onClick={(e) => e.stopPropagation()}>
         <MonacoEditor
           defaultLanguage="sql"
           value={step.query}
           onChange={(v) => onUpdateQuery(v ?? "")}
-          theme="vs"
+          beforeMount={defineQueryPadThemes}
+          theme={theme === "dark" ? "qp-dark" : "qp-light"}
           options={{
             minimap: { enabled: false },
-            fontSize: 11,
+            fontSize: 12,
+            fontFamily: codeFontFamily(),
             lineNumbers: "off",
             scrollBeyondLastLine: false,
             wordWrap: "on",
-            padding: { top: 4 },
+            padding: { top: 6 },
             automaticLayout: true,
             folding: false,
             glyphMargin: false,
-            lineDecorationsWidth: 4,
+            lineDecorationsWidth: 8,
             overviewRulerLanes: 0,
+            renderLineHighlight: "none",
+            scrollbar: { verticalScrollbarSize: 6 },
           }}
         />
       </div>

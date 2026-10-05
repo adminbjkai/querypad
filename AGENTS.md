@@ -19,12 +19,28 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
 - Node-only code (`src/lib/duckdb-node`, `src/cli`) must never be imported by app code,
   or the native addon leaks into the browser bundle. `npm run check`'s build step
   verifies this.
+- Shared core under `src/lib/discovery` and `src/lib/ai` uses relative imports only (the
+  CLI runs under tsx without the `@/` alias).
+- **Collaboration relay** (`collab/server.mjs`) is plain Node ESM with only ws, yjs,
+  y-protocols and lib0 (plus lib0's dependency isomorphic.js); the Docker image copies
+  just those modules for it — update the Dockerfile if the relay gains an import.
+
+## UI conventions
+
+- Colors come from semantic tokens in `src/app/globals.css` (light + `[data-theme="dark"]`);
+  never hardcode palette colors in components. Column kinds use `text-k-num/k-text/k-date/
+  k-bool`, joins use `text-join`.
+- Shared building blocks live in `src/components/ui` (`btn`, `input`, `Dialog`, `Menu`,
+  `KindGlyph`, `Icon`). Toasts: `toast()` from `src/stores/ui-store.ts`.
+- Cross-component actions (run, share, preview) live in `src/lib/workspace-actions.ts`;
+  the editor is reachable through `src/lib/editor-bridge.ts`.
 
 ## Release and verification
 
 - Keep `package.json`, `package-lock.json`, and the latest `CHANGELOG.md` release version in sync.
 - Run `npm run check` after code/config changes.
-- Run `npm test` when UI behavior or e2e-covered flows change.
+- Run `npm test` when UI behavior or e2e-covered flows change (it starts its own dev
+  server on port 3217 and a relay on 1999 — it never reuses another server).
 - Run `npm run test:cli` when discovery/CLI logic changes.
 - Do not commit demo video artifacts or `.querypad/` inspection output; use the videos
   as release/README upload assets.

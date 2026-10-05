@@ -2,82 +2,89 @@
 
 import { useState } from "react";
 import type { TableInfo } from "@/types";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { toast } from "@/stores/ui-store";
+import { insertAtCursor } from "@/lib/editor-bridge";
+import { previewTable } from "@/lib/workspace-actions";
+import { Icon } from "@/components/ui/icons";
+import { KindGlyph } from "@/components/ui/primitives";
 
 interface TableSchemaProps {
   table: TableInfo;
-  onRemove: (name: string) => void;
-  onOpenProfile: (name: string) => void;
+  keyColumns: Map<string, "key" | "ref">;
   profileActive: boolean;
+  onOpenProfile: () => void;
 }
 
-export default function TableSchema({
-  table,
-  onRemove,
-  onOpenProfile,
-  profileActive,
-}: TableSchemaProps) {
+function quoteIfNeeded(name: string): string {
+  return /^[a-z_][a-z0-9_]*$/.test(name) ? name : `"${name.replaceAll('"', '""')}"`;
+}
+
+export default function TableSchema({ table, keyColumns, profileActive, onOpenProfile }: TableSchemaProps) {
+  const removeTable = useWorkspaceStore((s) => s.removeTable);
   const [expanded, setExpanded] = useState(true);
 
+  const insert = (text: string) => {
+    if (!insertAtCursor(text)) toast("Open the SQL editor to insert names.", "info");
+  };
+
   return (
-    <div className="text-sm group/table">
-      <div className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-100 rounded transition-colors">
+    <div className="group/table px-1.5 pt-1">
+      <div className="flex items-center rounded-md hover:bg-raised">
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-label={table.name}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1.5 text-left"
         >
-          <svg
-            className={`w-3 h-3 text-gray-400 transition-transform ${expanded ? "rotate-90" : ""}`}
-            fill="currentColor"
-            viewBox="0 0 20 20"
+          <Icon name="chevronRight" size={13} className={`text-faint transition-transform ${expanded ? "rotate-90" : ""}`} />
+          <span className="truncate font-mono text-[13px] font-medium text-ink">{table.name}</span>
+          <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-faint">{table.rowCount.toLocaleString()}</span>
+        </button>
+        <div className="flex shrink-0 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/table:opacity-100">
+          <button onClick={() => previewTable(table.name)} className="rounded p-1 text-muted hover:bg-sunken hover:text-ink" title="Preview rows in a new tab" aria-label={`Preview ${table.name}`}>
+            <Icon name="play" size={13} />
+          </button>
+          <button
+            onClick={onOpenProfile}
+            className={`rounded p-1 hover:bg-sunken ${profileActive ? "text-accent" : "text-muted hover:text-ink"}`}
+            title="Profile columns"
+            aria-label={`Profile ${table.name}`}
           >
-            <path d="M6 4l8 6-8 6V4z" />
-          </svg>
-          <span className="truncate font-medium text-gray-800 font-mono">
-            {table.name}
-          </span>
-          <span className="ml-auto shrink-0 text-xs text-gray-400">
-            {table.rowCount.toLocaleString()} rows
-          </span>
-        </button>
-        <button
-          onClick={() => onOpenProfile(table.name)}
-          className={`shrink-0 p-0.5 rounded transition-colors ${
-            profileActive
-              ? "text-blue-600 bg-blue-50"
-              : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"
-          }`}
-          title="Profile table"
-          aria-label={`Profile ${table.name}`}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 19V5m0 14h16M8 16V9m4 7V7m4 9v-4" />
-          </svg>
-        </button>
-        <button
-          onClick={() => onRemove(table.name)}
-          className="shrink-0 p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-          title="Remove table"
-          aria-label={`Remove ${table.name}`}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+            <Icon name="profile" size={13} />
+          </button>
+          <button onClick={() => void removeTable(table.name)} className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger" title="Remove table" aria-label={`Remove ${table.name}`}>
+            <Icon name="x" size={13} />
+          </button>
+        </div>
       </div>
       {expanded && (
-        <div className="ml-5 mt-0.5 space-y-px">
-          {table.columns.map((col) => (
-            <div
-              key={col.name}
-              className="flex items-center gap-2 px-2 py-0.5 text-xs"
-            >
-              <span className="text-gray-700 font-mono">{col.name}</span>
-              <span className="text-gray-400 ml-auto">{col.type}</span>
-            </div>
-          ))}
-        </div>
+        <ul className="mb-1 ml-[18px] border-l border-line pl-1.5">
+          {table.columns.map((col) => {
+            const mark = keyColumns.get(`${table.name}.${col.name}`);
+            return (
+              <li key={col.name}>
+                <button
+                  onClick={() => insert(quoteIfNeeded(col.name))}
+                  className="flex w-full items-center gap-1 rounded px-1 py-[3px] text-left hover:bg-raised"
+                  title={`Insert ${col.name} — ${col.type}`}
+                >
+                  <KindGlyph type={col.type} />
+                  <span className="truncate font-mono text-[12px] text-ink">{col.name}</span>
+                  {mark && (
+                    <Icon
+                      name={mark === "key" ? "key" : "join"}
+                      size={12}
+                      className="text-join"
+                      aria-label={mark === "key" ? "join key" : "references another table"}
+                    />
+                  )}
+                  <span className="ml-auto shrink-0 truncate pl-2 text-[11px] text-faint">{col.type.toLowerCase()}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

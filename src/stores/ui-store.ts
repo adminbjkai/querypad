@@ -1,0 +1,110 @@
+import { create } from "zustand";
+
+export type Theme = "light" | "dark";
+export type SidebarPanel = "tables" | "joins" | "history";
+export type Dialog = "addFiles" | "collaborate" | "plugins" | "shortcuts" | null;
+
+export interface Toast {
+  id: number;
+  tone: "info" | "success" | "warning" | "error";
+  message: string;
+}
+
+interface UiState {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+
+  sidebarOpen: boolean;
+  sidebarPanel: SidebarPanel;
+  setSidebarOpen: (open: boolean) => void;
+  showPanel: (panel: SidebarPanel) => void;
+
+  profileTable: string | null;
+  setProfileTable: (name: string | null) => void;
+
+  paletteOpen: boolean;
+  setPaletteOpen: (open: boolean) => void;
+
+  /** AI bar above the editor; `aiSeed` pre-fills its prompt (e.g. "fix this error"). */
+  aiOpen: boolean;
+  aiSeed: string | null;
+  openAi: (seed?: string) => void;
+  closeAi: () => void;
+
+  dialog: Dialog;
+  setDialog: (dialog: Dialog) => void;
+
+  /** Editor share of the vertical split, 0.15–0.85. */
+  editorFraction: number;
+  setEditorFraction: (fraction: number) => void;
+
+  toasts: Toast[];
+  toast: (message: string, tone?: Toast["tone"]) => void;
+  dismissToast: (id: number) => void;
+}
+
+const THEME_KEY = "querypad:theme";
+const SPLIT_KEY = "querypad:split";
+
+function initialTheme(): Theme {
+  if (typeof document === "undefined") return "light";
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function initialSplit(): number {
+  if (typeof window === "undefined") return 0.45;
+  const saved = Number(localStorage.getItem(SPLIT_KEY));
+  return saved >= 0.15 && saved <= 0.85 ? saved : 0.45;
+}
+
+let toastSeq = 0;
+
+export const useUiStore = create<UiState>((set, get) => ({
+  theme: initialTheme(),
+  setTheme: (theme) => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
+    set({ theme });
+  },
+  toggleTheme: () => get().setTheme(get().theme === "dark" ? "light" : "dark"),
+
+  // Phones start with the sidebar closed so the editor is visible.
+  sidebarOpen: typeof window === "undefined" || window.innerWidth >= 768,
+  sidebarPanel: "tables",
+  setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+  showPanel: (sidebarPanel) => set({ sidebarPanel, sidebarOpen: true }),
+
+  profileTable: null,
+  setProfileTable: (profileTable) => set({ profileTable }),
+
+  paletteOpen: false,
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+
+  aiOpen: false,
+  aiSeed: null,
+  openAi: (seed) => set({ aiOpen: true, aiSeed: seed ?? null }),
+  closeAi: () => set({ aiOpen: false, aiSeed: null }),
+
+  dialog: null,
+  setDialog: (dialog) => set({ dialog }),
+
+  editorFraction: initialSplit(),
+  setEditorFraction: (fraction) => {
+    const clamped = Math.min(0.85, Math.max(0.15, fraction));
+    localStorage.setItem(SPLIT_KEY, clamped.toFixed(3));
+    set({ editorFraction: clamped });
+  },
+
+  toasts: [],
+  toast: (message, tone = "info") => {
+    const id = ++toastSeq;
+    set((s) => ({ toasts: [...s.toasts.slice(-3), { id, tone, message }] }));
+    setTimeout(() => get().dismissToast(id), tone === "error" ? 7000 : 3500);
+  },
+  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+}));
+
+/** Shorthand for non-React callers. */
+export const toast = (message: string, tone?: Toast["tone"]) =>
+  useUiStore.getState().toast(message, tone);

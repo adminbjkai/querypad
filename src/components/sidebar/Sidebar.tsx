@@ -1,91 +1,102 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useMemo } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { SAMPLE_TABLE_NAMES } from "@/lib/constants";
+import { useUiStore, type SidebarPanel } from "@/stores/ui-store";
+import { relationshipKey } from "@/lib/discovery/relationships";
 import TableSchema from "./TableSchema";
 import ProfileDrawer from "./ProfileDrawer";
 import RelationshipsPanel from "./RelationshipsPanel";
-import DropZone from "@/components/dropzone/DropZone";
+import HistoryPanel from "./HistoryPanel";
+import { Icon } from "@/components/ui/icons";
+import { btn } from "@/components/ui/primitives";
+
+const PANELS: { id: SidebarPanel; label: string }[] = [
+  { id: "tables", label: "Tables" },
+  { id: "joins", label: "Joins" },
+  { id: "history", label: "History" },
+];
 
 export default function Sidebar() {
   const tables = useWorkspaceStore((s) => s.tables);
-  const removeTable = useWorkspaceStore((s) => s.removeTable);
-  const [profileTableName, setProfileTableName] = useState<string | null>(null);
-  const [showRelationships, setShowRelationships] = useState(false);
-  const onlySampleTables =
-    tables.length > 0 && tables.every((t) => SAMPLE_TABLE_NAMES.has(t.name));
-  const visibleProfileTableName =
-    profileTableName && tables.some((t) => t.name === profileTableName)
-      ? profileTableName
-      : null;
+  const discovery = useWorkspaceStore((s) => s.discovery);
+  const verdicts = useWorkspaceStore((s) => s.relationshipVerdicts);
+  const open = useUiStore((s) => s.sidebarOpen);
+  const panel = useUiStore((s) => s.sidebarPanel);
+  const showPanel = useUiStore((s) => s.showPanel);
+  const setOpen = useUiStore((s) => s.setSidebarOpen);
+  const setDialog = useUiStore((s) => s.setDialog);
+  const profileTable = useUiStore((s) => s.profileTable);
+  const setProfileTable = useUiStore((s) => s.setProfileTable);
 
-  const handleFilesAdded = useCallback(() => {
-    if (onlySampleTables) {
-      for (const name of SAMPLE_TABLE_NAMES) {
-        removeTable(name);
-      }
+  // Columns that take part in a (non-rejected) join, so the tree can mark keys.
+  const keyColumns = useMemo(() => {
+    const marks = new Map<string, "key" | "ref">();
+    for (const rel of discovery.relationships) {
+      if (verdicts[relationshipKey(rel)] === "rejected") continue;
+      marks.set(`${rel.to.table}.${rel.to.column}`, "key");
+      if (!marks.has(`${rel.from.table}.${rel.from.column}`)) marks.set(`${rel.from.table}.${rel.from.column}`, "ref");
     }
-  }, [onlySampleTables, removeTable]);
+    return marks;
+  }, [discovery.relationships, verdicts]);
 
-  const handleRemove = useCallback(
-    (name: string) => {
-      if (profileTableName === name) setProfileTableName(null);
-      removeTable(name);
-    },
-    [profileTableName, removeTable]
-  );
+  const visibleProfile = profileTable && tables.some((t) => t.name === profileTable) ? profileTable : null;
+  if (!open) return null;
 
   return (
-    <div className="flex h-full shrink-0">
-      <div className="w-60 border-r border-gray-200 bg-white flex flex-col h-full">
-        <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Tables
-          </h2>
-          <DropZone compact highlight={onlySampleTables} onFilesAdded={handleFilesAdded} />
-        </div>
-        <button
-          onClick={() => setShowRelationships((v) => !v)}
-          className={`mx-2 my-1 flex items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors ${
-            showRelationships
-              ? "text-green-700 bg-green-50"
-              : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-          }`}
-          aria-label="Relationships"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H17a3 3 0 010 6h-3.5M10.5 18H7a3 3 0 010-6h3.5M8 15h8" />
-          </svg>
-          Relationships
-        </button>
-        <div className="flex-1 overflow-y-auto py-1">
-          {tables.length === 0 ? (
-            <p className="px-3 py-4 text-xs text-gray-400 text-center">
-              No tables loaded
-            </p>
-          ) : (
-            tables.map((t) => (
-              <TableSchema
-                key={t.name}
-                table={t}
-                onRemove={handleRemove}
-                onOpenProfile={setProfileTableName}
-                profileActive={visibleProfileTableName === t.name}
-              />
-            ))
+    <>
+      {/* Small screens: the sidebar floats over the workbench. */}
+      <div className="fixed inset-0 top-12 z-30 bg-scrim md:hidden" onClick={() => setOpen(false)} />
+      <div className="fixed bottom-0 left-0 top-12 z-30 flex md:static md:z-auto">
+        <aside className="flex h-full w-[272px] flex-col border-r border-line bg-surface" aria-label="Workspace sidebar">
+          <div className="flex items-center gap-1 border-b border-line px-2 py-1.5" role="tablist">
+            {PANELS.map((p) => (
+              <button
+                key={p.id}
+                role="tab"
+                aria-selected={panel === p.id}
+                onClick={() => showPanel(p.id)}
+                className={`h-7 rounded-md px-2.5 text-[13px] transition-colors ${
+                  panel === p.id ? "bg-sunken font-medium text-ink" : "text-muted hover:text-ink"
+                }`}
+              >
+                {p.label}
+                {p.id === "joins" && discovery.status === "ready" && discovery.relationships.length > 0 && (
+                  <span className="ml-1.5 text-[11px] text-join">{discovery.relationships.length}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {panel === "tables" && (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex items-center justify-between px-3 pb-1 pt-2.5">
+                <p className="text-[12px] text-muted">
+                  {tables.length} {tables.length === 1 ? "table" : "tables"}
+                </p>
+                <button onClick={() => setDialog("addFiles")} className={btn.ghost}>
+                  <Icon name="plus" size={14} />
+                  Add data
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+                {tables.map((t) => (
+                  <TableSchema
+                    key={t.name}
+                    table={t}
+                    keyColumns={keyColumns}
+                    profileActive={visibleProfile === t.name}
+                    onOpenProfile={() => setProfileTable(visibleProfile === t.name ? null : t.name)}
+                  />
+                ))}
+              </div>
+            </div>
           )}
-        </div>
+          {panel === "joins" && <RelationshipsPanel />}
+          {panel === "history" && <HistoryPanel />}
+        </aside>
+        {visibleProfile && <ProfileDrawer tableName={visibleProfile} onClose={() => setProfileTable(null)} />}
       </div>
-      {visibleProfileTableName && (
-        <ProfileDrawer
-          tableName={visibleProfileTableName}
-          onClose={() => setProfileTableName(null)}
-        />
-      )}
-      {showRelationships && (
-        <RelationshipsPanel onClose={() => setShowRelationships(false)} />
-      )}
-    </div>
+    </>
   );
 }
