@@ -7,6 +7,29 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.13.0 — A Snowsight-grade look and feel
+
+A design pass modelled on Snowflake Snowsight, MotherDuck, Databricks SQL and the
+Linear / Vercel design systems (documented in `docs/DESIGN.md`).
+
+- **Design system**: Inter + JetBrains Mono, a role-per-step neutral palette with tinted chrome
+  (header, rail, panels, status bar) around white content, hairline borders, elevation only on
+  floating layers, a 4px density grid, consistent radii and motion; editor themes match
+- **Results grid**: mini distribution charts under every column header (toggle "Show column
+  stats"), rectangular range selection (shift-click, drag, shift-arrows, row numbers, column
+  select, select all) copied as TSV, and a Snowsight-style footer with Count / Sum / Avg /
+  Min / Max for the selection; columns size to their names and values
+- **Home screen** for empty spaces: drop zone, sample data, load from URL, recent spaces and
+  snippets; a skeleton of the workspace while it loads
+- **Panels**: explorer, joins (real Accept / Reject buttons and a confidence meter), history,
+  snippets, table profile and the pipeline view (dot-grid canvas) restyled
+- **Frame**: 44px header with space avatars, 36px tabs, a status bar with the DuckDB version,
+  cursor line/column and selection size; the sample-data notice is a floating card
+- **Assistant**: context-aware quick questions (explain the query, why it failed, summarize
+  the result, suggest a chart)
+- Store requests retry briefly on 404/502–504, so a redeploy or a route warming up doesn't
+  lose a save
+
 ## v0.12.0 — Snowsight-style charts and stats, an answer-only Assistant you can resize
 
 - **Chart builder**: chart on the left, "Chart settings" on the right — bar, horizontal bar,

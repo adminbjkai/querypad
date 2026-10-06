@@ -62,6 +62,17 @@ export default function QueryEditor() {
     setEditor(mounted);
     monacoRef.current = monaco;
     registerEditor(mounted);
+    // Cursor position and selection size for the status bar.
+    mounted.onDidChangeCursorSelection(() => {
+      const sel = mounted.getSelection();
+      const model = mounted.getModel();
+      if (!sel || !model) return;
+      useUiStore.getState().setCursor({
+        line: sel.positionLineNumber,
+        column: sel.positionColumn,
+        selected: sel.isEmpty() ? 0 : model.getValueInRange(sel).length,
+      });
+    });
     monaco.editor.setTheme(useUiStore.getState().theme === "dark" ? "qp-dark" : "qp-light");
 
     // Actions read live state through stores, so they never run a stale query.

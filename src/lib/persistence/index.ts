@@ -68,14 +68,30 @@ export function hasPendingWrites(): boolean {
   return inFlight > 0;
 }
 
+/** Transient failures: the server restarting (502–504) or a route still warming up (404). */
+const RETRYABLE = new Set([404, 502, 503, 504]);
+const RETRY_DELAYS_MS = [300, 1200];
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  inFlight += init?.method && init.method !== "GET" ? 1 : 0;
+  const writing = !!init?.method && init.method !== "GET";
+  inFlight += writing ? 1 : 0;
   try {
-    const res = await fetch(url, { cache: "no-store", ...init });
-    if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${url} failed (${res.status})`);
-    return (await res.json()) as T;
+    for (let attempt = 0; ; attempt++) {
+      let res: Response | null = null;
+      try {
+        res = await fetch(url, { cache: "no-store", ...init });
+      } catch (err) {
+        if (attempt >= RETRY_DELAYS_MS.length) throw err;
+      }
+      if (res?.ok) return (await res.json()) as T;
+      // Every store write is idempotent (a full record or a merge), so retrying is safe.
+      if (res && (!RETRYABLE.has(res.status) || attempt >= RETRY_DELAYS_MS.length)) {
+        throw new Error(`${init?.method ?? "GET"} ${url} failed (${res.status})`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+    }
   } finally {
-    inFlight -= init?.method && init.method !== "GET" ? 1 : 0;
+    inFlight -= writing ? 1 : 0;
   }
 }
 

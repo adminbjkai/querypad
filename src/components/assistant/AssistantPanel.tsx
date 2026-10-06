@@ -176,6 +176,7 @@ export default function AssistantPanel() {
   const spaceId = useWorkspaceStore((s) => s.spaceId);
   const tableCount = useWorkspaceStore((s) => s.tables.length + s.views.length);
   const width = useUiStore((s) => s.assistantWidth);
+  const activeTab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -204,11 +205,11 @@ export default function AssistantPanel() {
   return (
     <aside
       style={{ width }}
-      className="relative flex h-full shrink-0 flex-col border-l border-line bg-surface max-md:fixed max-md:inset-y-12 max-md:right-0 max-md:z-30 max-md:!w-full"
+      className="relative flex h-full shrink-0 flex-col border-l border-line bg-surface max-md:fixed max-md:top-11 max-md:bottom-6 max-md:right-0 max-md:z-30 max-md:!w-full"
       aria-label="Assistant"
     >
       <ResizeHandle />
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-line px-3">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-chrome px-3">
         <Icon name="sparkle" size={15} className="text-accent" />
         <h2 className="text-[13px] font-semibold text-ink">Assistant</h2>
         <span className="flex-1" />
@@ -281,6 +282,27 @@ export default function AssistantPanel() {
       </div>
 
       <div className="shrink-0 border-t border-line p-2.5">
+        {!busy && visible.length > 0 && (
+          <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Quick questions">
+            {[
+              activeTab?.query.trim() && "Explain the query in the editor",
+              activeTab?.error && "Why did my query fail?",
+              activeTab?.result && "Summarize this result",
+              activeTab?.result && "What chart fits this result?",
+              "Any data quality issues?",
+            ]
+              .filter((q): q is string => !!q)
+              .map((q) => (
+                <button
+                  key={q}
+                  onClick={() => send(q)}
+                  className="shrink-0 rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] text-muted transition-colors hover:border-line-strong hover:text-ink"
+                >
+                  {q}
+                </button>
+              ))}
+          </div>
+        )}
         <div className="rounded-xl border border-line bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
           <textarea
             ref={inputRef}

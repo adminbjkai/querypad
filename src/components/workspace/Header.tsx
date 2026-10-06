@@ -46,7 +46,7 @@ export default function Header() {
   };
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-2 sm:px-3">
+    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-chrome px-2 sm:px-3">
       {hasTables && (
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -107,7 +107,7 @@ export default function Header() {
       <div className="flex flex-1 justify-center px-2">
         <button
           onClick={() => setPaletteOpen(true)}
-          className="flex h-8 w-full max-w-sm items-center gap-2 rounded-lg border border-line bg-raised px-2.5 text-[13px] text-faint transition-colors hover:border-line-strong hover:text-muted"
+          className="flex h-8 w-full max-w-md items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-faint shadow-[0_1px_0_rgb(15_23_42/0.03)] transition-colors hover:border-line-strong hover:text-muted"
           aria-label="Open command palette"
         >
           <Icon name="search" size={14} />

@@ -206,7 +206,7 @@ test.describe("Saved on the server", () => {
     await c.goto("/");
     await expect(c.getByRole("button", { name: /^Space: From A/ })).toBeVisible({ timeout: 30_000 });
     await c.getByRole("button", { name: /^Space: / }).click();
-    await c.getByRole("button", { name: /^Playground/ }).click();
+    await c.getByRole("dialog", { name: "Spaces" }).getByRole("button", { name: /^Playground/ }).click();
     await expect(c.getByRole("button", { name: "synced", exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(c.locator(".monaco-editor")).toContainText("CREATE TABLE synced");
 
@@ -413,6 +413,20 @@ test.describe("Charts", () => {
     await expect(page.locator(".recharts-bar-rectangle")).toHaveCount(4);
     await page.getByRole("radio", { name: "Scorecard" }).click();
     await expect(page.locator(".recharts-bar-rectangle")).toHaveCount(0);
+  });
+});
+
+test.describe("Results grid", () => {
+  test("selects a range and shows its aggregates", async ({ page }) => {
+    await openWithSamples(page);
+    await runSql(page, "SELECT name, salary FROM employees ORDER BY emp_id");
+    await expect(page.getByRole("columnheader", { name: /salary/ })).toBeVisible({ timeout: 15_000 });
+    const cells = page.getByRole("row").nth(1).getByRole("gridcell");
+    await cells.nth(1).click();
+    await page.getByRole("row").nth(3).getByRole("gridcell").nth(1).click({ modifiers: ["Shift"] });
+    await expect(page.getByText("3 cells")).toBeVisible();
+    await expect(page.getByText(/Sum\s/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Show column stats" })).toBeVisible();
   });
 });
 

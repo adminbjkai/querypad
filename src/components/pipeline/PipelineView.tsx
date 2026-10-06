@@ -48,7 +48,7 @@ export default function PipelineView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-stretch border-b border-line bg-raised">
+      <div className="flex h-9 shrink-0 items-stretch border-b border-line bg-chrome">
         <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto" role="tablist" aria-label="Pipelines">
           {pipelines.map((p) => {
             const active = p.id === activePipelineId;
@@ -61,7 +61,7 @@ export default function PipelineView() {
                 onClick={() => setActivePipeline(p.id)}
                 onKeyDown={(e) => e.key === "Enter" && setActivePipeline(p.id)}
                 className={`group relative flex shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-3 text-[13px] ${
-                  active ? "bg-surface text-ink" : "text-muted hover:bg-sunken hover:text-ink"
+                  active ? "bg-surface text-ink" : "text-muted transition-colors hover:bg-sunken hover:text-ink"
                 }`}
               >
                 {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" />}
@@ -107,12 +107,26 @@ export default function PipelineView() {
       </div>
 
       {!pipeline ? (
-        <p className="p-6 text-[13px] text-muted">Create a pipeline to chain SQL steps.</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-1.5 bg-surface p-6 text-center">
+          <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+            <Icon name="flow" size={18} />
+          </span>
+          <p className="text-[14px] font-medium text-ink">No pipeline</p>
+          <p className="text-[13px] text-muted">Create a pipeline to chain SQL steps.</p>
+          <button onClick={addPipeline} className={`${btn.primary} mt-2`}>
+            <Icon name="plus" size={14} />
+            New pipeline
+          </button>
+        </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <div className="flex w-full shrink-0 flex-col gap-2.5 overflow-y-auto border-b border-line bg-paper p-3 md:w-[340px] md:border-b-0 md:border-r">
+          <div className="flex w-full shrink-0 flex-col gap-2.5 overflow-y-auto border-b border-line bg-chrome p-3 md:w-[340px] md:border-b-0 md:border-r">
             {pipeline.steps.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-line-strong p-4 text-[13px] leading-5 text-muted">
+              <div className="rounded-lg border border-dashed border-line-strong bg-surface p-4 text-[13px] leading-5 text-muted">
+                <span className="mb-2 flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+                  <Icon name="flow" size={18} />
+                </span>
+                <p className="text-[14px] font-medium text-ink">No steps yet</p>
                 Each step is a SQL query saved as a temporary table named after the step. Later steps can select from earlier ones by name.
                 <button onClick={() => addStep(pipeline.id)} className={`${btn.secondary} mt-3`}>
                   <Icon name="plus" size={14} />
@@ -135,7 +149,7 @@ export default function PipelineView() {
             )}
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="h-1/2 min-h-[160px] border-b border-line bg-paper">
+            <div className="h-1/2 min-h-[160px] border-b border-line bg-surface">
               <PipelineDag steps={pipeline.steps} results={results} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
             </div>
             <div className="min-h-0 flex-1">

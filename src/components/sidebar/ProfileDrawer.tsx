@@ -31,33 +31,33 @@ function ColumnCard({ column, rowCount }: { column: ColumnProfile; rowCount: num
   const distinct = column.distinctCount;
   const unique = distinct !== null && rowCount > 0 && distinct === rowCount - column.nullCount && column.nullCount === 0;
   return (
-    <li className="px-3 py-2.5">
+    <li className="px-3 py-2.5 transition-colors hover:bg-raised/60">
       <div className="flex items-center gap-1">
         <KindGlyph kind={column.kind} type={column.type} />
         <span className="min-w-0 truncate font-mono text-[12px] font-medium text-ink">{column.name}</span>
-        {unique && <span className="rounded bg-join-soft px-1 text-[10px] font-medium text-join">unique</span>}
-        <span className="ml-auto shrink-0 text-[11px] text-faint">{column.type.toLowerCase()}</span>
+        {unique && <span className="rounded bg-join-soft px-1 text-[10px] font-medium leading-4 text-join">unique</span>}
+        <span className="ml-auto shrink-0 pl-2 font-mono text-[11px] text-faint">{column.type.toLowerCase()}</span>
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted">
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] tabular-nums text-muted">
         <span>{column.nullPercent >= 10 ? column.nullPercent.toFixed(0) : column.nullPercent.toFixed(1)}% empty</span>
         <span>{distinct?.toLocaleString() ?? "—"} distinct</span>
         <Meter fraction={column.nullPercent / 100} className="bg-warn" />
         <Meter fraction={distinct !== null && rowCount > 0 ? distinct / rowCount : 0} className="bg-k-text" />
       </div>
       {column.kind === "numeric" && (
-        <p className="mt-2 text-[11px] text-muted">
+        <p className="mt-2 font-mono text-[11px] tabular-nums text-muted">
           {formatScalar(column.min)} to {formatScalar(column.max)}, average {formatNumber(column.avg)}
         </p>
       )}
       {column.kind === "date" && (
-        <p className="mt-2 text-[11px] text-muted">
+        <p className="mt-2 font-mono text-[11px] tabular-nums text-muted">
           {formatScalar(column.min)} to {formatScalar(column.max)}
         </p>
       )}
       {column.topValues.length > 0 && (
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-2 space-y-1.5">
           {column.topValues.map((top) => (
-            <li key={top.value} className="grid grid-cols-[1fr_auto] items-center gap-x-2 text-[11px]">
+            <li key={top.value} className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-0.5 text-[11px]">
               <span className="truncate font-mono text-ink">{top.value || "(empty)"}</span>
               <span className="tabular-nums text-faint">{top.count.toLocaleString()}</span>
               <span className="col-span-2">
@@ -84,11 +84,11 @@ export default function ProfileDrawer({ tableName, onClose }: { tableName: strin
 
   return (
     <aside className="flex h-full w-[300px] max-w-[80vw] flex-col border-r border-line bg-surface" aria-label={`${tableName} profile`}>
-      <div className="flex items-center gap-1 border-b border-line px-3 py-2">
+      <div className="flex shrink-0 items-center gap-1 border-b border-line bg-chrome px-3 py-1.5">
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-mono text-[13px] font-semibold text-ink">{tableName} profile</h2>
-          <p className="text-[11px] text-muted">
-            {table.rowCount.toLocaleString()} rows, {table.columns.length} columns
+          <p className="text-[11px] tabular-nums text-muted">
+            {table.rowCount.toLocaleString()} rows × {table.columns.length} columns
           </p>
         </div>
         <button
@@ -106,9 +106,18 @@ export default function ProfileDrawer({ tableName, onClose }: { tableName: strin
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {state.status === "loading" && (
-          <p className="flex items-center gap-2 px-3 py-4 text-[13px] text-muted">
-            <Spinner className="size-3.5 text-accent" /> Profiling columns…
-          </p>
+          <div role="status" aria-label="Profiling columns" className="divide-y divide-line">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-2 px-3 py-3">
+                <div className="qp-skeleton h-3.5 w-1/2" />
+                <div className="qp-skeleton h-2.5 w-full" />
+                <div className="qp-skeleton h-2.5 w-3/4" />
+              </div>
+            ))}
+            <p className="flex items-center gap-2 px-3 py-3 text-[12px] text-muted">
+              <Spinner className="size-3 text-accent" /> Profiling columns…
+            </p>
+          </div>
         )}
         {state.status === "error" && (
           <div className="px-3 py-4 text-[13px]">

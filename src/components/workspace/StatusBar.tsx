@@ -1,7 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useUiStore } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
 
 const AI_LABEL_KEY = "querypad:ai-model-label";
@@ -34,6 +35,25 @@ export default function StatusBar() {
   const tab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   const aiLabel = useSyncExternalStore(subscribeAiLabel, readAiLabel, () => null);
+  const cursor = useUiStore((s) => s.cursor);
+  const viewMode = useWorkspaceStore((s) => s.viewMode);
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!dbReady) return;
+    let cancelled = false;
+    void import("@/lib/duckdb/instance")
+      .then(({ getConnection }) => getConnection())
+      .then((conn) => conn.query("SELECT version() AS v"))
+      .then((table) => {
+        const v = table.toArray()[0]?.v;
+        if (!cancelled && v) setVersion(String(v));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [dbReady]);
 
   let result: { text: string; tone: string } | null = null;
   if (tab?.isExecuting) result = { text: "Running…", tone: "text-muted" };
@@ -46,10 +66,10 @@ export default function StatusBar() {
   }
 
   return (
-    <footer className="flex h-6 shrink-0 items-center gap-4 border-t border-line bg-surface px-3 text-[11px] text-muted" aria-label="Status bar">
+    <footer className="flex h-6 shrink-0 items-center gap-4 border-t border-line bg-chrome px-3 text-[11px] text-muted" aria-label="Status bar">
       <span className="flex items-center gap-1.5" title={dbReady ? "DuckDB-Wasm is running in your browser" : "DuckDB is starting"}>
         <span className={`size-1.5 rounded-full ${dbReady ? "bg-ok" : "bg-warn"}`} aria-hidden="true" />
-        DuckDB {dbReady ? "ready" : "starting"}
+        DuckDB{version ? ` ${version}` : ""} {dbReady ? "ready" : "starting"}
       </span>
       {spaceName && (
         <span className="flex min-w-0 items-center gap-1.5" title="Current space">
@@ -63,6 +83,12 @@ export default function StatusBar() {
       </span>
 
       <span className="ml-auto" />
+      {viewMode === "sql" && cursor && (
+        <span className="shrink-0 tabular-nums" title="Cursor position">
+          Ln {cursor.line}, Col {cursor.column}
+          {cursor.selected > 0 && ` (${cursor.selected.toLocaleString()} selected)`}
+        </span>
+      )}
       {result && (
         <span className={`min-w-0 max-w-[50%] truncate tabular-nums ${result.tone}`} title={tab?.error?.message}>
           {result.text}

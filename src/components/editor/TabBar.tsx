@@ -31,7 +31,7 @@ export default function TabBar() {
   };
 
   return (
-    <div className="flex h-10 shrink-0 items-stretch border-b border-line bg-raised">
+    <div className="flex h-9 shrink-0 items-stretch border-b border-line bg-chrome">
       <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto" role="tablist" aria-label="Query tabs">
         {tabs.map((tab) => {
           const selected = tab.id === activeTabId;

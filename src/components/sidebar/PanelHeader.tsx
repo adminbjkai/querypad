@@ -4,9 +4,9 @@ import { Icon } from "@/components/ui/icons";
 /** The title row every sidebar panel starts with: title, a quiet count, then actions. */
 export default function PanelHeader({ title, count, children }: { title: string; count?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-line px-3">
-      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted">{title}</h2>
-      {count !== undefined && <span className="truncate text-[11px] tabular-nums text-faint">{count}</span>}
+    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-line bg-chrome px-3">
+      <h2 className="text-[11px] font-medium uppercase tracking-wide text-faint">{title}</h2>
+      {count !== undefined && <span className="truncate text-[11px] tabular-nums text-muted">{count}</span>}
       <div className="ml-auto flex items-center gap-0.5">{children}</div>
     </div>
   );
@@ -25,8 +25,8 @@ export function SearchBox({
   label: string;
 }) {
   return (
-    <div className="relative px-3 pb-2 pt-2.5">
-      <Icon name="search" size={13} className="pointer-events-none absolute left-5 top-[18px] text-faint" />
+    <div className="relative px-3 pb-2 pt-2">
+      <Icon name="search" size={13} className="pointer-events-none absolute left-5 top-[15px] text-faint" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}

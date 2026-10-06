@@ -71,7 +71,7 @@ function ColumnRow({
         onClick={onToggle}
         aria-expanded={expanded}
         title={`${column}${type ? ` — ${type}` : ""}`}
-        className={`flex w-full items-center gap-1.5 px-2 py-1.5 text-left transition-colors hover:bg-raised ${expanded ? "bg-raised" : ""}`}
+        className={`flex w-full items-center gap-1.5 px-2 py-1.5 text-left transition-colors hover:bg-sunken ${expanded ? "bg-accent-soft" : ""}`}
       >
         <Icon name="chevronRight" size={12} className={`text-faint transition-transform ${expanded ? "rotate-90" : ""}`} />
         <KindGlyph type={type} kind={stats?.kind} />
@@ -111,7 +111,7 @@ export default function ColumnStatsPane({
 
   return (
     <aside aria-label="Column inspector" className="flex h-full w-[280px] shrink-0 flex-col border-l border-line bg-surface">
-      <div className="flex shrink-0 items-center gap-1 border-b border-line py-1.5 pl-3 pr-2">
+      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-line bg-chrome pl-3 pr-2">
         <p
           className="min-w-0 flex-1 truncate text-[12px] tabular-nums text-muted"
           title={truncated ? `Stats cover the ${result.rows.length.toLocaleString()} rows loaded in the grid.` : undefined}

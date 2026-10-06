@@ -17,6 +17,9 @@ function columnsOf(tables: TableInfo[], table: string): string[] {
   return tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? [];
 }
 
+const small = "h-6 px-1.5 text-[12px]";
+const subtle = "inline-flex h-6 shrink-0 items-center rounded-md border px-2 text-[12px] font-medium transition-colors";
+
 const select =
   "min-w-0 flex-1 rounded-md border border-line bg-surface px-1.5 py-1 font-mono text-[12px] text-ink outline-none focus:border-accent";
 
@@ -48,10 +51,10 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
   );
 
   const tone =
-    verdict === "accepted" ? "border-ok/50 bg-ok-soft/40" : verdict === "rejected" ? "border-line opacity-55" : "border-line";
+    verdict === "accepted" ? "border-ok/40" : verdict === "rejected" ? "border-line opacity-60" : "border-line";
 
   return (
-    <li className={`rounded-lg border bg-surface px-2.5 py-2 ${tone}`}>
+    <li className={`rounded-lg border bg-surface p-2.5 ${tone}`}>
       <p className={`font-mono text-[12px] leading-[18px] text-ink [overflow-wrap:anywhere] ${verdict === "rejected" ? "line-through" : ""}`}>
         <span className="block">{rel.from.table}.{rel.from.column}</span>
         <span className="block">
@@ -59,15 +62,18 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
           {rel.to.table}.{rel.to.column}
         </span>
       </p>
-      <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
-        <span className="relative h-1 w-14 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
+      <div className="mt-2 flex items-center gap-2 text-[11px] text-muted">
+        <span className="relative h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
           <span className="absolute inset-y-0 left-0 rounded-full bg-join" style={{ width: `${rel.confidence}%` }} />
         </span>
-        <span className="font-medium tabular-nums text-ink">{rel.confidence}%</span>
+        <span className="shrink-0 font-medium tabular-nums text-ink">{rel.confidence}%</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-faint">
         <span>{rel.cardinality}</span>
         {rel.evidence === "name" && <span title="This table has no rows yet, so only column names and types were compared">name match</span>}
         {edited && <span className="text-accent">edited</span>}
-        {verdict === "accepted" && <span className="ml-auto text-ok">accepted</span>}
+        {verdict === "accepted" && <span className="ml-auto font-medium text-ok">accepted</span>}
+        {verdict === "rejected" && <span className="ml-auto">rejected</span>}
       </div>
 
       {editing ? (
@@ -125,16 +131,16 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
               ))}
             </ul>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-0.5">
+          <div className="mt-2 flex flex-wrap items-center gap-1">
             <button
               onClick={() => onVerdict(verdict === "accepted" ? null : "accepted")}
-              className={`h-6 rounded px-2 text-[12px] font-medium ${verdict === "accepted" ? "bg-ok text-surface" : "text-ok hover:bg-ok-soft"}`}
+              className={`${subtle} ${verdict === "accepted" ? "border-ok bg-ok text-surface" : "border-ok/30 bg-ok-soft text-ok hover:border-ok/60"}`}
             >
               Accept
             </button>
             <button
               onClick={() => onVerdict(verdict === "rejected" ? null : "rejected")}
-              className={`h-6 rounded px-2 text-[12px] font-medium ${verdict === "rejected" ? "bg-muted text-surface" : "text-muted hover:bg-sunken"}`}
+              className={`${subtle} ${verdict === "rejected" ? "border-danger bg-danger text-surface" : "border-danger/30 bg-danger-soft text-danger hover:border-danger/60"}`}
             >
               Reject
             </button>
@@ -145,7 +151,7 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
                 setToColumn(rel.to.column);
                 setEditing(true);
               }}
-              className="h-6 rounded px-2 text-[12px] text-muted hover:bg-sunken hover:text-ink"
+              className={`${btn.ghost} ${small}`}
             >
               Edit
             </button>
@@ -153,12 +159,12 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
               onClick={() => {
                 if (!insertAtCursor(`${joinClause(rel)}\n`)) toast("Open the SQL editor to insert the join.", "info");
               }}
-              className="h-6 rounded px-2 text-[12px] text-muted hover:bg-sunken hover:text-ink"
+              className={`${btn.ghost} ${small}`}
               title={joinClause(rel)}
             >
               Insert JOIN
             </button>
-            <button onClick={() => setExpanded((v) => !v)} className="ml-auto h-6 rounded px-2 text-[12px] text-muted hover:bg-sunken hover:text-ink">
+            <button onClick={() => setExpanded((v) => !v)} className={`${btn.ghost} ${small} ml-auto`}>
               {expanded ? "Hide" : "Why?"}
             </button>
           </div>
@@ -201,13 +207,13 @@ export default function RelationshipsPanel() {
           <Icon name="refresh" size={14} />
         </button>
       </PanelHeader>
-      <p className="px-3 pb-2 pt-2.5 text-[12px] leading-[17px] text-muted">
-        {discovery.status === "ready"
-          ? sorted.length > 0
+      {!(discovery.status === "ready" && sorted.length === 0) && (
+        <p className="px-3 pb-2 pt-2.5 text-[12px] leading-4 text-muted">
+          {discovery.status === "ready"
             ? `${sorted.length} inferred from your data. Accept the right ones — AI uses them for joins.`
-            : "No joins found yet."
-          : "Finding joins by comparing key values across tables…"}
-      </p>
+            : "Finding joins by comparing key values across tables…"}
+        </p>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {discovery.status === "loading" && (
           <p className="flex items-center gap-2 px-1 py-3 text-[13px] text-muted">
@@ -224,12 +230,18 @@ export default function RelationshipsPanel() {
           </div>
         )}
         {discovery.status === "ready" && sorted.length === 0 && (
-          <p className="px-1 py-3 text-[13px] leading-5 text-muted">
-            Load at least two tables that share a key — for example orders.customer_id and customers.id.
-          </p>
+          <div className="flex flex-col items-center px-4 py-8 text-center">
+            <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+              <Icon name="join" size={18} />
+            </span>
+            <p className="mt-3 text-[14px] font-medium text-ink">No joins yet</p>
+            <p className="mt-1 text-[13px] leading-5 text-muted">
+              Load at least two tables that share a key — for example orders.customer_id and customers.id.
+            </p>
+          </div>
         )}
         {discovery.status === "ready" && sorted.length > 0 && (
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {sorted.map((rel) => {
               const key = relationshipKey(rel);
               return (

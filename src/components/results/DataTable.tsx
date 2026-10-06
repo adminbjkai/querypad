@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { QueryResult } from "@/types";
 import { formatValue } from "@/lib/utils";
@@ -8,16 +8,21 @@ import { classifyType } from "@/lib/duckdb/sql-utils";
 import { copyText } from "@/lib/export/clipboard";
 import { toast } from "@/stores/ui-store";
 import { Icon, type IconName } from "@/components/ui/icons";
-import { KindGlyph } from "@/components/ui/primitives";
+import { Kbd, KindGlyph, MOD } from "@/components/ui/primitives";
+import ColumnMiniChart, { DIST_HEIGHT } from "./ColumnMiniChart";
+import { computeRangeStats, formatNumber, rangeToTsv } from "./range-stats";
 
 const ROW_HEIGHT = 28;
 const HEADER_HEIGHT = 32;
+const FOOTER_HEIGHT = 28;
 const NUM_COL = 56;
 const MIN_COL = 48;
 const MAX_COL = 640;
 
 type Sort = { column: string; dir: "asc" | "desc" } | null;
 type Cell = { row: number; col: number };
+/** A rectangular selection; `mode` records how it was made (whole rows/columns copy differently). */
+type Sel = { anchor: Cell; focus: Cell; mode: "cell" | "row" | "col" | "all" };
 
 function compare(a: unknown, b: unknown): number {
   if (a === b) return 0;
@@ -32,7 +37,7 @@ function compare(a: unknown, b: unknown): number {
  * (~7.3px/char of UI text), values are 12px monospace (~7.3px/char).
  */
 function widthFor(name: string, rows: Record<string, unknown>[], sample: number, cap: number): number {
-  const header = name.length * 7.3 + 72;
+  const header = name.length * 7.6 + 92;
   let chars = 0;
   for (let i = 0; i < Math.min(rows.length, sample); i++) {
     chars = Math.max(chars, Math.min(120, formatValue(rows[i][name]).length));
@@ -108,6 +113,7 @@ export default function DataTable({
   result,
   filter = "",
   inspectedColumn = null,
+  showStats = false,
   onInspect,
   onSelectColumn,
 }: {
@@ -115,6 +121,8 @@ export default function DataTable({
   filter?: string;
   /** Column currently shown in the inspector (highlighted in the header). */
   inspectedColumn?: string | null;
+  /** Show the mini-distribution strip under each column header. */
+  showStats?: boolean;
   onInspect?: (column: string) => void;
   /** Called when a cell is selected, so the inspector can follow the selection. */
   onSelectColumn?: (column: string) => void;
@@ -122,7 +130,7 @@ export default function DataTable({
   const parentRef = useRef<HTMLDivElement>(null);
   const [sort, setSort] = useState<Sort>(null);
   const [overrides, setOverrides] = useState<Record<string, number>>({});
-  const [sel, setSel] = useState<Cell | null>(null);
+  const [sel, setSel] = useState<Sel | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   const kinds = useMemo(
@@ -133,6 +141,8 @@ export default function DataTable({
   const widths = result.columns.map((c, i) => overrides[c] ?? autoWidths[i]);
   const gridCols = `${NUM_COL}px ${widths.map((w) => `${w}px`).join(" ")}`;
   const totalWidth = NUM_COL + widths.reduce((a, b) => a + b, 0);
+
+  const headerHeight = HEADER_HEIGHT + (showStats ? DIST_HEIGHT : 0);
 
   const rows = useMemo(() => {
     let out = result.rows;
@@ -161,8 +171,8 @@ export default function DataTable({
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 16,
-    scrollMargin: HEADER_HEIGHT,
-    scrollPaddingStart: HEADER_HEIGHT,
+    scrollMargin: headerHeight,
+    scrollPaddingStart: headerHeight,
   });
 
   const cycleSort = (column: string) =>
@@ -170,9 +180,42 @@ export default function DataTable({
       s?.column !== column ? { column, dir: "asc" } : s.dir === "asc" ? { column, dir: "desc" } : null
     );
 
-  const copyCell = (cell: Cell) => {
-    const text = cellText(rows[cell.row]?.[result.columns[cell.col]]);
-    void copyText(text).then(() => toast(text === "" ? "Copied empty value" : `Copied ${short(text)}`));
+  const lastRow = rows.length - 1;
+  const lastCol = result.columns.length - 1;
+
+  // Normalised, clamped rectangle (rows can shrink under a selection when the filter changes).
+  const range = useMemo(() => {
+    if (!sel || lastRow < 0) return null;
+    const cl = (n: number, max: number) => Math.max(0, Math.min(max, n));
+    const ar = cl(sel.anchor.row, lastRow), fr = cl(sel.focus.row, lastRow);
+    const ac = cl(sel.anchor.col, lastCol), fc = cl(sel.focus.col, lastCol);
+    return {
+      r1: Math.min(ar, fr), r2: Math.max(ar, fr), c1: Math.min(ac, fc), c2: Math.max(ac, fc),
+      focus: { row: fr, col: fc }, mode: sel.mode,
+    };
+  }, [sel, lastRow, lastCol]);
+
+  // Aggregates are only computed when a range exists, and deferred so dragging stays responsive.
+  const deferredRange = useDeferredValue(range);
+  const rangeStats = useMemo(
+    () =>
+      deferredRange
+        ? computeRangeStats(rows, result.columns, deferredRange.r1, deferredRange.r2, deferredRange.c1, deferredRange.c2)
+        : null,
+    [deferredRange, rows, result.columns]
+  );
+
+  const copyRange = () => {
+    if (!range) return;
+    const { r1, r2, c1, c2, mode } = range;
+    const single = r1 === r2 && c1 === c2;
+    const text = single
+      ? cellText(rows[r1]?.[result.columns[c1]])
+      : rangeToTsv(rows, result.columns, r1, r2, c1, c2, mode === "col" || mode === "all");
+    const n = (r2 - r1 + 1) * (c2 - c1 + 1);
+    void copyText(text).then(() =>
+      toast(single ? (text === "" ? "Copied empty value" : `Copied ${short(text)}`) : `Copied ${n.toLocaleString()} cells`)
+    );
   };
 
   const copyColumnValues = (column: string) => {
@@ -182,9 +225,56 @@ export default function DataTable({
 
   const copyColumnName = (column: string) => void copyText(column).then(() => toast(`Copied ${column}`));
 
-  const select = (cell: Cell) => {
-    setSel(cell);
-    onSelectColumn?.(result.columns[cell.col]);
+  const notify = (col: number) => onSelectColumn?.(result.columns[col]);
+
+  /** Select (or, with `extend`, grow the selection to) a cell. */
+  const selectCell = (cell: Cell, extend = false) => {
+    setSel((s) => (extend && s ? { ...s, focus: cell, mode: "cell" } : { anchor: cell, focus: cell, mode: "cell" }));
+    notify(cell.col);
+  };
+  const selectRow = (row: number, extend: boolean) => {
+    if (lastCol < 0) return;
+    setSel((s) =>
+      extend && s ? { anchor: { row: s.anchor.row, col: 0 }, focus: { row, col: lastCol }, mode: "row" } : { anchor: { row, col: 0 }, focus: { row, col: lastCol }, mode: "row" }
+    );
+  };
+  const selectColumn = (col: number, extend: boolean) => {
+    setSel((s) =>
+      extend && s ? { anchor: { row: 0, col: s.anchor.col }, focus: { row: lastRow, col }, mode: "col" } : { anchor: { row: 0, col }, focus: { row: lastRow, col }, mode: "col" }
+    );
+    notify(col);
+  };
+  const selectAll = () => {
+    if (lastRow < 0) return;
+    setSel({ anchor: { row: 0, col: 0 }, focus: { row: lastRow, col: lastCol }, mode: "all" });
+  };
+
+  /** Mouse-down on a cell starts a drag selection; moving over other cells grows the range. */
+  const startDrag = (e: React.MouseEvent, cell: Cell) => {
+    if (e.button !== 0) return;
+    e.preventDefault(); // no text selection while dragging
+    parentRef.current?.focus({ preventScroll: true });
+    selectCell(cell, e.shiftKey);
+    const move = (ev: MouseEvent) => {
+      const el = parentRef.current;
+      if (el) {
+        const b = el.getBoundingClientRect();
+        if (ev.clientY > b.bottom - 24) el.scrollTop += 24;
+        else if (ev.clientY < b.top + headerHeight + 16) el.scrollTop -= 24;
+        if (ev.clientX > b.right - 24) el.scrollLeft += 24;
+        else if (ev.clientX < b.left + NUM_COL + 16) el.scrollLeft -= 24;
+      }
+      const hit = (document.elementFromPoint(ev.clientX, ev.clientY) as Element | null)?.closest<HTMLElement>("[data-r]");
+      if (!hit) return;
+      const next = { row: Number(hit.dataset.r), col: Number(hit.dataset.c) };
+      setSel((s) => (s && (s.focus.row !== next.row || s.focus.col !== next.col) ? { ...s, focus: next, mode: "cell" } : s));
+    };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
   };
 
   const ensureColVisible = (col: number) => {
@@ -200,26 +290,31 @@ export default function DataTable({
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (rows.length === 0) return;
     const meta = e.ctrlKey || e.metaKey;
-    if (meta && e.key.toLowerCase() === "c") {
-      if (sel) {
+    const key = e.key.toLowerCase();
+    if (meta && key === "c") {
+      if (range) {
         e.preventDefault();
-        copyCell(sel);
+        copyRange();
       }
+      return;
+    }
+    if (meta && key === "a") {
+      e.preventDefault();
+      selectAll();
       return;
     }
     if (e.key === "Escape") {
       setSel(null);
       return;
     }
-    const lastRow = rows.length - 1;
-    const lastCol = result.columns.length - 1;
-    const page = Math.max(1, Math.floor(((parentRef.current?.clientHeight ?? 300) - HEADER_HEIGHT) / ROW_HEIGHT) - 1);
-    const cur = sel ?? { row: 0, col: 0 };
-    let next: Cell | null = null;
+    const page = Math.max(1, Math.floor(((parentRef.current?.clientHeight ?? 300) - headerHeight - FOOTER_HEIGHT) / ROW_HEIGHT) - 1);
+    const cur = range?.focus ?? { row: 0, col: 0 };
+    const has = !!range;
+    let next: Cell;
     switch (e.key) {
-      case "ArrowDown": next = { ...cur, row: Math.min(lastRow, sel ? cur.row + 1 : 0) }; break;
+      case "ArrowDown": next = { ...cur, row: Math.min(lastRow, has ? cur.row + 1 : 0) }; break;
       case "ArrowUp": next = { ...cur, row: Math.max(0, cur.row - 1) }; break;
-      case "ArrowRight": next = { ...cur, col: Math.min(lastCol, sel ? cur.col + 1 : 0) }; break;
+      case "ArrowRight": next = { ...cur, col: Math.min(lastCol, has ? cur.col + 1 : 0) }; break;
       case "ArrowLeft": next = { ...cur, col: Math.max(0, cur.col - 1) }; break;
       case "PageDown": next = { ...cur, row: Math.min(lastRow, cur.row + page) }; break;
       case "PageUp": next = { ...cur, row: Math.max(0, cur.row - page) }; break;
@@ -228,7 +323,7 @@ export default function DataTable({
       default: return;
     }
     e.preventDefault();
-    select(next);
+    selectCell(next, e.shiftKey && has);
     virtualizer.scrollToIndex(next.row);
     ensureColVisible(next.col);
   };
@@ -254,6 +349,8 @@ export default function DataTable({
   const autoFit = (column: string) =>
     setOverrides((o) => ({ ...o, [column]: widthFor(column, result.rows, 1000, MAX_COL) }));
 
+  const cellInRange = (r: number, c: number) => !!range && r >= range.r1 && r <= range.r2 && c >= range.c1 && c <= range.c2;
+
   if (result.columns.length === 0) {
     return (
       <div className="flex h-full items-center justify-center bg-surface p-6 text-[13px] text-muted">
@@ -266,154 +363,257 @@ export default function DataTable({
     { label: "Sort ascending", icon: "sortAsc" as const, onSelect: () => setSort({ column, dir: "asc" }) },
     { label: "Sort descending", icon: "sortDesc" as const, onSelect: () => setSort({ column, dir: "desc" }) },
     ...(sort?.column === column ? [{ label: "Clear sort", icon: "x" as const, onSelect: () => setSort(null) }] : []),
+    { label: "Select column", icon: "table" as const, onSelect: () => selectColumn(result.columns.indexOf(column), false) },
     { label: "Copy column name", icon: "copy" as const, onSelect: () => copyColumnName(column) },
     { label: "Copy column values", icon: "copy" as const, onSelect: () => copyColumnValues(column) },
     ...(onInspect ? [{ label: "Inspect column", icon: "panelRight" as const, onSelect: () => onInspect(column) }] : []),
   ];
 
+  const multi = !!range && (range.r1 !== range.r2 || range.c1 !== range.c2);
+  const st = rangeStats;
+  const sep = <span aria-hidden="true" className="text-faint">·</span>;
+  const stat = (label: string, value: string) => (
+    <span className="whitespace-nowrap">
+      <span className="text-muted">{label}</span> <span className="text-ink">{value}</span>
+    </span>
+  );
+
   return (
-    <div
-      ref={parentRef}
-      className="group/grid h-full overflow-auto bg-surface outline-none"
-      role="grid"
-      aria-rowcount={rows.length}
-      aria-colcount={result.columns.length}
-      tabIndex={0}
-      onKeyDown={onKeyDown}
-    >
-      <div style={{ width: totalWidth, minWidth: "100%" }}>
-        <div
-          className="sticky top-0 z-10 grid border-b border-line bg-raised"
-          style={{ gridTemplateColumns: gridCols, height: HEADER_HEIGHT }}
-          role="row"
-        >
+    <div className="flex h-full flex-col bg-surface">
+      <div
+        ref={parentRef}
+        className="group/grid min-h-0 flex-1 select-none overflow-auto bg-surface outline-none"
+        role="grid"
+        aria-rowcount={rows.length}
+        aria-colcount={result.columns.length}
+        aria-multiselectable="true"
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+      >
+        <div style={{ width: totalWidth, minWidth: "100%" }}>
           <div
-            className="sticky left-0 z-[2] flex items-center justify-end border-r border-line bg-raised px-3 text-[11px] text-faint"
-            role="columnheader"
+            className="sticky top-0 z-10 grid border-b border-line bg-chrome"
+            style={{ gridTemplateColumns: gridCols, height: headerHeight }}
+            role="row"
           >
-            #
-          </div>
-          {result.columns.map((col, i) => {
-            const active = sort?.column === col;
-            const inspected = inspectedColumn === col;
-            return (
-              <div
-                key={col}
-                role="columnheader"
-                tabIndex={0}
-                aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"}
-                onClick={(e) => (e.altKey && onInspect ? onInspect(col) : cycleSort(col))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    cycleSort(col);
-                  }
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setMenu({ column: col, x: e.clientX, y: e.clientY });
-                }}
-                title={`${col} — ${result.columnTypes[i]}. Click to sort, Alt-click to inspect.`}
-                className={`group relative flex min-w-0 cursor-pointer select-none items-center gap-0.5 border-r border-line/60 px-2 text-[12px] font-medium hover:bg-sunken ${
-                  active ? "text-accent" : "text-ink"
-                } ${inspected ? "shadow-[inset_0_-2px_0_var(--accent)]" : ""}`}
-              >
-                <KindGlyph kind={kinds[i]} type={result.columnTypes[i]} />
-                <span className={`min-w-0 flex-1 truncate ${kinds[i] === "numeric" ? "text-right" : ""}`}>{col}</span>
-                <Icon
-                  name={active ? (sort!.dir === "asc" ? "sortAsc" : "sortDesc") : "sort"}
-                  size={12}
-                  className={active ? "" : "text-faint opacity-0 group-hover:opacity-100"}
-                />
-                <button
-                  tabIndex={-1}
-                  aria-label={`Menu for ${col}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const r = e.currentTarget.getBoundingClientRect();
-                    setMenu({ column: col, x: r.right - 200, y: r.bottom + 4 });
-                  }}
-                  className="inline-flex size-5 shrink-0 items-center justify-center rounded text-faint opacity-0 hover:bg-line hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
-                >
-                  <Icon name="chevronDown" size={12} />
-                </button>
-                <span
-                  aria-hidden="true"
-                  title="Drag to resize, double-click to fit"
-                  onPointerDown={(e) => startResize(e, col, widths[i])}
-                  onClick={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    autoFit(col);
-                  }}
-                  className="qp-col-resize absolute inset-y-0 -right-0.5 z-[3] w-2 cursor-col-resize"
-                />
-              </div>
-            );
-          })}
-        </div>
-        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-          {virtualizer.getVirtualItems().map((item) => {
-            const row = rows[item.index];
-            const odd = item.index % 2 === 1;
-            return (
-              <div
-                key={item.key}
-                role="row"
-                className={`group/row absolute left-0 grid w-full border-b border-line/40 hover:bg-sunken ${odd ? "bg-raised" : "bg-surface"}`}
-                style={{
-                  height: item.size,
-                  transform: `translateY(${item.start - virtualizer.options.scrollMargin}px)`,
-                  gridTemplateColumns: gridCols,
-                }}
-              >
+            <div
+              className="sticky left-0 z-[2] flex cursor-pointer items-start justify-end border-r border-line bg-chrome px-3 pt-2 text-[11px] text-faint hover:text-ink"
+              role="columnheader"
+              title="Select all"
+              onClick={selectAll}
+            >
+              #
+            </div>
+            {result.columns.map((col, i) => {
+              const active = sort?.column === col;
+              const inspected = inspectedColumn === col;
+              const colSelected = !!range && i >= range.c1 && i <= range.c2 && (range.mode === "col" || range.mode === "all");
+              return (
                 <div
-                  className={`sticky left-0 z-[1] flex items-center justify-end border-r border-line px-3 font-mono text-[11px] tabular-nums text-faint group-hover/row:bg-sunken ${
-                    odd ? "bg-raised" : "bg-surface"
-                  } ${sel?.row === item.index ? "text-accent" : ""}`}
+                  key={col}
+                  role="columnheader"
+                  tabIndex={0}
+                  aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"}
+                  onClick={(e) => {
+                    if (e.altKey && onInspect) onInspect(col);
+                    else if (e.metaKey || e.ctrlKey) selectColumn(i, e.shiftKey);
+                    else cycleSort(col);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      cycleSort(col);
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMenu({ column: col, x: e.clientX, y: e.clientY });
+                  }}
+                  title={`${col} — ${result.columnTypes[i]}. Click to sort, ${MOD}-click to select the column, Alt-click to inspect.`}
+                  className={`group relative flex min-w-0 cursor-pointer select-none flex-col border-r border-line/60 text-[12px] font-medium hover:bg-sunken ${
+                    active ? "text-accent" : "text-ink"
+                  } ${colSelected ? "bg-accent-soft" : ""} ${inspected ? "shadow-[inset_0_-2px_0_var(--accent)]" : ""}`}
                 >
-                  {item.index + 1}
-                </div>
-                {result.columns.map((col, i) => {
-                  const value = row[col];
-                  const isNull = value === null || value === undefined;
-                  const text = formatValue(value);
-                  const selected = sel?.row === item.index && sel.col === i;
-                  return (
-                    <div
-                      key={col}
-                      role="gridcell"
-                      aria-selected={selected}
-                      onClick={() => select({ row: item.index, col: i })}
-                      onDoubleClick={() => copyCell({ row: item.index, col: i })}
-                      title={isNull ? "NULL" : text.length > 500 ? `${text.slice(0, 500)}…` : text}
-                      className={`flex min-w-0 items-center border-r border-line/40 px-2 font-mono text-[12px] tabular-nums ${
-                        kinds[i] === "numeric" ? "justify-end" : ""
-                      } ${selected ? "ring-2 ring-inset ring-line-strong group-focus/grid:ring-accent" : ""} ${
-                        isNull ? "" : "text-ink"
-                      }`}
+                  <div className="flex shrink-0 items-center gap-0.5 px-2" style={{ height: HEADER_HEIGHT }}>
+                    <KindGlyph kind={kinds[i]} type={result.columnTypes[i]} />
+                    <span className={`min-w-0 flex-1 truncate ${kinds[i] === "numeric" ? "text-right" : ""}`}>{col}</span>
+                    <Icon
+                      name={active ? (sort!.dir === "asc" ? "sortAsc" : "sortDesc") : "sort"}
+                      size={12}
+                      className={active ? "" : "text-faint opacity-0 group-hover:opacity-100"}
+                    />
+                    <button
+                      tabIndex={-1}
+                      aria-label={`Menu for ${col}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setMenu({ column: col, x: r.right - 200, y: r.bottom + 4 });
+                      }}
+                      className="inline-flex size-5 shrink-0 items-center justify-center rounded text-faint opacity-0 hover:bg-line hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
                     >
-                      {isNull ? (
-                        <span className="rounded bg-sunken px-1 font-sans text-[10px] font-medium italic leading-4 text-faint">NULL</span>
-                      ) : text === "" ? (
-                        <span className="text-faint">&quot;&quot;</span>
-                      ) : (
-                        <span className="truncate">{text}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+                      <Icon name="chevronDown" size={12} />
+                    </button>
+                  </div>
+                  {showStats && onInspect && <ColumnMiniChart result={result} column={col} index={i} onOpen={() => onInspect(col)} />}
+                  <span
+                    aria-hidden="true"
+                    title="Drag to resize, double-click to fit"
+                    onPointerDown={(e) => startResize(e, col, widths[i])}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      autoFit(col);
+                    }}
+                    className="qp-col-resize absolute inset-y-0 -right-0.5 z-[3] w-2 cursor-col-resize"
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+            {virtualizer.getVirtualItems().map((item) => {
+              const row = rows[item.index];
+              const odd = item.index % 2 === 1;
+              const rowSelected = !!range && item.index >= range.r1 && item.index <= range.r2 && (range.mode === "row" || range.mode === "all");
+              return (
+                <div
+                  key={item.key}
+                  role="row"
+                  className={`absolute left-0 grid w-full border-b border-line/40 hover:bg-sunken ${odd ? "bg-raised" : "bg-surface"}`}
+                  style={{
+                    height: item.size,
+                    transform: `translateY(${item.start - virtualizer.options.scrollMargin}px)`,
+                    gridTemplateColumns: gridCols,
+                  }}
+                >
+                  <div
+                    onMouseDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.preventDefault();
+                      parentRef.current?.focus({ preventScroll: true });
+                      selectRow(item.index, e.shiftKey);
+                    }}
+                    title="Select row"
+                    className={`sticky left-0 z-[1] flex cursor-pointer items-center justify-end border-r border-line px-3 font-mono text-[11px] tabular-nums ${
+                      rowSelected ? "bg-accent-soft text-ink" : range && item.index >= range.r1 && item.index <= range.r2 ? "bg-chrome text-accent" : "bg-chrome text-faint hover:text-ink"
+                    }`}
+                  >
+                    {item.index + 1}
+                  </div>
+                  {result.columns.map((col, i) => {
+                    const value = row[col];
+                    const isNull = value === null || value === undefined;
+                    const text = formatValue(value);
+                    const inRange = cellInRange(item.index, i);
+                    const isFocus = !!range && range.focus.row === item.index && range.focus.col === i;
+                    let shadow: string | undefined;
+                    if (inRange && range) {
+                      const edges: string[] = [];
+                      if (item.index === range.r1) edges.push("inset 0 1px 0 0 var(--accent)");
+                      if (item.index === range.r2) edges.push("inset 0 -1px 0 0 var(--accent)");
+                      if (i === range.c1) edges.push("inset 1px 0 0 0 var(--accent)");
+                      if (i === range.c2) edges.push("inset -1px 0 0 0 var(--accent)");
+                      if (isFocus && multi) edges.push("inset 0 0 0 2px var(--accent)");
+                      if (edges.length) shadow = edges.join(", ");
+                    }
+                    return (
+                      <div
+                        key={col}
+                        role="gridcell"
+                        data-r={item.index}
+                        data-c={i}
+                        aria-selected={inRange}
+                        onMouseDown={(e) => startDrag(e, { row: item.index, col: i })}
+                        onDoubleClick={() => {
+                          selectCell({ row: item.index, col: i });
+                          const t = cellText(value);
+                          void copyText(t).then(() => toast(t === "" ? "Copied empty value" : `Copied ${short(t)}`));
+                        }}
+                        title={isNull ? "NULL" : text.length > 500 ? `${text.slice(0, 500)}…` : text}
+                        style={shadow ? { boxShadow: shadow } : undefined}
+                        className={`flex min-w-0 items-center border-r border-line/40 px-2 font-mono text-[12px] tabular-nums ${
+                          kinds[i] === "numeric" ? "justify-end" : ""
+                        } ${inRange && !(isFocus && multi) ? "bg-accent-soft" : ""} ${isNull ? "" : "text-ink"}`}
+                      >
+                        {isNull ? (
+                          <span className="font-sans italic text-faint">NULL</span>
+                        ) : text === "" ? (
+                          <span className="text-faint">&quot;&quot;</span>
+                        ) : (
+                          <span className="truncate">{text}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+          {rows.length === 0 && (
+            <p className="px-4 py-6 text-[13px] text-muted">
+              {filter ? `No rows contain “${filter}”.` : "The query returned no rows."}
+            </p>
+          )}
         </div>
-        {rows.length === 0 && (
-          <p className="px-4 py-6 text-[13px] text-muted">
-            {filter ? `No rows contain “${filter}”.` : "The query returned no rows."}
+        {menu && <ColumnMenu state={menu} items={menuItems(menu.column)} onClose={() => setMenu(null)} />}
+      </div>
+      <div
+        className="flex shrink-0 items-center gap-2 border-t border-line bg-chrome px-3 text-[12px] tabular-nums"
+        style={{ height: FOOTER_HEIGHT }}
+        aria-live="polite"
+        data-testid="grid-footer"
+      >
+        {st && range ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+            <span className="whitespace-nowrap">
+              <span className="text-ink">{st.cells.toLocaleString()}</span> <span className="text-muted">{st.cells === 1 ? "cell" : "cells"}</span>
+            </span>
+            {st.numericCount > 0 ? (
+              <>
+                {sep}
+                {stat("Sum", formatNumber(st.sum!))}
+                {sep}
+                {stat("Avg", formatNumber(st.avg!))}
+                {sep}
+                {stat("Min", formatNumber(st.min!))}
+                {sep}
+                {stat("Max", formatNumber(st.max!))}
+              </>
+            ) : (
+              <>
+                {sep}
+                {stat("Unique", st.distinct.toLocaleString())}
+              </>
+            )}
+            {st.nulls > 0 && (
+              <>
+                {sep}
+                {stat("Nulls", st.nulls.toLocaleString())}
+              </>
+            )}
+          </div>
+        ) : (
+          <p className="min-w-0 flex-1 truncate text-muted">
+            <span className="text-ink">{rows.length.toLocaleString()}</span> {rows.length === 1 ? "row" : "rows"}
+            {rows.length !== result.rows.length && <span className="text-faint"> of {result.rows.length.toLocaleString()}</span>}
+            {" · "}
+            <span className="text-ink">{result.columns.length}</span> {result.columns.length === 1 ? "column" : "columns"}
           </p>
         )}
+        {range && (
+          <button
+            onClick={copyRange}
+            className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1.5 text-muted transition-colors hover:bg-sunken hover:text-ink"
+            title="Copy selection as TSV"
+            aria-label="Copy selection"
+          >
+            <Icon name="copy" size={12} />
+            <Kbd>{MOD}</Kbd>
+            <Kbd>C</Kbd>
+          </button>
+        )}
       </div>
-      {menu && <ColumnMenu state={menu} items={menuItems(menu.column)} onClose={() => setMenu(null)} />}
     </div>
   );
 }

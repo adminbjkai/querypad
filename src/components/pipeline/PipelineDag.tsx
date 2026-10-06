@@ -3,12 +3,12 @@
 import { useMemo, useCallback } from "react";
 import {
   ReactFlow,
-  Background,
   Controls,
   type Node,
   type Edge,
 } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
+import { Icon } from "@/components/ui/icons";
 import { extractEdges } from "@/lib/pipeline/graph";
 import type { PipelineStep, PipelineExecutionResult } from "@/types/pipeline";
 import { useUiStore } from "@/stores/ui-store";
@@ -78,8 +78,8 @@ export default function PipelineDag({
         position: { x: 0, y: 0 },
         style: {
           background: bg,
-          border: `1.5px solid ${border}`,
-          borderRadius: 8,
+          border: `1px solid ${border}`,
+          borderRadius: 6,
           padding: "8px 14px",
           fontSize: 12,
           fontFamily: "var(--font-code), monospace",
@@ -111,14 +111,18 @@ export default function PipelineDag({
 
   if (steps.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-[13px] text-muted">
-        Steps and their dependencies appear here as a graph.
+      <div className="qp-dotgrid flex h-full flex-col items-center justify-center gap-2 bg-surface text-center">
+        <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+          <Icon name="flow" size={18} />
+        </span>
+        <p className="text-[14px] font-medium text-ink">No graph yet</p>
+        <p className="text-[13px] text-muted">Steps and their dependencies appear here as a graph.</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full">
+    <div className="qp-dotgrid h-full w-full bg-surface">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -128,8 +132,8 @@ export default function PipelineDag({
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false}
         nodesConnectable={false}
+        style={{ background: "transparent" }}
       >
-        <Background color="var(--line)" gap={18} />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>

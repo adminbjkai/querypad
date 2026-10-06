@@ -8,70 +8,79 @@
  */
 :root {
   color-scheme: light;
-  --paper: #eef1f4;
+  /* Neutrals follow a role-per-step scale: page, chrome (panels), surface (editor/grid),
+     raised (subtle fills), sunken (hover/pressed); hairline borders, no decorative chrome. */
+  --paper: #f3f5f8;
+  --chrome: #f7f8fa;
   --surface: #ffffff;
   --raised: #f6f8fa;
-  --sunken: #e6eaef;
-  --line: #d6dce3;
-  --line-strong: #bcc5cf;
-  --ink: #1b2433;
-  --muted: #5c6878;
-  --faint: #8c97a4;
-  --accent: #1a6ce7;
-  --accent-hover: #1558c2;
-  --accent-soft: #e6f0fd;
+  --sunken: #eceff3;
+  --line: #e2e6eb;
+  --line-strong: #cbd2db;
+  --ink: #0f172a;
+  --muted: #4f5b6c;
+  --faint: #7c8796;
+  --accent: #1d5fdb;
+  --accent-hover: #174ec0;
+  --accent-soft: #e8effc;
   --on-accent: #ffffff;
-  --join: #b86e00;
-  --join-soft: #fbefd9;
-  --ok: #1f7a4d;
-  --ok-soft: #e1f2e8;
-  --danger: #b4232f;
-  --danger-soft: #fbe5e6;
-  --warn: #9a5b00;
-  --warn-soft: #fcf0d8;
-  --k-num: #1d7a86;
-  --k-text: #6a4fc9;
-  --k-date: #b4471d;
-  --k-bool: #4f7a12;
-  --k-other: #6b7684;
-  --shadow: 0 1px 2px rgb(27 36 51 / 0.06), 0 8px 24px -8px rgb(27 36 51 / 0.18);
-  --scrim: rgb(8 12 18 / 0.45);
+  --join: #b25e00;
+  --join-soft: #fdf0dc;
+  --ok: #067647;
+  --ok-soft: #e3f4ea;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --warn: #b54708;
+  --warn-soft: #fef0e1;
+  --k-num: #0e7490;
+  --k-text: #6d4fd0;
+  --k-date: #c2410c;
+  --k-bool: #4d7c0f;
+  --k-other: #64748b;
+  /* Elevation only for floating layers; everything docked uses a hairline. */
+  --shadow: 0 0 0 1px rgb(15 23 42 / 0.06), 0 4px 12px rgb(15 23 42 / 0.08), 0 12px 32px -8px rgb(15 23 42 / 0.14);
+  --shadow-dialog: 0 0 0 1px rgb(15 23 42 / 0.06), 0 16px 48px rgb(15 23 42 / 0.18);
+  --scrim: rgb(15 23 42 / 0.32);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --paper: #0d131a;
-  --surface: #121a23;
-  --raised: #18222d;
-  --sunken: #0a0f15;
-  --line: #243040;
-  --line-strong: #33425a;
-  --ink: #e2e8ef;
-  --muted: #95a2b2;
-  --faint: #66748a;
-  --accent: #58a6ff;
-  --accent-hover: #79b8ff;
-  --accent-soft: #14294a;
-  --on-accent: #0b1a33;
-  --join: #f0b041;
-  --join-soft: #3a2a0c;
-  --ok: #4cc38a;
-  --ok-soft: #10301f;
-  --danger: #ff7a85;
-  --danger-soft: #3b1418;
-  --warn: #f2b33d;
-  --warn-soft: #3a2a0c;
-  --k-num: #4ec4d1;
-  --k-text: #ab95ff;
-  --k-date: #ff9466;
-  --k-bool: #9bd14b;
-  --k-other: #8c99aa;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -12px rgb(0 0 0 / 0.7);
+  --paper: #0a0d12;
+  --chrome: #11151c;
+  --surface: #0e1116;
+  --raised: #151922;
+  --sunken: #1c212b;
+  --line: #232a35;
+  --line-strong: #3a4250;
+  --ink: #eceef2;
+  --muted: #a1a9b6;
+  --faint: #7e8796;
+  --accent: #5b9dff;
+  --accent-hover: #7db1ff;
+  --accent-soft: #16264a;
+  --on-accent: #071226;
+  --join: #f5b041;
+  --join-soft: #33240b;
+  --ok: #47cd89;
+  --ok-soft: #0f2e1f;
+  --danger: #f97066;
+  --danger-soft: #3a1513;
+  --warn: #fdb022;
+  --warn-soft: #33240b;
+  --k-num: #4fc7d6;
+  --k-text: #b09cff;
+  --k-date: #ff9a6b;
+  --k-bool: #9fd356;
+  --k-other: #8c96a5;
+  --shadow: 0 0 0 1px rgb(255 255 255 / 0.06), 0 8px 24px rgb(0 0 0 / 0.5);
+  --shadow-dialog: 0 0 0 1px rgb(255 255 255 / 0.07), 0 24px 64px rgb(0 0 0 / 0.6);
   --scrim: rgb(0 0 0 / 0.55);
 }
 
 @theme inline {
   --color-paper: var(--paper);
+  --color-chrome: var(--chrome);
   --color-surface: var(--surface);
   --color-raised: var(--raised);
   --color-sunken: var(--sunken);
@@ -98,6 +107,7 @@
   --color-k-bool: var(--k-bool);
   --color-k-other: var(--k-other);
   --shadow-pop: var(--shadow);
+  --shadow-dialog: var(--shadow-dialog);
   --color-scrim: var(--scrim);
   --font-sans: var(--font-ui);
   --font-mono: var(--font-code);
@@ -114,6 +124,7 @@
     background: var(--paper);
     color: var(--ink);
     font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
   }
 
@@ -123,7 +134,14 @@
 
   :focus-visible {
     outline: 2px solid var(--accent);
-    outline-offset: 1px;
+    outline-offset: 2px;
+  }
+
+  /* Numbers line up everywhere (grid, stats, status bar). */
+  .tabular-nums,
+  [role="gridcell"],
+  [role="status"] {
+    font-variant-numeric: tabular-nums;
   }
 
   /* Thin, theme-aware scrollbars across the workspace */
@@ -147,11 +165,23 @@
   to { opacity: 1; transform: none; }
 }
 .qp-pop {
-  animation: qp-pop 140ms ease-out;
+  animation: qp-pop 160ms var(--ease-out);
+}
+
+/* Skeleton loaders: neutral blocks with a soft shimmer. */
+@keyframes qp-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.qp-skeleton {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--sunken) 0%, var(--raised) 50%, var(--sunken) 100%);
+  background-size: 200% 100%;
+  animation: qp-shimmer 1.2s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .qp-scan, .qp-pop { animation: none; }
+  .qp-scan, .qp-pop, .qp-skeleton { animation: none; }
 }
 
 /* Results grid: keep column resize handles and sticky cells crisp. */
@@ -179,4 +209,10 @@
 .qp-chart .recharts-surface:focus,
 .qp-chart .recharts-wrapper:focus {
   outline: none;
+}
+
+/* Subtle dot grid for canvases (pipeline graph). */
+.qp-dotgrid {
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 16px 16px;
 }

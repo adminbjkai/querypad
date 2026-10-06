@@ -188,7 +188,8 @@ falls back to keeping everything in the browser.
 - **Snippet library** — save SQL you reuse (Ctrl/⌘+Shift+S) into folders; search it, insert at
   the cursor, run it in a tab, or autocomplete it by name. Shared by every space and device;
   export/import as JSON
-- **A results grid like a desktop tool** — sticky headers and row numbers, resizable
+- **A results grid like a desktop tool** — mini distribution charts under each header,
+  range selection with a Sum / Avg / Min / Max footer, sticky headers and row numbers, resizable
   columns, NULLs marked, keyboard cell navigation with Ctrl/⌘+C, a per-column menu (sort, copy
   name or values, inspect), a column inspector with distribution, nulls, distinct values and
   top values, a Details view with the SQL and timings, and export to CSV /
@@ -210,6 +211,9 @@ falls back to keeping everything in the browser.
   never touches your spaces ("Save as a new space" keeps a copy)
 - **Agent context** — copy schema, profiles, the current SQL and its results for Claude Code,
   Codex or any agent
+- **A considered design system** ([`docs/DESIGN.md`](docs/DESIGN.md)) in the spirit of
+  Snowsight and Linear: tinted chrome, hairlines, Inter + JetBrains Mono, matching light and
+  dark themes, skeleton loading, a home screen for empty spaces
 - **Light and dark themes**, keyboard-first (press `?` for shortcuts), works on phones
 
 <details>

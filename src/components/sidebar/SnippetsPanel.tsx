@@ -115,13 +115,19 @@ export default function SnippetsPanel() {
         <SearchBox value={query} onChange={setQuery} placeholder="Search snippets" label="Search snippets" />
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3">
+      <div className="min-h-0 flex-1 overflow-y-auto pb-3">
         {loaded && snippets.length === 0 && (
-          <p className="px-2.5 py-6 text-center text-[13px] leading-5 text-muted">
-            Keep SQL you reuse here — joins, cleanups, report queries. Select some SQL (or use the whole
-            tab) and press <span className="whitespace-nowrap">{MOD}+Shift+S</span>. Snippets are shared by every
-            space and device.
-          </p>
+          <div className="flex flex-col items-center px-3 py-8 text-center">
+            <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+              <Icon name="bookmark" size={18} />
+            </span>
+            <p className="mt-3 text-[14px] font-medium text-ink">No snippets yet</p>
+            <p className="mt-1 text-[13px] leading-5 text-muted">
+              Keep SQL you reuse here — joins, cleanups, report queries. Select some SQL (or use the whole
+              tab) and press <span className="whitespace-nowrap">{MOD}+Shift+S</span>. Snippets are shared by every
+              space and device.
+            </p>
+          </div>
         )}
         {snippets.length > 0 && groups.length === 0 && (
           <p className="px-2.5 py-6 text-center text-[13px] text-muted">No snippet matches “{query}”.</p>
@@ -132,13 +138,12 @@ export default function SnippetsPanel() {
             <section key={folder} aria-label={`Folder ${folder}`}>
               <button
                 onClick={() => toggle(folder)}
-                className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[12px] font-medium text-muted hover:text-ink"
+                className="flex h-6 w-full items-center gap-1.5 px-3 text-left text-[11px] font-medium uppercase tracking-wide text-faint transition-colors hover:text-ink"
                 aria-expanded={!isCollapsed}
               >
-                <Icon name={isCollapsed ? "chevronRight" : "chevronDown"} size={13} />
-                <Icon name="folder" size={13} />
+                <Icon name={isCollapsed ? "chevronRight" : "chevronDown"} size={12} />
                 <span className="flex-1 truncate">{folder}</span>
-                <span className="text-[11px] text-faint">{items.length}</span>
+                <span className="font-normal tabular-nums">{items.length}</span>
               </button>
               {!isCollapsed && (
                 <ul>
@@ -146,17 +151,17 @@ export default function SnippetsPanel() {
                     <li key={snippet.id} className="group/s relative">
                       <button
                         onClick={() => insertSnippet(snippet.sql)}
-                        className="w-full rounded-md py-1.5 pl-6 pr-16 text-left hover:bg-raised"
+                        className="w-full border-b border-line py-2 pl-3 pr-16 text-left transition-colors hover:bg-sunken"
                         title="Insert at the cursor"
                         aria-label={`Snippet ${snippet.name}`}
                       >
-                        <span className="block truncate text-[13px] text-ink">{snippet.name}</span>
+                        <span className="block truncate text-[13px] font-medium leading-5 text-ink">{snippet.name}</span>
                         {snippet.description && (
                           <span className="block truncate text-[11px] text-muted">{snippet.description}</span>
                         )}
-                        <code className="mt-0.5 line-clamp-2 break-all font-mono text-[11px] leading-4 text-faint">{snippet.sql}</code>
+                        <code className="mt-0.5 line-clamp-2 break-all font-mono text-[11px] leading-4 text-muted">{snippet.sql}</code>
                       </button>
-                      <div className="absolute right-1 top-1 flex items-center opacity-0 focus-within:opacity-100 group-hover/s:opacity-100">
+                      <div className="absolute right-1.5 top-1.5 flex items-center rounded-md bg-surface opacity-0 ring-1 ring-line focus-within:opacity-100 group-hover/s:opacity-100">
                         <button
                           onClick={() => openSnippet(snippet.sql, snippet.name, true)}
                           className={btn.icon}
@@ -187,7 +192,7 @@ export default function SnippetsPanel() {
                         />
                       </div>
                       {confirming === snippet.id && (
-                        <div className="mx-1 mb-1 flex items-center gap-1.5 rounded-md bg-danger-soft px-2 py-1.5 text-[12px] text-danger">
+                        <div className="mx-2 my-1.5 flex items-center gap-1.5 rounded-md bg-danger-soft px-2 py-1 text-[12px] text-danger">
                           <span className="flex-1">Delete this snippet?</span>
                           <button onClick={() => void remove(snippet)} className={`${btn.ghost} h-6 text-danger`} aria-label={`Confirm delete ${snippet.name}`}>
                             Delete

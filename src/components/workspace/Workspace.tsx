@@ -19,6 +19,7 @@ import Sidebar from "@/components/sidebar/Sidebar";
 import SqlWorkbench from "@/components/editor/SqlWorkbench";
 import Toaster from "@/components/ui/Toaster";
 import { Icon } from "@/components/ui/icons";
+import { btn } from "@/components/ui/primitives";
 
 const PipelineView = dynamic(() => import("@/components/pipeline/PipelineView"), { ssr: false });
 const CommandPalette = dynamic(() => import("./CommandPalette"), { ssr: false });
@@ -195,16 +196,25 @@ export default function Workspace() {
       <Header />
 
       {onlySampleTables && !welcomeDismissed && !isSharedPage && (
-        <div className="flex items-center gap-3 border-b border-line bg-accent-soft/60 px-4 py-1.5 text-[13px] text-ink">
-          <span className="flex-1">
+        <div
+          role="note"
+          className="qp-pop fixed bottom-10 left-1/2 z-30 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-xl border border-line bg-surface py-2 pl-3 pr-2 text-[13px] text-ink shadow-pop"
+        >
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
+            <Icon name="sparkle" size={14} />
+          </span>
+          <span className="min-w-0">
             You&apos;re exploring two sample tables. Drop your own files anywhere and they&apos;ll replace them.
           </span>
+          <button onClick={() => setDialog("addFiles")} className={`${btn.secondary} h-7 shrink-0`}>
+            Use my own data
+          </button>
           <button
             onClick={() => {
               setWelcomeDismissed(true);
               localStorage.setItem(WELCOME_KEY, "1");
             }}
-            className="text-muted hover:text-ink"
+            className={btn.icon}
             aria-label="Dismiss"
           >
             <Icon name="x" size={14} />

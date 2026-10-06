@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -18,6 +18,24 @@ import { Kbd, MOD, Spinner, btn } from "@/components/ui/primitives";
 
 const ChartPanel = dynamic(() => import("./ChartPanel"), { ssr: false });
 
+const STATS_KEY = "querypad-grid-stats";
+const STATS_EVENT = "qp-grid-stats";
+const subscribeStats = (cb: () => void) => {
+  window.addEventListener("storage", cb);
+  window.addEventListener(STATS_EVENT, cb);
+  return () => {
+    window.removeEventListener("storage", cb);
+    window.removeEventListener(STATS_EVENT, cb);
+  };
+};
+const readStats = () => {
+  try {
+    return localStorage.getItem(STATS_KEY);
+  } catch {
+    return null;
+  }
+};
+
 type View = "table" | "chart" | "details" | string;
 
 export default function ResultsPanel() {
@@ -25,6 +43,15 @@ export default function ResultsPanel() {
   const plugins = useWorkspaceStore((s) => s.plugins);
   const openAi = useUiStore((s) => s.openAi);
   const result = tab?.result ?? null;
+  // Header distributions: an explicit choice is remembered, otherwise on for results of up to 50 columns.
+  const statsPref = useSyncExternalStore(subscribeStats, readStats, () => null);
+  const showStats = statsPref === null ? (result?.columns.length ?? 0) <= 50 : statsPref === "1";
+  const toggleStats = () => {
+    try {
+      localStorage.setItem(STATS_KEY, showStats ? "0" : "1");
+    } catch {}
+    window.dispatchEvent(new Event(STATS_EVENT));
+  };
   const error = tab?.error ?? null;
   const isExecuting = tab?.isExecuting ?? false;
 
@@ -113,11 +140,12 @@ export default function ResultsPanel() {
       aria-selected={current.view === view}
       disabled={disabled}
       onClick={() => patch({ view })}
-      className={`h-7 rounded-md px-2.5 text-[13px] transition-colors disabled:opacity-35 ${
-        current.view === view ? "bg-sunken font-medium text-ink" : "text-muted hover:text-ink"
+      className={`relative h-9 px-3 text-[13px] transition-colors disabled:opacity-45 ${
+        current.view === view ? "font-medium text-ink" : "text-muted hover:text-ink"
       }`}
     >
       {label}
+      {current.view === view && <span aria-hidden="true" className="absolute inset-x-2 bottom-0 h-0.5 rounded-t-sm bg-accent" />}
     </button>
   );
   const inspect = (column: string) => {
@@ -130,14 +158,14 @@ export default function ResultsPanel() {
   return (
     <div className="relative flex h-full flex-col bg-surface">
       {scanLine}
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface px-2 py-1">
-        <div className="flex items-center gap-0.5 rounded-lg bg-raised p-0.5" role="tablist" aria-label="Result view">
+      <div className="flex h-9 shrink-0 items-center gap-3 overflow-hidden border-b border-line bg-chrome px-2">
+        <div className="flex h-full items-center" role="tablist" aria-label="Result view">
           {viewButton("table", "Table")}
           {viewButton("chart", "Chart", !chartConfig)}
           {viewButton("details", "Details")}
           {pluginViews.map((v) => viewButton(v.key, v.label))}
         </div>
-        <p className="flex items-center gap-2 text-[12px] tabular-nums text-muted">
+        <p className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[12px] tabular-nums text-muted">
           <span>
             <span className="font-medium text-ink">{result.rowCount.toLocaleString()}</span> {result.rowCount === 1 ? "row" : "rows"}
           </span>
@@ -156,7 +184,7 @@ export default function ResultsPanel() {
             </span>
           )}
         </p>
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {current.view === "table" && (
             <label className="relative">
               <Icon name="filter" size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
@@ -164,10 +192,21 @@ export default function ResultsPanel() {
                 value={current.filter}
                 onChange={(e) => patch({ filter: e.target.value })}
                 placeholder="Filter rows"
-                className="h-7 w-36 rounded-md border border-line bg-surface pl-7 pr-2 text-[12px] text-ink outline-none placeholder:text-faint focus:w-52 focus:border-accent transition-[width]"
+                className="h-7 w-36 rounded-md border border-line bg-raised pl-7 pr-2 text-[12px] text-ink outline-none placeholder:text-faint focus:w-52 focus:border-accent transition-[width]"
                 aria-label="Filter rows"
               />
             </label>
+          )}
+          {current.view === "table" && result.columns.length > 0 && (
+            <button
+              onClick={toggleStats}
+              aria-pressed={showStats}
+              aria-label="Show column stats"
+              title="Show column stats"
+              className={`${btn.icon} ${showStats ? "bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent" : ""}`}
+            >
+              <Icon name="profile" size={15} />
+            </button>
           )}
           {current.view === "table" && result.columns.length > 0 && (
             <button
@@ -197,6 +236,7 @@ export default function ResultsPanel() {
               result={result}
               filter={current.filter}
               inspectedColumn={inspectedColumn}
+              showStats={showStats}
               onInspect={inspect}
               onSelectColumn={(column) => inspectorOpen && patch({ inspectCol: column })}
             />

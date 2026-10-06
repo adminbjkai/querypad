@@ -39,28 +39,28 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
   };
 
   return (
-    <div className="group/table px-1.5 pt-1">
-      <div className="flex items-center rounded-md hover:bg-raised">
+    <div className="group/table px-1.5 pt-0.5">
+      <div className="flex h-6 items-center rounded-md transition-colors hover:bg-sunken">
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={isExpanded}
           aria-label={table.name}
-          className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1.5 text-left"
+          className="flex min-w-0 flex-1 items-center h-6 gap-1.5 px-1.5 text-left"
         >
           <Icon name="chevronRight" size={13} className={`text-faint transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-          <span className="truncate font-mono text-[13px] font-medium text-ink">{table.name}</span>
+          <span className="truncate font-mono text-[12px] font-medium text-ink">{table.name}</span>
           <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-faint">
             {isView ? "view" : table.rowCount.toLocaleString()}
           </span>
         </button>
         <div className="flex shrink-0 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/table:opacity-100">
-          <button onClick={() => previewTable(table.name)} className="rounded p-1 text-muted hover:bg-sunken hover:text-ink" title="Preview rows in a new tab" aria-label={`Preview ${table.name}`}>
+          <button onClick={() => previewTable(table.name)} className="rounded p-1 text-muted hover:bg-line hover:text-ink" title="Preview rows in a new tab" aria-label={`Preview ${table.name}`}>
             <Icon name="play" size={13} />
           </button>
           {!isView && (
             <button
               onClick={onOpenProfile}
-              className={`rounded p-1 hover:bg-sunken ${profileActive ? "text-accent" : "text-muted hover:text-ink"}`}
+              className={`rounded p-1 hover:bg-line ${profileActive ? "text-accent" : "text-muted hover:text-ink"}`}
               title="Profile columns"
               aria-label={`Profile ${table.name}`}
             >
@@ -78,14 +78,14 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
         </div>
       </div>
       {isExpanded && (
-        <ul className="mb-1 ml-[18px] border-l border-line pl-1.5">
+        <ul className="mb-1 ml-[13px] border-l border-line pl-1">
           {columns.map((col) => {
             const mark = keyColumns.get(`${table.name}.${col.name}`);
             return (
               <li key={col.name}>
                 <button
                   onClick={() => insert(quoteIfNeeded(col.name))}
-                  className="flex w-full items-center gap-1 rounded px-1 py-[3px] text-left hover:bg-raised"
+                  className="flex h-6 w-full items-center gap-1 rounded px-1 text-left transition-colors hover:bg-sunken"
                   title={`Insert ${col.name} — ${col.type}`}
                 >
                   <KindGlyph type={col.type} />

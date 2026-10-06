@@ -28,7 +28,7 @@ function matchesFilter(table: TableInfo, q: string): boolean {
 
 function SectionLabel({ label, count }: { label: string; count: number }) {
   return (
-    <div className="flex items-center gap-1.5 px-3 pb-0.5 pt-2.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
+    <div className="flex items-center gap-1.5 px-3 pb-0.5 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-faint">
       <span>{label}</span>
       <span className="font-normal tabular-nums">{count}</span>
     </div>
@@ -70,10 +70,10 @@ export default function Sidebar() {
   return (
     <>
       {/* Small screens: the sidebar floats over the workbench. */}
-      <div className="fixed inset-0 top-12 z-30 bg-scrim md:hidden" onClick={() => setOpen(false)} />
-      <div className="fixed bottom-6 left-0 top-12 z-30 flex md:static md:z-auto">
-        <aside className="flex h-full border-r border-line bg-surface" aria-label="Workspace sidebar">
-          <div role="tablist" aria-orientation="vertical" aria-label="Sidebar panels" className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-line bg-raised py-2">
+      <div className="fixed inset-0 top-11 z-30 bg-scrim md:hidden" onClick={() => setOpen(false)} />
+      <div className="fixed bottom-6 left-0 top-11 z-30 flex md:static md:z-auto">
+        <aside className="flex h-full border-r border-line bg-chrome" aria-label="Workspace sidebar">
+          <div role="tablist" aria-orientation="vertical" aria-label="Sidebar panels" className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-line bg-chrome py-2">
             {PANELS.map((p) => {
               const selected = panel === p.id;
               const joinCount = p.id === "joins" && discovery.status === "ready" ? discovery.relationships.length : 0;
@@ -85,14 +85,14 @@ export default function Sidebar() {
                   aria-label={p.label}
                   title={p.label}
                   onClick={() => showPanel(p.id)}
-                  className={`relative flex size-9 items-center justify-center rounded-md transition-colors ${
-                    selected ? "bg-surface text-ink shadow-sm" : "text-muted hover:bg-sunken hover:text-ink"
+                  className={`relative flex size-8 items-center justify-center rounded-md transition-colors ${
+                    selected ? "bg-surface text-ink ring-1 ring-line" : "text-muted hover:bg-sunken hover:text-ink"
                   }`}
                 >
-                  {selected && <span className="absolute -left-1 top-2 h-5 w-0.5 rounded-full bg-accent" />}
-                  <Icon name={p.icon} size={18} />
+                  {selected && <span className="absolute -left-[5px] top-2 h-5 w-0.5 rounded-r bg-accent" />}
+                  <Icon name={p.icon} size={16} />
                   {joinCount > 0 && (
-                    <span className="absolute -right-0.5 top-0.5 min-w-[15px] rounded-full bg-join-soft px-1 text-center text-[10px] font-medium leading-[15px] tabular-nums text-join">
+                    <span className="absolute -right-0.5 top-0.5 min-w-[14px] rounded-full bg-join-soft px-1 text-center text-[10px] font-medium leading-[14px] tabular-nums text-join">
                       {joinCount}
                     </span>
                   )}

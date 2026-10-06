@@ -41,6 +41,9 @@ interface UiState {
   /** The side Assistant chat panel (remembered across reloads). */
   assistantOpen: boolean;
   setAssistantOpen: (open: boolean) => void;
+  /** Editor cursor for the status bar: line, column and selected characters. */
+  cursor: { line: number; column: number; selected: number } | null;
+  setCursor: (cursor: { line: number; column: number; selected: number } | null) => void;
   /** Width of the Assistant panel in px (drag its left edge; remembered). */
   assistantWidth: number;
   setAssistantWidth: (width: number) => void;
@@ -115,6 +118,8 @@ export const useUiStore = create<UiState>((set, get) => ({
     localStorage.setItem(ASSISTANT_KEY, assistantOpen ? "1" : "0");
     set({ assistantOpen });
   },
+  cursor: null,
+  setCursor: (cursor) => set({ cursor }),
   assistantWidth: initialAssistantWidth(),
   setAssistantWidth: (assistantWidth) => {
     localStorage.setItem(ASSISTANT_WIDTH_KEY, String(Math.round(assistantWidth)));

@@ -21,6 +21,18 @@ const CREATE_OPTIONS: { template: SpaceTemplate; label: string; detail: string; 
   { template: "empty", label: "New empty space", detail: "Start from nothing", icon: "plus" },
 ];
 
+const AVATAR_TONES = ["bg-accent-soft text-accent", "bg-join-soft text-join", "bg-ok-soft text-ok", "bg-warn-soft text-warn"];
+
+/** A space's initial on a tone picked from its name, so each space is recognizable. */
+function SpaceAvatar({ name }: { name: string }) {
+  const tone = AVATAR_TONES[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % AVATAR_TONES.length];
+  return (
+    <span className={`flex size-5 shrink-0 items-center justify-center rounded-[5px] text-[11px] font-semibold ${tone}`} aria-hidden="true">
+      {name.trim().charAt(0).toUpperCase() || "S"}
+    </span>
+  );
+}
+
 /** Header control for saved spaces: switch, create (copy / template / empty), rename, delete. */
 export default function SpaceSwitcher() {
   const spaces = useWorkspaceStore((s) => s.spaces);
@@ -89,7 +101,7 @@ export default function SpaceSwitcher() {
         aria-expanded={open}
         title="Spaces: switch, save, or start fresh"
       >
-        <span className="size-2 shrink-0 rounded-sm bg-join" aria-hidden="true" />
+        <SpaceAvatar name={current?.name ?? "Space"} />
         <span className="truncate font-medium">{current?.name ?? "Space"}</span>
         <Icon name="chevronDown" size={13} className="text-faint" />
       </button>

@@ -8,7 +8,7 @@ import { Icon } from "@/components/ui/icons";
 import { Spinner, btn } from "@/components/ui/primitives";
 
 /** Click-or-drop area that imports files as tables. */
-export default function DropTarget({ onAdded, tall }: { onAdded?: () => void; tall?: boolean }) {
+export default function DropTarget({ onAdded, tall, title = "Drop files here, or choose them" }: { onAdded?: () => void; tall?: boolean; title?: string }) {
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -38,20 +38,22 @@ export default function DropTarget({ onAdded, tall }: { onAdded?: () => void; ta
         setOver(false);
         void handle(e.dataTransfer.files);
       }}
-      className={`flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 text-center transition-colors ${
-        tall ? "min-h-[240px]" : "min-h-[180px]"
-      } ${over ? "border-accent bg-accent-soft/60" : "border-line-strong bg-raised"}`}
+      className={`flex w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 text-center transition-colors ${
+        tall ? "min-h-[220px]" : "min-h-[180px]"
+      } ${over ? "border-accent bg-accent-soft" : "border-line-strong bg-raised hover:bg-sunken/60"}`}
     >
       {busy ? (
         <>
           <Spinner className="size-6 text-accent" />
-          <p className="text-sm text-muted">Reading files into DuckDB…</p>
+          <p className="text-[13px] text-muted">Reading files into DuckDB…</p>
         </>
       ) : (
         <>
-          <Icon name="upload" size={26} className="text-muted" />
+          <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface text-muted">
+            <Icon name="upload" size={20} />
+          </span>
           <div>
-            <p className="text-[15px] font-medium text-ink">Drop files here, or choose them</p>
+            <p className="text-[14px] font-medium text-ink">{title}</p>
             <p className="mt-1 text-[13px] text-muted">
               CSV, TSV, Parquet, JSON, NDJSON or Excel, up to {formatBytes(MAX_FILE_SIZE)} each
             </p>
