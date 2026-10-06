@@ -1,5 +1,6 @@
 import { AiHttpError, streamComplete, type ChatTurn } from "@/lib/ai/complete";
-import { AI_PROVIDER_IDS, getAiProviderConfig, isAiProvider, type AiProvider } from "@/lib/ai/providers";
+import { AI_PROVIDER_IDS, getAiProviderConfig, isAiProvider, type AiEffort, type AiProvider } from "@/lib/ai/providers";
+import { availableBridgeModels, streamFromBridge } from "@/lib/ai/local-bridge";
 
 export const runtime = "nodejs";
 // Keys come from the runtime environment (container env), never from build time.
@@ -21,9 +22,13 @@ function text(message: string, status: number): Response {
   });
 }
 
-/** Providers with a server-side key configured (ids only, never key values). */
+/** Providers usable without a browser key: server-side keys, plus signed-in local CLIs. */
 export async function GET() {
-  const providers = AI_PROVIDER_IDS.filter((id) => serverKey(id));
+  const bridgeModels = await availableBridgeModels();
+  const providers = AI_PROVIDER_IDS.filter((id) => {
+    const config = getAiProviderConfig(id);
+    return config.kind === "local" ? bridgeModels.includes(config.bridgeModel!) : !!serverKey(id);
+  });
   return Response.json({ providers }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -74,6 +79,7 @@ export async function POST(req: Request) {
     input?: unknown;
     history?: unknown;
     maxTokens?: unknown;
+    effort?: unknown;
   } | null;
   if (!body) return text("Request body must be JSON.", 400);
 
@@ -96,8 +102,11 @@ export async function POST(req: Request) {
     return text(`Prompt too large (max ${MAX_PROMPT_CHARS} characters).`, 413);
   }
 
-  const apiKey = serverKey(provider);
-  if (!apiKey) {
+  const config = getAiProviderConfig(provider);
+  const effort: AiEffort | undefined =
+    body.effort === "low" || body.effort === "medium" ? body.effort : undefined;
+  const apiKey = config.kind === "local" ? "" : serverKey(provider);
+  if (config.kind !== "local" && !apiKey) {
     const { label } = getAiProviderConfig(provider);
     return text(`${label} is not configured on this server. Add your own API key instead.`, 400);
   }
@@ -105,22 +114,26 @@ export async function POST(req: Request) {
   const requested = typeof maxTokens === "number" && Number.isFinite(maxTokens) ? maxTokens : DEFAULT_MAX_TOKENS;
   const clampedMaxTokens = Math.min(MAX_TOKENS_LIMIT, Math.max(1, Math.floor(requested)));
 
-  const chunks = streamComplete({
-    provider,
-    apiKey,
-    system,
-    input,
-    history,
-    maxTokens: clampedMaxTokens,
-    signal: req.signal,
-  });
+  const chunks =
+    config.kind === "local"
+      ? streamFromBridge({ model: config.bridgeModel!, effort, system, input, history, signal: req.signal })
+      : streamComplete({
+          provider,
+          apiKey,
+          system,
+          input,
+          history,
+          maxTokens: clampedMaxTokens,
+          signal: req.signal,
+        });
 
   // Pull the first chunk before responding so upstream failures map to a real status.
   let first: IteratorResult<string>;
   try {
     first = await chunks.next();
   } catch (err) {
-    const status = err instanceof AiHttpError ? err.status : 502;
+    const status =
+      err instanceof AiHttpError ? err.status : typeof (err as { status?: unknown }).status === "number" ? (err as { status: number }).status : 502;
     return text(err instanceof Error ? err.message : "Upstream request failed.", status);
   }
 

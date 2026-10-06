@@ -7,10 +7,12 @@ import { getDB } from "@/lib/duckdb/instance";
 import { SAMPLE_TABLE_NAMES } from "@/lib/constants";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
+import { useAiStore } from "@/stores/ai-store";
 import { useUiStore } from "@/stores/ui-store";
 import { importAndReport } from "@/lib/import";
 import { runActive } from "@/lib/workspace-actions";
 import Header from "./Header";
+import StatusBar from "./StatusBar";
 import EmptyState from "./EmptyState";
 import Splash from "./Splash";
 import Sidebar from "@/components/sidebar/Sidebar";
@@ -25,6 +27,7 @@ const CollaborateDialog = dynamic(() => import("@/components/collaboration/Colla
 const PluginManager = dynamic(() => import("@/components/plugins/PluginManager"), { ssr: false });
 const ShortcutsDialog = dynamic(() => import("./ShortcutsDialog"), { ssr: false });
 const SnippetDialog = dynamic(() => import("@/components/editor/SnippetDialog"), { ssr: false });
+const AssistantPanel = dynamic(() => import("@/components/assistant/AssistantPanel"), { ssr: false });
 
 const WELCOME_KEY = "querypad:welcome-dismissed";
 
@@ -47,6 +50,7 @@ export default function Workspace() {
   const setDialog = useUiStore((s) => s.setDialog);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const snippetDraft = useSnippetStore((s) => s.draft);
+  const assistantOpen = useUiStore((s) => s.assistantOpen);
 
   const isSharedPage = usePathname() === "/shared";
   const [dbError, setDbError] = useState<string | null>(null);
@@ -73,9 +77,11 @@ export default function Workspace() {
     void init();
   }, [dbReady, isSharedPage, init]);
 
-  // The snippet library is shared by every space; load it once.
+  // Load the shared snippet library and the AI model choice once.
   useEffect(() => {
-    if (hydrated) void useSnippetStore.getState().init();
+    if (!hydrated) return;
+    void useSnippetStore.getState().init();
+    void useAiStore.getState().init();
   }, [hydrated]);
 
   // Invite links (?room=<id>) join the room once the workspace is ready.
@@ -153,6 +159,9 @@ export default function Workspace() {
       } else if (mod && e.shiftKey && key === "s") {
         e.preventDefault();
         void saveCurrentAsSnippet();
+      } else if (mod && key === "i") {
+        e.preventDefault();
+        ui.setAssistantOpen(!ui.assistantOpen);
       } else if (mod && key === "b") {
         e.preventDefault();
         ui.setSidebarOpen(!ui.sidebarOpen);
@@ -202,16 +211,22 @@ export default function Workspace() {
         </div>
       )}
 
-      {tables.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="flex min-h-0 flex-1">
-          <Sidebar />
-          <main className="flex min-w-0 flex-1 flex-col">
-            {viewMode === "sql" ? <SqlWorkbench /> : <PipelineView />}
-          </main>
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1">
+        {tables.length === 0 ? (
+          <div className="flex min-w-0 flex-1 flex-col">
+            <EmptyState />
+          </div>
+        ) : (
+          <>
+            <Sidebar />
+            <main className="flex min-w-0 flex-1 flex-col">
+              {viewMode === "sql" ? <SqlWorkbench /> : <PipelineView />}
+            </main>
+          </>
+        )}
+        {assistantOpen && !isSharedPage && <AssistantPanel />}
+      </div>
+      <StatusBar />
 
       {dragging && (
         <div className="pointer-events-none fixed inset-2 z-50 flex items-center justify-center rounded-2xl border-2 border-dashed border-accent bg-accent-soft/50">

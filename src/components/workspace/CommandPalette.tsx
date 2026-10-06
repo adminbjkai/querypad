@@ -50,6 +50,7 @@ export default function CommandPalette() {
     const actions: Command[] = [
       { id: "run", group: "Actions", label: "Run query", detail: "execute selection", icon: "play", hint: `${MOD} ↵`, run: runActive },
       { id: "ai", group: "Actions", label: "Ask AI to write SQL", icon: "sparkle", hint: `${MOD} K`, run: () => ui().openAi() },
+      { id: "assistant", group: "Actions", label: "Open the Assistant chat", detail: "ask questions explain help", icon: "sparkle", hint: `${MOD} I`, run: () => ui().setAssistantOpen(true) },
       { id: "new-tab", group: "Actions", label: "New query tab", icon: "plus", run: () => ws().addTab() },
       { id: "add", group: "Actions", label: "Add data files", detail: "import upload url", icon: "upload", run: () => ui().setDialog("addFiles") },
       { id: "joins", group: "Actions", label: "Show relationships", detail: "joins keys discover", icon: "join", run: () => ui().showPanel("joins") },

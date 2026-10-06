@@ -322,6 +322,74 @@ test.describe("Snippet library", () => {
   });
 });
 
+test.describe("Assistant panel", () => {
+  test("looks at the data on its own, answers, and applies an action on click", async ({ page }) => {
+    const bodies: { provider: string; effort?: string; input: string; system: string }[] = [];
+    const replies = [
+      "Let me count them.\n```sql-run\nSELECT COUNT(*) AS n FROM employees\n```",
+      'There are **12** employees.\n\n```action\n{"type":"run_in_tab","title":"All employees","sql":"SELECT * FROM employees ORDER BY emp_id"}\n```',
+    ];
+    await page.route("**/api/complete", async (route: Route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ json: { providers: ["local-claude"] } });
+        return;
+      }
+      bodies.push(route.request().postDataJSON());
+      await route.fulfill({ status: 200, contentType: "text/plain", body: replies[bodies.length - 1] ?? "Done." });
+    });
+
+    await openWithSamples(page);
+    await page.keyboard.press(`${MOD}+i`);
+    const panel = page.getByRole("complementary", { name: "Assistant" });
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("button", { name: "AI model" })).toContainText("Sonnet 5.5");
+    await panel.getByLabel("Message the assistant").fill("How many employees are there?");
+    await panel.getByLabel("Message the assistant").press("Enter");
+
+    // The read-only lookup ran automatically and its result went back to the model.
+    await expect(panel.getByText("There are")).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByRole("button", { name: /Looked at the data · 1 rows/ })).toBeVisible();
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].provider).toBe("local-claude");
+    expect(bodies[0].effort).toBe("low");
+    expect(bodies[0].input).toContain("## Open tabs");
+    expect(bodies[0].input).toContain("User: How many employees are there?");
+    expect(bodies[1].input).toContain("QueryPad ran your sql-run query (1 rows");
+    expect(bodies[1].input).toMatch(/n\n12/);
+
+    // Actions wait for a click.
+    await expect(panel.getByText("Run in a new tab “All employees”")).toBeVisible();
+    await panel.getByRole("button", { name: "Apply" }).click();
+    await expect(page.getByRole("tab", { name: /All employees/ })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: /hire_date/ })).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByRole("button", { name: "Done" })).toBeVisible();
+
+    // The conversation is kept for this space.
+    await page.waitForTimeout(500);
+    await page.reload();
+    await expect(page.getByRole("complementary", { name: "Assistant" }).getByText("There are")).toBeVisible({ timeout: 30_000 });
+  });
+});
+
+test.describe("Workbench tools", () => {
+  test("formats SQL and inspects a result column", async ({ page }) => {
+    await openWithSamples(page);
+    await runSql(page, "select dept_id, count(*) as n from employees group by dept_id");
+    await expect(page.getByRole("columnheader", { name: /dept_id/ })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Format SQL" }).click();
+    await expect(page.locator(".monaco-editor")).toContainText("SELECT");
+    await expect(page.locator(".monaco-editor")).toContainText("GROUP BY");
+
+    await page.getByRole("button", { name: "Menu for n" }).click();
+    await page.getByRole("menuitem", { name: "Inspect column" }).click();
+    await expect(page.getByText("Distinct")).toBeVisible();
+    await page.getByRole("button", { name: "Close inspector" }).click();
+
+    await page.getByRole("tab", { name: "Details" }).click();
+    await expect(page.getByText(/group by dept_id/)).toBeVisible();
+  });
+});
+
 test.describe("AI assistant conversation", () => {
   test("remembers earlier turns, sees the run log, and repairs SQL that doesn't compile", async ({ page }) => {
     const bodies: { input: string; history?: { role: string; content: string }[] }[] = [];

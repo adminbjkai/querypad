@@ -21,6 +21,10 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   verifies this.
 - Shared core under `src/lib/discovery` and `src/lib/ai` uses relative imports only (the
   CLI runs under tsx without the `@/` alias).
+- **Local AI bridge** (`local-ai/bridge.mjs`, `sandbox.mjs`) runs on the host (systemd user
+  unit), not in Docker: plain Node, no deps, Unix socket + token. Every CLI runs under
+  bubblewrap with tools disabled — keep it that way when adding a model (re-test that the CLI
+  can't read host files). The app reaches it only from `src/lib/ai/local-bridge.ts` (server).
 - **Collaboration relay** (`collab/server.mjs`) is plain Node ESM with only ws, yjs,
   y-protocols and lib0 (plus lib0's dependency isomorphic.js); the Docker image copies
   just those modules for it — update the Dockerfile if the relay gains an import.
@@ -37,6 +41,10 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
 - **Snippets** (`src/stores/snippet-store.ts`): one library shared by all spaces, stored in
   `snippets.json` via `PATCH /api/store/snippets` (per-snippet upsert by `updatedAt`, tombstoned
   removals) or the `querypad-snippets` IndexedDB key; refreshed when the poll reports a new rev.
+- **Assistant** (`src/stores/assistant-store.ts`, `src/lib/ai/assistant-context.ts`): context is
+  rebuilt from the stores on every message; `sql-run` blocks auto-run only as one read-only
+  statement (`isReadOnlyStatement`); everything else is an `action` block applied on click
+  (`src/lib/assistant-actions.ts`). Conversations live in localStorage per space.
 - **Catalog sync**: after any non-read-only statement, `syncCatalog` reconciles the store with
   `duckdb_tables()`/`duckdb_views()` (main schema only); new/changed tables are snapshotted to
   Parquet file entries. The `querypad` schema (relationships/keys) is internal and never listed.

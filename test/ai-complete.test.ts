@@ -94,8 +94,15 @@ test("provider table is consistent", () => {
   for (const id of AI_PROVIDER_IDS) {
     const c = getAiProviderConfig(id);
     assert.equal(c.id, id);
-    assert.match(c.envKey, /^[A-Z_]+_API_KEY$/);
-    assert.match(c.baseUrl, /^https:\/\//);
+    if (c.kind === "local") {
+      // Signed-in CLIs on the host, through the local AI bridge: no key, no URL.
+      assert.equal(c.envKey, "");
+      assert.ok(c.bridgeModel, id);
+      assert.ok(Array.isArray(c.efforts), id);
+    } else {
+      assert.match(c.envKey, /^[A-Z_]+_API_KEY$/);
+      assert.match(c.baseUrl, /^https:\/\//);
+    }
     assert.ok(isAiProvider(id));
   }
   assert.ok(!isAiProvider("nope"));

@@ -11,6 +11,8 @@ services:
     volumes:
       # Spaces, tabs, history and table files, shared by every device.
       - querypad-data:/data
+      # Socket of the host's local AI bridge (local-ai/bridge.mjs): signed-in AI CLIs, no API keys.
+      - ${HOME}/.local/state/querypad-ai:/run/querypad-ai
     mem_limit: 384m
 
   # Real-time collaboration relay, proxied by nginx at /collab/.

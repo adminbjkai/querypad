@@ -7,6 +7,36 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.11.0 — A pro workspace, an Assistant that sees everything, and AI without keys
+
+### AI models without API keys
+- QueryPad can use the AI CLIs signed in on its host: Claude Sonnet 5.5, Codex GPT-6 Luna and
+  Grok 4.7 (low or medium effort), and through Cursor, Grok 4.7 Medium Fast (256k) and
+  Composer 2.5. They're grouped under "Signed in on this server" in a new model menu shared by
+  every AI surface, with an effort toggle where the model offers one
+- A small host service, the local AI bridge (`local-ai/`), runs them: reachable only through a
+  Unix socket mounted into the container plus a shared token, each CLI sandboxed with
+  bubblewrap (only its own install and login folders are visible), tools disabled, in an
+  empty scratch folder. Answers stream back; a stuck CLI is stopped after 3 minutes
+
+### The Assistant
+- Ctrl/⌘+I (or "Assistant" in the header) opens a chat panel that sees the live workspace:
+  tables and value hints, joins, open tabs, the current result, recent runs, snippets and spaces
+- It looks at the data on its own with read-only queries (single statement, checked before it
+  runs), then answers in Markdown with SQL you can run in a tab, insert, replace or save
+- It can propose actions — run in a tab, replace the query, save a snippet, preview or
+  profile a table, re-discover or accept/reject a join, switch space — applied on one click
+- One conversation per space, kept across reloads
+
+### A more professional workspace
+- Results: sticky header and row numbers, resizable columns, NULL badges, keyboard cell
+  navigation and Ctrl/⌘+C, a column menu (sort, copy name/values, inspect), a column inspector
+  (distribution, nulls, distinct, min/max/mean, top values), and a Details view (SQL, timings,
+  columns)
+- Explorer on a slim activity rail with search across tables, views and columns; history
+  search with All / Succeeded / Failed
+- A status bar (engine, space, sync, last result, AI model) and Format SQL (Shift+Alt+F)
+
 ## v0.10.0 — A snippet library for the SQL you reuse
 
 - New **Snippets** sidebar tab: a library of saved SQL, grouped into folders, searchable by

@@ -8,6 +8,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { registerEditor } from "@/lib/editor-bridge";
 import { runActive } from "@/lib/workspace-actions";
+import { formatSql } from "./format-sql";
 import { defineQueryPadThemes, codeFontFamily } from "@/lib/monaco-theme";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -85,6 +86,12 @@ export default function QueryEditor() {
       label: "Save as snippet (selection or query)",
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS],
       run: () => void saveCurrentAsSnippet(),
+    });
+    editor.addAction({
+      id: "querypad.format",
+      label: "Format SQL (selection or query)",
+      keybindings: [monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF],
+      run: () => void formatSql(),
     });
     editor.addAction({
       id: "querypad.palette",

@@ -5,6 +5,8 @@ import { Dialog, Kbd, MOD } from "@/components/ui/primitives";
 const SHORTCUTS: [string, string[]][] = [
   ["Run query (or the selected part)", [MOD, "Enter"]],
   ["Ask AI to write SQL", [MOD, "K"]],
+  ["Open the Assistant chat", [MOD, "I"]],
+  ["Format SQL", ["Shift", "Alt", "F"]],
   ["Command palette", [MOD, "P"]],
   ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
   ["Toggle sidebar", [MOD, "B"]],

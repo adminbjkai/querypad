@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-import { AI_PROVIDER_OPTIONS, DEFAULT_AI_PROVIDER } from "../lib/ai/providers";
+import { KEY_PROVIDER_OPTIONS, DEFAULT_AI_PROVIDER } from "../lib/ai/providers";
 import { runAsk } from "./ask";
 import { runExplain } from "./explain";
 import { runInspect } from "./inspect";
@@ -21,7 +21,7 @@ Options for ask:
   --show-sql                       Print the generated SQL without executing
 
 AI providers (the API key is read from the listed environment variable):
-${AI_PROVIDER_OPTIONS.map(
+${KEY_PROVIDER_OPTIONS.map(
   (p) => `  ${p.id.padEnd(12)}${p.envKey.padEnd(21)}${p.label} — ${p.modelLabel} (${p.model})`
 ).join("\n")}
 

@@ -38,6 +38,10 @@ interface UiState {
   dialog: Dialog;
   setDialog: (dialog: Dialog) => void;
 
+  /** The side Assistant chat panel (remembered across reloads). */
+  assistantOpen: boolean;
+  setAssistantOpen: (open: boolean) => void;
+
   /** Editor share of the vertical split, 0.15–0.85. */
   editorFraction: number;
   setEditorFraction: (fraction: number) => void;
@@ -49,6 +53,7 @@ interface UiState {
 
 const THEME_KEY = "querypad:theme";
 const SPLIT_KEY = "querypad:split";
+const ASSISTANT_KEY = "querypad:assistant-open";
 
 function initialTheme(): Theme {
   if (typeof document === "undefined") return "light";
@@ -94,6 +99,12 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   dialog: null,
   setDialog: (dialog) => set({ dialog }),
+
+  assistantOpen: typeof window !== "undefined" && localStorage.getItem(ASSISTANT_KEY) === "1" && window.innerWidth >= 1024,
+  setAssistantOpen: (assistantOpen) => {
+    localStorage.setItem(ASSISTANT_KEY, assistantOpen ? "1" : "0");
+    set({ assistantOpen });
+  },
 
   editorFraction: initialSplit(),
   setEditorFraction: (fraction) => {

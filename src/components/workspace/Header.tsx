@@ -25,6 +25,7 @@ export default function Header() {
   const clearWorkspace = useWorkspaceStore((s) => s.clearWorkspace);
   const roomId = useCollaborationStore((s) => s.roomId);
   const theme = useUiStore((s) => s.theme);
+  const assistantOpen = useUiStore((s) => s.assistantOpen);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
@@ -118,6 +119,15 @@ export default function Header() {
         </button>
       </div>
 
+      <button
+        onClick={() => useUiStore.getState().setAssistantOpen(!useUiStore.getState().assistantOpen)}
+        className={`${btn.ghost} ${assistantOpen ? "bg-accent-soft text-accent" : ""}`}
+        aria-pressed={assistantOpen}
+        title={`Assistant (${MOD}+I)`}
+      >
+        <Icon name="sparkle" size={15} />
+        <span className="max-lg:hidden">Assistant</span>
+      </button>
       {roomId ? (
         <RoomBar />
       ) : (

@@ -8,14 +8,17 @@ import { MAX_RESULT_ROWS } from "@/lib/duckdb/queries";
 import { detectChartConfig, type ChartConfig } from "@/lib/charts/detect";
 import type { QueryResult } from "@/types";
 import DataTable from "./DataTable";
+import ColumnInspector from "./ColumnInspector";
+import DetailsView from "./DetailsView";
 import ExportMenu from "./ExportMenu";
+import { resultMeta } from "./result-meta";
 import PluginVisualization from "@/components/plugins/PluginVisualization";
 import { Icon } from "@/components/ui/icons";
-import { Kbd, MOD, btn } from "@/components/ui/primitives";
+import { Kbd, MOD, Spinner, btn } from "@/components/ui/primitives";
 
 const ChartPanel = dynamic(() => import("./ChartPanel"), { ssr: false });
 
-type View = "table" | "chart" | string;
+type View = "table" | "chart" | "details" | string;
 
 export default function ResultsPanel() {
   const tab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
@@ -26,14 +29,19 @@ export default function ResultsPanel() {
   const isExecuting = tab?.isExecuting ?? false;
 
   // View/filter/chart choices reset whenever a new result arrives.
-  const [viewState, setViewState] = useState<{ result: QueryResult | null; view: View; filter: string; chart: ChartConfig | null }>({
-    result: null,
-    view: "table",
-    filter: "",
-    chart: null,
-  });
-  const current = viewState.result === result ? viewState : { result, view: "table", filter: "", chart: null };
+  const [viewState, setViewState] = useState<{
+    result: QueryResult | null;
+    view: View;
+    filter: string;
+    chart: ChartConfig | null;
+    inspectCol: string | null;
+  }>({ result: null, view: "table", filter: "", chart: null, inspectCol: null });
+  const current = viewState.result === result ? viewState : { result, view: "table", filter: "", chart: null, inspectCol: null };
   const patch = (next: Partial<typeof viewState>) => setViewState({ ...current, ...next, result });
+  // The inspector drawer stays open across re-runs; its column falls back to the first one.
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const inspectedColumn =
+    result && inspectorOpen ? (current.inspectCol && result.columns.includes(current.inspectCol) ? current.inspectCol : result.columns[0] ?? null) : null;
 
   const detected = useMemo(() => (result ? detectChartConfig(result) : null), [result]);
   const chartConfig = current.chart ?? detected;
@@ -78,10 +86,16 @@ export default function ResultsPanel() {
       <div className="relative flex h-full items-center justify-center bg-surface p-6 text-center">
         {scanLine}
         {isExecuting ? (
-          <p className="text-[13px] text-muted">Running…</p>
+          <p className="flex items-center gap-2 text-[13px] text-muted">
+            <Spinner />
+            Running…
+          </p>
         ) : (
           <div className="text-[13px] leading-6 text-muted">
-            <p>Results appear here.</p>
+            <span className="mx-auto mb-2 flex size-9 items-center justify-center rounded-lg bg-raised text-faint">
+              <Icon name="table" size={18} />
+            </span>
+            <p className="font-medium text-ink">No results yet</p>
             <p>
               Run with <Kbd>{MOD}</Kbd> <Kbd>Enter</Kbd>, ask AI with <Kbd>{MOD}</Kbd> <Kbd>K</Kbd>, or press <Kbd>?</Kbd> for shortcuts.
             </p>
@@ -106,22 +120,41 @@ export default function ResultsPanel() {
       {label}
     </button>
   );
+  const inspect = (column: string) => {
+    setInspectorOpen(true);
+    patch({ inspectCol: column });
+  };
+  const showTable = !(current.view === "chart" && chartConfig) && !activePlugin && current.view !== "details";
+  const sql = tab?.lastRunSql ?? tab?.query ?? "";
 
   return (
     <div className="relative flex h-full flex-col bg-surface">
       {scanLine}
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-2 py-1">
-        <div className="flex items-center gap-0.5" role="tablist" aria-label="Result view">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface px-2 py-1">
+        <div className="flex items-center gap-0.5 rounded-lg bg-raised p-0.5" role="tablist" aria-label="Result view">
           {viewButton("table", "Table")}
           {viewButton("chart", "Chart", !chartConfig)}
+          {viewButton("details", "Details")}
           {pluginViews.map((v) => viewButton(v.key, v.label))}
         </div>
-        <p className="flex items-center gap-3 text-[12px] tabular-nums text-muted">
+        <p className="flex items-center gap-2 text-[12px] tabular-nums text-muted">
           <span>
             <span className="font-medium text-ink">{result.rowCount.toLocaleString()}</span> {result.rowCount === 1 ? "row" : "rows"}
           </span>
-          <span>{result.executionTimeMs} ms</span>
-          {truncated && <span className="text-warn">showing first {MAX_RESULT_ROWS.toLocaleString()}</span>}
+          <span aria-hidden="true" className="text-faint">·</span>
+          <span>
+            <span className="font-medium text-ink">{result.columns.length}</span> {result.columns.length === 1 ? "column" : "columns"}
+          </span>
+          <span aria-hidden="true" className="text-faint">·</span>
+          <span>{result.executionTimeMs.toLocaleString()} ms</span>
+          {truncated && (
+            <span
+              className="rounded bg-warn-soft px-1.5 py-0.5 text-[11px] font-medium text-warn"
+              title={`Only the first ${MAX_RESULT_ROWS.toLocaleString()} rows are loaded into the grid. Parquet export includes all rows.`}
+            >
+              showing first {MAX_RESULT_ROWS.toLocaleString()}
+            </span>
+          )}
         </p>
         <div className="ml-auto flex items-center gap-1.5">
           {current.view === "table" && (
@@ -136,16 +169,46 @@ export default function ResultsPanel() {
               />
             </label>
           )}
+          {current.view === "table" && result.columns.length > 0 && (
+            <button
+              onClick={() => (inspectorOpen ? setInspectorOpen(false) : inspect(current.inspectCol ?? result.columns[0]))}
+              aria-pressed={inspectorOpen}
+              aria-label="Column inspector"
+              title="Column inspector"
+              className={`${btn.icon} ${inspectorOpen ? "bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent" : ""}`}
+            >
+              <Icon name="panelRight" size={15} />
+            </button>
+          )}
           <ExportMenu result={result} query={tab?.lastRunSql ?? tab?.query ?? ""} />
         </div>
       </div>
-      <div className={`min-h-0 flex-1 transition-opacity ${isExecuting ? "opacity-50" : ""}`}>
-        {current.view === "chart" && chartConfig ? (
-          <ChartPanel result={result} config={chartConfig} onConfigChange={(chart) => patch({ chart })} />
-        ) : activePlugin ? (
-          <PluginVisualization extension={activePlugin.extension} pluginName={activePlugin.label} result={result} />
-        ) : (
-          <DataTable result={result} filter={current.filter} />
+      <div className={`flex min-h-0 flex-1 transition-opacity ${isExecuting ? "opacity-50" : ""}`}>
+        <div className="min-h-0 min-w-0 flex-1">
+          {current.view === "chart" && chartConfig ? (
+            <ChartPanel result={result} config={chartConfig} onConfigChange={(chart) => patch({ chart })} />
+          ) : activePlugin ? (
+            <PluginVisualization extension={activePlugin.extension} pluginName={activePlugin.label} result={result} />
+          ) : current.view === "details" ? (
+            <DetailsView result={result} sql={sql} at={resultMeta(result).at} />
+          ) : (
+            <DataTable
+              key={resultMeta(result).id}
+              result={result}
+              filter={current.filter}
+              inspectedColumn={inspectedColumn}
+              onInspect={inspect}
+              onSelectColumn={(column) => inspectorOpen && patch({ inspectCol: column })}
+            />
+          )}
+        </div>
+        {showTable && inspectedColumn && (
+          <ColumnInspector
+            result={result}
+            column={inspectedColumn}
+            onColumnChange={(column) => patch({ inspectCol: column })}
+            onClose={() => setInspectorOpen(false)}
+          />
         )}
       </div>
     </div>

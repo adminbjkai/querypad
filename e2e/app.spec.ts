@@ -90,10 +90,14 @@ test.describe("QueryPad", () => {
   test("AI assistant lets you switch providers", async ({ page }) => {
     await openWithSamples(page);
     await page.getByRole("button", { name: /Ask AI/ }).click();
-    const provider = page.getByLabel("AI provider");
-    await provider.selectOption("anthropic");
+    // Without the local AI bridge (dev server), signed-in CLI models show as unavailable.
+    await page.getByRole("button", { name: "AI model" }).click();
+    await expect(page.getByRole("menuitemradio", { name: /Codex.*GPT-6 Luna.*unavailable/ })).toBeDisabled();
+    await page.getByRole("menuitemradio", { name: /Sonnet 5\.5.*add key/ }).click();
+    await page.keyboard.press("Escape");
     await expect(page.getByPlaceholder("Enter your Anthropic API key (sk-ant-...)")).toBeVisible();
-    await provider.selectOption("openai");
+    await page.getByRole("button", { name: "AI model" }).click();
+    await page.getByRole("menuitemradio", { name: /OpenAI.*GPT-5\.5/ }).click();
     await expect(page.getByPlaceholder("Enter your OpenAI API key (sk-...)")).toBeVisible();
   });
 

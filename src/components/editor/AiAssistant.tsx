@@ -14,15 +14,10 @@ import {
 import { relationshipKey } from "@/lib/discovery/relationships";
 import { insertAtCursor } from "@/lib/editor-bridge";
 import { copyText } from "@/lib/export/clipboard";
-import {
-  getStoredAiProvider,
-  setAiProvider,
-  getApiKey,
-  setApiKey,
-  clearApiKey,
-  fetchServerProviders,
-} from "@/lib/ai/api-key";
-import { AI_PROVIDER_OPTIONS, DEFAULT_AI_PROVIDER, getAiProviderConfig, type AiProvider } from "@/lib/ai/providers";
+import { getApiKey, setApiKey, clearApiKey } from "@/lib/ai/api-key";
+import { getAiProviderConfig } from "@/lib/ai/providers";
+import { useAiStore, currentEffort } from "@/stores/ai-store";
+import ModelPicker from "@/components/ai/ModelPicker";
 import type { AiTurn } from "@/types";
 import { Icon } from "@/components/ui/icons";
 import { Spinner, btn, input } from "@/components/ui/primitives";
@@ -78,9 +73,11 @@ export default function AiAssistant() {
   );
   const runCount = useWorkspaceStore((s) => Math.min(s.history.length, 8));
 
-  const [provider, setProvider] = useState<AiProvider>(() => getStoredAiProvider() ?? DEFAULT_AI_PROVIDER);
-  const [serverProviders, setServerProviders] = useState<AiProvider[]>([]);
-  const [userKey, setUserKey] = useState<string | null>(() => getApiKey(getStoredAiProvider() ?? DEFAULT_AI_PROVIDER));
+  const provider = useAiStore((s) => s.provider);
+  const serverProviders = useAiStore((s) => s.serverProviders);
+  // Bumped when the stored key changes so the memo re-reads it.
+  const [keyVersion, setKeyVersion] = useState(0);
+  const userKey = useMemo(() => (keyVersion >= 0 ? getApiKey(provider) : null), [provider, keyVersion]);
   const [keyDraft, setKeyDraft] = useState("");
   const [editingKey, setEditingKey] = useState(false);
   const [prompt, setPrompt] = useState(seed ?? "");
@@ -94,24 +91,14 @@ export default function AiAssistant() {
 
   const turns = useMemo(() => thread ?? [], [thread]);
   const config = getAiProviderConfig(provider);
+  const isLocal = config.kind === "local";
   const serverManaged = serverProviders.includes(provider);
   const ready = serverManaged || !!userKey;
   const busy = phase !== "idle";
 
-  // Pick the stored provider, else the first one the server has a key for.
   useEffect(() => {
-    let cancelled = false;
-    void fetchServerProviders().then((available) => {
-      if (cancelled) return;
-      setServerProviders(available);
-      const chosen = getStoredAiProvider() ?? available[0] ?? DEFAULT_AI_PROVIDER;
-      setProvider(chosen);
-      setUserKey(getApiKey(chosen));
-    });
-    return () => {
-      cancelled = true;
-      abortRef.current?.abort();
-    };
+    void useAiStore.getState().init();
+    return () => abortRef.current?.abort();
   }, []);
 
   useEffect(() => {
@@ -123,14 +110,6 @@ export default function AiAssistant() {
     threadEndRef.current?.scrollIntoView({ block: "nearest" });
   }, [turns.length, streaming]);
 
-  const chooseProvider = (next: AiProvider) => {
-    setProvider(next);
-    setAiProvider(next);
-    setUserKey(getApiKey(next));
-    setEditingKey(false);
-    setError(null);
-  };
-
   /** Stream one completion into the live preview; returns the cleaned SQL. */
   const ask = useCallback(
     async (input: string, history: ChatTurn[], signal: AbortSignal) => {
@@ -139,6 +118,7 @@ export default function AiAssistant() {
       for await (const chunk of streamComplete({
         provider,
         apiKey: serverManaged ? undefined : userKey ?? undefined,
+        effort: currentEffort(),
         system: WORKSPACE_SQL_SYSTEM_PROMPT,
         input,
         history,
@@ -204,7 +184,7 @@ export default function AiAssistant() {
       setError(message);
       if (/invalid api key/i.test(message) && !serverManaged) {
         clearApiKey(provider);
-        setUserKey(null);
+        setKeyVersion((v) => v + 1);
       }
     } finally {
       setPhase("idle");
@@ -316,18 +296,9 @@ export default function AiAssistant() {
             aria-label="Describe the query"
             disabled={busy}
           />
-          <select
-            value={provider}
-            onChange={(e) => chooseProvider(e.target.value as AiProvider)}
-            className="h-8 max-w-[150px] shrink-0 rounded-md border border-line bg-surface px-1.5 text-[12px] text-ink outline-none focus:border-accent"
-            aria-label="AI provider"
-          >
-            {AI_PROVIDER_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label} ({option.modelLabel})
-              </option>
-            ))}
-          </select>
+          <div className="mt-0.5 shrink-0">
+            <ModelPicker compact />
+          </div>
           {busy ? (
             <button onClick={() => abortRef.current?.abort()} className={btn.secondary}>
               <Icon name="stop" size={13} />
@@ -357,7 +328,13 @@ export default function AiAssistant() {
         </div>
 
         <div className="ml-6 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted">
-          {serverManaged ? (
+          {isLocal ? (
+            <span>
+              {serverManaged
+                ? `Runs through the ${config.label} CLI signed in on this server — no API key. Schemas, column hints and your SQL are sent to ${config.label}; table rows are not.`
+                : `The ${config.label} CLI isn't available on this server right now. Pick another model.`}
+            </span>
+          ) : serverManaged ? (
             <span>
               Using the server&apos;s {config.label} key. Schemas, column hints and your SQL are sent to {config.label}; table rows are not.
             </span>
@@ -376,7 +353,7 @@ export default function AiAssistant() {
                 const key = keyDraft.trim();
                 if (!key) return;
                 setApiKey(provider, key);
-                setUserKey(key);
+                setKeyVersion((v) => v + 1);
                 setKeyDraft("");
                 setEditingKey(false);
                 setError(null);

@@ -166,7 +166,17 @@ falls back to keeping everything in the browser.
 - **Tables you create with SQL are first-class** — `CREATE TABLE`, `CREATE VIEW`, `INSERT`,
   `ALTER`, `DROP`… the sidebar follows DuckDB's catalog, and new or changed tables are saved
   (as Parquet snapshots) so they survive reloads, travel in share links and sync to rooms
-- **An AI assistant that keeps the thread** — Ctrl/⌘+K opens a conversation per tab. Each
+- **The Assistant** — Ctrl/⌘+I opens a chat panel beside the editor that sees the whole
+  workspace: tables with value hints, joins, open tabs, the current result, recent runs,
+  snippets and spaces. It looks things up on its own with read-only queries (shown as
+  "Looked at the data"), answers in Markdown with runnable SQL, and offers app actions —
+  run in a tab, replace the query, save a snippet, preview or profile a table, accept a join,
+  switch space — that happen only when you click **Apply**. One conversation per space
+- **AI models without API keys** — on a self-hosted server, QueryPad can use the AI CLIs
+  already signed in on that machine: Claude Sonnet 5.5, Codex GPT-6 Luna and Grok 4.7 (each
+  with a low/medium effort toggle), plus Cursor's Grok 4.7 Medium Fast (256k) and Composer
+  2.5. Pick one from the model menu; API-key providers are still there too
+- **Ask AI in the editor** — Ctrl/⌘+K opens a conversation per tab. Each
   request carries your schemas with column hints, the inferred joins (accepted ones first,
   rejected ones excluded), your recent runs and their errors, and the earlier turns, so
   follow-ups like "now join everything" build on what came before. Every answer is compiled
@@ -179,8 +189,15 @@ falls back to keeping everything in the browser.
 - **Snippet library** — save SQL you reuse (Ctrl/⌘+Shift+S) into folders; search it, insert at
   the cursor, run it in a tab, or autocomplete it by name. Shared by every space and device;
   export/import as JSON
-- **Results you can work with** — sort by any column, filter rows, click a cell to copy,
-  one-click charts, export to CSV / JSON / Markdown / HTML / Excel / Parquet / clipboard
+- **A results grid like a desktop tool** — sticky headers and row numbers, resizable
+  columns, NULLs marked, keyboard cell navigation with Ctrl/⌘+C, a per-column menu (sort, copy
+  name or values, inspect), a column inspector with distribution, nulls, distinct values and
+  top values, a Details view with the SQL and timings, one-click charts, and export to CSV /
+  JSON / Markdown / HTML / Excel / Parquet / clipboard
+- **Explorer, history and status bar** — a searchable explorer for tables, views and columns
+  on a slim activity rail; history search with a succeeded/failed filter; a status bar with
+  the engine, space, sync state, last result and the active AI model; Format SQL
+  (Shift+Alt+F)
 - **Command palette** — Ctrl/⌘+P to run anything, open a space, insert a snippet, jump to a
   tab, preview or profile a table, or reopen a past query
 - **History** — each space keeps its last 100 runs with row counts, timings and failures
@@ -222,10 +239,29 @@ falls back to keeping everything in the browser.
 | Run query (or the selection) | Ctrl/⌘ + Enter |
 | Ask AI to write SQL | Ctrl/⌘ + K |
 | Command palette | Ctrl/⌘ + P |
+| Assistant chat | Ctrl/⌘ + I |
+| Save query as a snippet | Ctrl/⌘ + Shift + S |
+| Format SQL | Shift + Alt + F |
 | Toggle sidebar | Ctrl/⌘ + B |
 | Shortcut list | ? |
 
 ### AI providers
+
+**Signed-in CLIs (no API key).** When the server runs the local AI bridge
+([`local-ai/`](local-ai/README.md)), these appear under "Signed in on this server":
+
+| Model | Through | Effort |
+|-------|---------|--------|
+| Claude Sonnet 5.5 (`claude-sonnet-5-5`) | Claude Code CLI | low / medium |
+| GPT-6 Luna (`gpt-6-luna`) | Codex CLI | low / medium |
+| Grok 4.7 (`grok-4.7`) | Grok CLI | low / medium |
+| Grok 4.7 Medium Fast, 256k (`grok-4.7-medium-fast`) | Cursor CLI | fixed |
+| Composer 2.5 (`composer-2.5`) | Cursor CLI | fixed |
+
+The bridge runs each CLI in a bubblewrap sandbox with its tools switched off, in an empty
+scratch folder, so text in your data can't make an agent touch the host.
+
+**API-key providers:**
 
 | Provider | Model | Key |
 |----------|-------|-----|
@@ -283,6 +319,8 @@ This starts two containers from one image:
 Put a reverse proxy in front that sends `/collab/` (with WebSocket upgrade headers) to the
 relay and everything else to the app. Optional server-side AI keys go in `.env.server`
 (for example `OPENROUTER_API_KEY=…`); they are read at runtime and never sent to browsers.
+To use the AI CLIs signed in on the host instead of keys, set up the local AI bridge
+([`local-ai/README.md`](local-ai/README.md)); compose mounts its socket folder into the app.
 
 ## Tech stack
 
@@ -294,7 +332,7 @@ relay and everything else to the app. Optional server-side AI keys go in `.env.s
 | State | Zustand |
 | Persistence | Server file store (`/api/store`) with live sync; IndexedDB fallback |
 | Charts | Recharts |
-| AI | Groq, Ollama Cloud, OpenRouter, xAI, Anthropic, OpenAI — your key or the server's |
+| AI | Signed-in Claude / Codex / Grok / Cursor CLIs via the local bridge; Groq, Ollama Cloud, OpenRouter, xAI, Anthropic, OpenAI with keys |
 | Collaboration | Yjs + y-websocket, self-hosted relay |
 
 ## Releases

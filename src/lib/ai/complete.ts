@@ -1,4 +1,4 @@
-import type { AiProvider, AiProviderConfig } from "./providers";
+import type { AiEffort, AiProvider, AiProviderConfig } from "./providers";
 import { getAiProviderConfig } from "./providers";
 
 /** One earlier conversation turn. */
@@ -22,6 +22,8 @@ export interface CompleteOptions {
   history?: ChatTurn[];
   /** Max output tokens (default 1024). */
   maxTokens?: number;
+  /** Reasoning effort for models that offer a choice (local CLIs). */
+  effort?: AiEffort;
   /** Cancels the in-flight HTTP request. */
   signal?: AbortSignal;
 }
@@ -251,6 +253,7 @@ async function* streamViaServer(o: CompleteOptions): AsyncGenerator<string> {
       input: o.input,
       history: o.history?.length ? o.history : undefined,
       maxTokens: o.maxTokens ?? DEFAULT_MAX_TOKENS,
+      effort: o.effort,
     }),
     signal: o.signal,
   });
@@ -284,6 +287,15 @@ async function* streamViaServer(o: CompleteOptions): AsyncGenerator<string> {
 export async function* streamComplete(options: CompleteOptions): AsyncGenerator<string> {
   const config = getAiProviderConfig(options.provider);
   const { apiKey } = options;
+
+  // Local CLIs are reached through the server route (which talks to the host bridge).
+  if (config.kind === "local") {
+    if (typeof window !== "undefined") {
+      yield* streamViaServer(options);
+      return;
+    }
+    throw new Error(`${config.label} runs through the QueryPad server's local AI bridge.`);
+  }
 
   if (!apiKey) {
     if (typeof window !== "undefined") {

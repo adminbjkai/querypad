@@ -44,6 +44,9 @@ const PATHS = {
   folder: "M4 6h6l2 2h8v10H4z",
   insert: "M4 6h16M4 12h7M4 18h16M15 9l3 3-3 3",
   edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
+  panelRight: "M4 5h16v14H4zM15 5v14",
+  info: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v5M12 8h.01",
+  format: "M4 6h16M4 10h10M4 14h16M4 18h10",
 } as const;
 
 export type IconName = keyof typeof PATHS;

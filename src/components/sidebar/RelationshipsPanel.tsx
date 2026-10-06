@@ -10,6 +10,7 @@ import { insertAtCursor } from "@/lib/editor-bridge";
 import type { TableInfo } from "@/types";
 import type { Relationship, RelationshipVerdict } from "@/types/discovery";
 import { Icon } from "@/components/ui/icons";
+import PanelHeader from "./PanelHeader";
 import { Spinner, btn } from "@/components/ui/primitives";
 
 function columnsOf(tables: TableInfo[], table: string): string[] {
@@ -189,15 +190,7 @@ export default function RelationshipsPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-start gap-2 px-3 pb-2 pt-2.5">
-        <h2 className="sr-only">Relationships</h2>
-        <p className="flex-1 text-[12px] leading-[17px] text-muted">
-          {discovery.status === "ready"
-            ? sorted.length > 0
-              ? `${sorted.length} inferred from your data. Accept the right ones — AI uses them for joins.`
-              : "No joins found yet."
-            : "Finding joins by comparing key values across tables…"}
-        </p>
+      <PanelHeader title="Joins" count={discovery.status === "ready" ? sorted.length : undefined}>
         <button
           onClick={() => void discoverRelationships()}
           disabled={discovery.status === "loading"}
@@ -207,7 +200,14 @@ export default function RelationshipsPanel() {
         >
           <Icon name="refresh" size={14} />
         </button>
-      </div>
+      </PanelHeader>
+      <p className="px-3 pb-2 pt-2.5 text-[12px] leading-[17px] text-muted">
+        {discovery.status === "ready"
+          ? sorted.length > 0
+            ? `${sorted.length} inferred from your data. Accept the right ones — AI uses them for joins.`
+            : "No joins found yet."
+          : "Finding joins by comparing key values across tables…"}
+      </p>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {discovery.status === "loading" && (
           <p className="flex items-center gap-2 px-1 py-3 text-[13px] text-muted">

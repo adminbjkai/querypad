@@ -21,11 +21,14 @@ export function resolveAiCredentials(provider?: string): AiCredentials {
 
   if (!isAiProvider(selected)) {
     throw new Error(
-      `Unknown AI provider "${selected}". Use one of: ${AI_PROVIDER_IDS.join(", ")}.`
+      `Unknown AI provider "${selected}". Use one of: ${AI_PROVIDER_IDS.filter((id) => getAiProviderConfig(id).kind !== "local").join(", ")}.`
     );
   }
 
-  const { envKey } = getAiProviderConfig(selected);
+  const { envKey, kind } = getAiProviderConfig(selected);
+  if (kind === "local") {
+    throw new Error(`"${selected}" uses the web app's local AI bridge and isn't available in the CLI.`);
+  }
   const apiKey = process.env[envKey];
   if (!apiKey) {
     throw new Error(

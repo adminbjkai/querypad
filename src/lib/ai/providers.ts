@@ -1,9 +1,24 @@
-export const AI_PROVIDER_IDS = ["anthropic", "openai", "groq", "ollama", "openrouter", "xai"] as const;
+export const AI_PROVIDER_IDS = [
+  "local-claude",
+  "local-codex",
+  "local-grok",
+  "local-cursor-grok",
+  "local-cursor-composer",
+  "anthropic",
+  "openai",
+  "groq",
+  "ollama",
+  "openrouter",
+  "xai",
+] as const;
 
 export type AiProvider = (typeof AI_PROVIDER_IDS)[number];
 
 /** Wire protocol used to talk to the provider. */
-export type AiProviderKind = "anthropic" | "openai-responses" | "openai-compatible";
+export type AiProviderKind = "anthropic" | "openai-responses" | "openai-compatible" | "local";
+
+/** Reasoning effort for models that offer a choice (local CLIs). */
+export type AiEffort = "low" | "medium";
 
 export interface AiProviderConfig {
   id: AiProvider;
@@ -19,11 +34,48 @@ export interface AiProviderConfig {
   keyUrl: string;
   /** Extra fields merged into the request body (provider-specific tuning). */
   extraBody?: Record<string, unknown>;
+  /**
+   * kind "local": a CLI already signed in on the QueryPad host (Claude Code, Codex, Grok,
+   * Cursor), reached through the local AI bridge — no API key. `bridgeModel` is the
+   * bridge's model id; `efforts` lists the selectable reasoning efforts (empty = fixed).
+   */
+  bridgeModel?: string;
+  efforts?: AiEffort[];
+  /** Group shown in the model picker, e.g. "Cursor". */
+  vendor?: string;
+}
+
+function local(
+  id: AiProvider,
+  vendor: string,
+  modelLabel: string,
+  bridgeModel: string,
+  efforts: AiEffort[]
+): AiProviderConfig {
+  return {
+    id,
+    label: vendor,
+    modelLabel,
+    model: bridgeModel,
+    kind: "local",
+    baseUrl: "",
+    envKey: "",
+    keyPlaceholder: "",
+    keyUrl: "",
+    bridgeModel,
+    efforts,
+    vendor,
+  };
 }
 
 export const DEFAULT_AI_PROVIDER: AiProvider = "groq";
 
 export const AI_PROVIDER_CONFIGS: Record<AiProvider, AiProviderConfig> = {
+  "local-claude": local("local-claude", "Claude", "Sonnet 5.5", "claude-sonnet-5-5", ["low", "medium"]),
+  "local-codex": local("local-codex", "Codex", "GPT-6 Luna", "codex-gpt-6-luna", ["low", "medium"]),
+  "local-grok": local("local-grok", "Grok", "Grok 4.7", "grok-4-7", ["low", "medium"]),
+  "local-cursor-grok": local("local-cursor-grok", "Cursor", "Grok 4.7 Medium Fast (256k)", "cursor-grok-4-7-medium-fast", []),
+  "local-cursor-composer": local("local-cursor-composer", "Cursor", "Composer 2.5", "cursor-composer-2-5", []),
   anthropic: {
     id: "anthropic",
     label: "Claude",
@@ -104,3 +156,10 @@ export function isAiProvider(value: unknown): value is AiProvider {
 export function getAiProviderConfig(provider: AiProvider): AiProviderConfig {
   return AI_PROVIDER_CONFIGS[provider];
 }
+
+export function isLocalProvider(provider: AiProvider): boolean {
+  return AI_PROVIDER_CONFIGS[provider].kind === "local";
+}
+
+/** Providers that work with an API key (everything except the host's signed-in CLIs). */
+export const KEY_PROVIDER_OPTIONS = AI_PROVIDER_OPTIONS.filter((p) => p.kind !== "local");

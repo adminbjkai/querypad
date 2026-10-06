@@ -6,6 +6,7 @@ import { saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { runActive } from "@/lib/workspace-actions";
+import { formatSql } from "./format-sql";
 import PeerCursors from "@/components/collaboration/PeerCursors";
 import { Icon } from "@/components/ui/icons";
 import { MOD, Spinner, btn } from "@/components/ui/primitives";
@@ -96,17 +97,29 @@ export default function TabBar() {
         </button>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5 px-2">
+      <div className="flex shrink-0 items-center gap-2 border-l border-line px-2">
         {roomId && <PeerCursors />}
-        <button
-          onClick={() => void saveCurrentAsSnippet()}
-          disabled={!active?.query.trim()}
-          className={btn.icon}
-          title={`Save as snippet (${MOD}+Shift+S)`}
-          aria-label="Save as snippet"
-        >
-          <Icon name="bookmark" size={15} />
-        </button>
+        <div className="flex items-center">
+          <button
+            onClick={() => void formatSql()}
+            disabled={!active?.query.trim()}
+            className={btn.icon}
+            title="Format SQL (Shift+Alt+F)"
+            aria-label="Format SQL"
+          >
+            <Icon name="format" size={15} />
+          </button>
+          <button
+            onClick={() => void saveCurrentAsSnippet()}
+            disabled={!active?.query.trim()}
+            className={btn.icon}
+            title={`Save as snippet (${MOD}+Shift+S)`}
+            aria-label="Save as snippet"
+          >
+            <Icon name="bookmark" size={15} />
+          </button>
+        </div>
+        <span className="h-4 w-px bg-line" aria-hidden="true" />
         <button
           onClick={() => {
             const ui = useUiStore.getState();
@@ -115,6 +128,7 @@ export default function TabBar() {
           }}
           className={`${btn.ghost} ${aiOpen ? "bg-accent-soft text-accent" : ""}`}
           title={`Ask AI (${MOD}+K)`}
+          aria-label="Ask AI"
           aria-pressed={aiOpen}
         >
           <Icon name="sparkle" size={15} />

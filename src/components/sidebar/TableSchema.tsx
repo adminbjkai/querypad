@@ -13,6 +13,8 @@ interface TableSchemaProps {
   table: TableInfo;
   /** Views have no row count, profile, or file; removing one drops the view. */
   isView?: boolean;
+  /** Lowercased search text; matching columns are listed and the table opens to show them. */
+  filter?: string;
   keyColumns: Map<string, "key" | "ref">;
   profileActive: boolean;
   onOpenProfile: () => void;
@@ -22,10 +24,15 @@ function quoteIfNeeded(name: string): string {
   return /^[a-z_][a-z0-9_]*$/.test(name) ? name : `"${name.replaceAll('"', '""')}"`;
 }
 
-export default function TableSchema({ table, isView, keyColumns, profileActive, onOpenProfile }: TableSchemaProps) {
+export default function TableSchema({ table, isView, filter = "", keyColumns, profileActive, onOpenProfile }: TableSchemaProps) {
   const removeTable = useWorkspaceStore((s) => s.removeTable);
   const dropView = useWorkspaceStore((s) => s.dropView);
   const [expanded, setExpanded] = useState(!isView);
+
+  const matchedColumns = filter ? table.columns.filter((c) => c.name.toLowerCase().includes(filter)) : [];
+  const filtering = matchedColumns.length > 0;
+  const isExpanded = filtering || expanded;
+  const columns = filtering ? matchedColumns : table.columns;
 
   const insert = (text: string) => {
     if (!insertAtCursor(text)) toast("Open the SQL editor to insert names.", "info");
@@ -36,11 +43,11 @@ export default function TableSchema({ table, isView, keyColumns, profileActive, 
       <div className="flex items-center rounded-md hover:bg-raised">
         <button
           onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
+          aria-expanded={isExpanded}
           aria-label={table.name}
           className="flex min-w-0 flex-1 items-center gap-1.5 px-1.5 py-1.5 text-left"
         >
-          <Icon name="chevronRight" size={13} className={`text-faint transition-transform ${expanded ? "rotate-90" : ""}`} />
+          <Icon name="chevronRight" size={13} className={`text-faint transition-transform ${isExpanded ? "rotate-90" : ""}`} />
           <span className="truncate font-mono text-[13px] font-medium text-ink">{table.name}</span>
           <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-faint">
             {isView ? "view" : table.rowCount.toLocaleString()}
@@ -70,9 +77,9 @@ export default function TableSchema({ table, isView, keyColumns, profileActive, 
           </button>
         </div>
       </div>
-      {expanded && (
+      {isExpanded && (
         <ul className="mb-1 ml-[18px] border-l border-line pl-1.5">
-          {table.columns.map((col) => {
+          {columns.map((col) => {
             const mark = keyColumns.get(`${table.name}.${col.name}`);
             return (
               <li key={col.name}>

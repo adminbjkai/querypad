@@ -6,7 +6,8 @@ import { toast } from "@/stores/ui-store";
 import { insertSnippet, openSnippet } from "@/lib/workspace-actions";
 import { copyText } from "@/lib/export/clipboard";
 import { Icon } from "@/components/ui/icons";
-import { btn, input, Menu, MOD } from "@/components/ui/primitives";
+import PanelHeader, { SearchBox } from "./PanelHeader";
+import { btn, Menu, MOD } from "@/components/ui/primitives";
 import type { Snippet } from "@/types/snippet";
 
 const UNFILED = "Unfiled";
@@ -75,52 +76,43 @@ export default function SnippetsPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between gap-1 px-3 pb-1 pt-2.5">
-        <p className="text-[12px] text-muted">
-          {snippets.length} {snippets.length === 1 ? "snippet" : "snippets"}
-        </p>
-        <div className="flex items-center">
-          <button onClick={() => void saveCurrentAsSnippet()} className={btn.ghost} title={`Save the query or selection (${MOD}+Shift+S)`}>
-            <Icon name="plus" size={14} />
-            Save query
-          </button>
-          <Menu
-            label="Snippet library"
-            trigger={({ toggle }) => (
-              <button onClick={toggle} className={btn.icon} aria-label="Snippet library options">
-                <Icon name="more" />
-              </button>
-            )}
-            items={[
-              { label: "New empty snippet", icon: "plus", onSelect: () => useSnippetStore.getState().openEditor({ name: "", sql: "" }) },
-              { label: "Export all (JSON)", icon: "download", disabled: snippets.length === 0, onSelect: exportAll },
-              { label: "Import from JSON…", icon: "upload", onSelect: () => fileRef.current?.click() },
-            ]}
-          />
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            aria-label="Import snippets file"
-            onChange={(e) => {
-              void importFile(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </div>
-      </div>
+      <PanelHeader title="Snippets" count={snippets.length}>
+        <button
+          onClick={() => void saveCurrentAsSnippet()}
+          className={btn.icon}
+          title={`Save the query or selection (${MOD}+Shift+S)`}
+          aria-label="Save query"
+        >
+          <Icon name="plus" size={15} />
+        </button>
+        <Menu
+          label="Snippet library"
+          trigger={({ toggle }) => (
+            <button onClick={toggle} className={btn.icon} aria-label="Snippet library options">
+              <Icon name="more" />
+            </button>
+          )}
+          items={[
+            { label: "New empty snippet", icon: "plus", onSelect: () => useSnippetStore.getState().openEditor({ name: "", sql: "" }) },
+            { label: "Export all (JSON)", icon: "download", disabled: snippets.length === 0, onSelect: exportAll },
+            { label: "Import from JSON…", icon: "upload", onSelect: () => fileRef.current?.click() },
+          ]}
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          aria-label="Import snippets file"
+          onChange={(e) => {
+            void importFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+      </PanelHeader>
 
       {snippets.length > 0 && (
-        <div className="px-3 pb-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search snippets"
-            aria-label="Search snippets"
-            className={input}
-          />
-        </div>
+        <SearchBox value={query} onChange={setQuery} placeholder="Search snippets" label="Search snippets" />
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3">
