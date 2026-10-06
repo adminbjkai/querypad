@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from "@playwright/test";
+import { test, expect, isolate, type Page, type Route } from "./fixtures";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
@@ -154,6 +154,60 @@ test.describe("Spaces", () => {
     await expect(page.getByRole("button", { name: /^Space: Analysis/ })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("button", { name: "notes", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible();
+  });
+});
+
+test.describe("Saved on the server", () => {
+  test("two devices see the same workspace, live and after reload", async ({ browser }) => {
+    const ctxA = await browser.newContext();
+    const ns = await isolate(ctxA);
+    const a = await ctxA.newPage();
+    await openWithSamples(a);
+    await a.waitForTimeout(800);
+
+    // A second device (fresh browser storage, same account) opens the same space.
+    const ctxB = await browser.newContext();
+    await isolate(ctxB, ns);
+    const b = await ctxB.newPage();
+    await openWithSamples(b);
+    await expect(b.getByRole("button", { name: /^Space: Playground/ })).toBeVisible();
+
+    // Editor text typed on A shows up on B without reloading.
+    await a.locator(".monaco-editor").click();
+    await a.keyboard.press(`${MOD}+End`);
+    await a.keyboard.type("\n-- typed on device A");
+    await expect(b.locator(".monaco-editor")).toContainText("typed on device A", { timeout: 15_000 });
+
+    // Tables created on A appear on B.
+    await runSql(a, "CREATE TABLE synced AS SELECT 7 AS n");
+    await expect(a.getByRole("button", { name: "synced", exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(b.getByRole("button", { name: "synced", exact: true })).toBeVisible({ timeout: 20_000 });
+
+    // New spaces show up in B's space list.
+    await a.getByRole("button", { name: /^Space: / }).click();
+    await a.getByRole("button", { name: /New empty space/ }).click();
+    await a.getByLabel("New space name").fill("From A");
+    await a.getByRole("button", { name: "Create" }).click();
+    await expect(a.getByRole("button", { name: /^Space: From A/ })).toBeVisible({ timeout: 15_000 });
+    await a.waitForTimeout(800);
+    await b.getByRole("button", { name: /^Space: / }).click();
+    await expect(b.getByRole("button", { name: /^From A/ })).toBeVisible({ timeout: 15_000 });
+    await b.keyboard.press("Escape");
+
+    // A brand-new browser on the same account loads everything from the server.
+    const ctxC = await browser.newContext();
+    await isolate(ctxC, ns);
+    const c = await ctxC.newPage();
+    await c.goto("/");
+    await expect(c.getByRole("button", { name: /^Space: From A/ })).toBeVisible({ timeout: 30_000 });
+    await c.getByRole("button", { name: /^Space: / }).click();
+    await c.getByRole("button", { name: /^Playground/ }).click();
+    await expect(c.getByRole("button", { name: "synced", exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(c.locator(".monaco-editor")).toContainText("CREATE TABLE synced");
+
+    await ctxA.close();
+    await ctxB.close();
+    await ctxC.close();
   });
 });
 

@@ -7,6 +7,20 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.9.0 — Your workspace on every device
+
+- Spaces (tables, views, tabs, AI conversations, history, pipelines, join verdicts) are now
+  saved on the server through a new `/api/store` API instead of only in the browser, so every
+  device and browser opens the same workspace
+- Live sync: open clients check for changes every 3 seconds (and on focus) and apply edits
+  made on other devices — tab text, history and verdicts in place; new or changed tables,
+  views and plugins by reopening the space. New, renamed and deleted spaces show up too.
+  Unsaved local edits are never pulled over
+- Spaces already saved in a browser are uploaded automatically the first time it opens an
+  empty server; without the storage API (static hosting) the app keeps using IndexedDB
+- Docker: the web container stores data in `/data` (`QUERYPAD_DATA_DIR`), mounted as the
+  `querypad-data` volume
+
 ## v0.8.0 — Spaces, SQL-created tables, and an AI that keeps the thread
 
 ### Spaces

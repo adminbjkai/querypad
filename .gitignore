@@ -60,3 +60,6 @@ docs/SHOW-HN.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# server-side workspace storage (local dev)
+/.querypad-data

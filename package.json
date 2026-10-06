@@ -1,6 +1,6 @@
 {
   "name": "querypad",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "Local-first data workspace: drop data files, see how they connect, and query them with SQL or plain English — DuckDB in the browser, plus a CLI.",
   "author": "QueryPad Contributors",

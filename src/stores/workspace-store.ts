@@ -16,10 +16,13 @@ import {
   deleteSpaceFiles,
   deleteSpaceData,
   newSpaceId,
+  checkRemote,
+  pullSpaceState,
+  hasPendingWrites,
   type FileEntry,
   type PersistedState,
   type SpaceMeta,
-} from "@/lib/persistence/indexeddb";
+} from "@/lib/persistence";
 import { getConnection } from "@/lib/duckdb/instance";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
 import { relationshipKey } from "@/lib/discovery/relationships";
@@ -961,6 +964,7 @@ export async function saveSharedAsSpace(name: string): Promise<void> {
 
 useWorkspaceStore.subscribe((state, prev) => {
   const spaceId = state.spaceId;
+  if (applyingRemote) return;
   if (!spaceId || !state._hydrated || !state.persistEnabled) return;
   if (!prev._hydrated || !prev.persistEnabled || prev.spaceId !== spaceId) return;
 
@@ -993,6 +997,133 @@ useWorkspaceStore.subscribe((state, prev) => {
     saveTimer = setTimeout(() => void flushPendingSave(), 400);
   }
 });
+
+// --- Live sync ---------------------------------------------------------------------
+// With server storage, other devices may change the same spaces. Poll for their changes
+// and apply them here: state-only edits (tabs, history, verdicts…) in place, anything that
+// touches tables, views or plugins by reopening the space. Never pull over unsaved work.
+
+const SYNC_INTERVAL_MS = 3000;
+/** Set while remote state is applied, so the save subscription doesn't echo it back. */
+let applyingRemote = false;
+let pulling = false;
+
+function sameJson(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+}
+
+function hasLocalChanges(): boolean {
+  return saveTimer !== null || pendingSave !== null || hasPendingWrites();
+}
+
+async function inLiveRoom(): Promise<boolean> {
+  const { useCollaborationStore } = await import("@/stores/collaboration-store");
+  return useCollaborationStore.getState().roomId !== null;
+}
+
+/** Merge saved tabs into the open ones, keeping this device's results and active tab. */
+function applyRemoteState(remote: PersistedState): void {
+  const s = useWorkspaceStore.getState();
+  const localById = new Map(s.tabs.map((t) => [t.id, t]));
+  const tabs = (remote.tabs ?? []).map((pt) => {
+    const local = localById.get(pt.id);
+    const base = local ?? { ...createTab(1, pt.query), id: pt.id, createdAt: pt.createdAt };
+    return { ...base, title: pt.title, query: pt.query, aiThread: pt.aiThread ?? [] };
+  });
+  const pipelines = remote.pipelines ?? [];
+  applyingRemote = true;
+  try {
+    useWorkspaceStore.setState({
+      ...(tabs.length > 0 && {
+        tabs,
+        activeTabId: tabs.some((t) => t.id === s.activeTabId) ? s.activeTabId : tabs[0].id,
+      }),
+      history: remote.history ?? [],
+      pipelines,
+      activePipelineId: pipelines.some((p) => p.id === s.activePipelineId)
+        ? s.activePipelineId
+        : (pipelines[0]?.id ?? null),
+      relationshipVerdicts: remote.relationshipVerdicts ?? {},
+      relationshipOverrides: remote.relationshipOverrides ?? [],
+    });
+  } finally {
+    applyingRemote = false;
+  }
+}
+
+/** Reload the open space from storage (tables, views and plugins changed elsewhere). */
+async function reopenSpace(spaceId: string): Promise<void> {
+  const keepTab = useWorkspaceStore.getState().activeTabId;
+  useWorkspaceStore.setState({ _hydrated: false });
+  try {
+    await resetEngine();
+    useWorkspaceStore.setState({ ...emptySpaceData(), spaceId });
+    await openSpace(spaceId);
+    if (useWorkspaceStore.getState().tabs.some((t) => t.id === keepTab)) {
+      useWorkspaceStore.setState({ activeTabId: keepTab });
+    }
+  } finally {
+    useWorkspaceStore.setState({ _hydrated: true });
+  }
+}
+
+async function pullRemoteChanges(): Promise<void> {
+  const ready = () => {
+    const s = useWorkspaceStore.getState();
+    return s._hydrated && s.persistEnabled && s.spaceId !== null && !hasLocalChanges();
+  };
+  if (pulling || !ready()) return;
+  pulling = true;
+  try {
+    const spaceId = useWorkspaceStore.getState().spaceId!;
+    const changes = await checkRemote(spaceId);
+    if (!changes || !ready() || useWorkspaceStore.getState().spaceId !== spaceId) return;
+
+    if (changes.spaces) {
+      const remoteSpaces = changes.spaces;
+      changes.ack();
+      if (remoteSpaces.some((sp) => sp.id === spaceId)) {
+        useWorkspaceStore.setState({ spaces: remoteSpaces });
+      } else if (remoteSpaces.length > 0) {
+        // The open space was deleted on another device.
+        useWorkspaceStore.setState({ spaces: [...remoteSpaces, ...useWorkspaceStore.getState().spaces.filter((sp) => sp.id === spaceId)] });
+        toast("This space was deleted on another device.", "info");
+        await useWorkspaceStore.getState().switchSpace(remoteSpaces[0].id);
+        useWorkspaceStore.setState({ spaces: remoteSpaces });
+        return;
+      }
+    }
+
+    if (!changes.spaceChanged || (await inLiveRoom())) return;
+    const pulled = await pullSpaceState(spaceId);
+    if (!pulled || !ready() || useWorkspaceStore.getState().spaceId !== spaceId) return;
+    const s = useWorkspaceStore.getState();
+    const local = snapshotState();
+    const needsReopen =
+      pulled.filesChanged ||
+      !sameJson(pulled.state.files, local.files) ||
+      !sameJson(pulled.state.views, local.views) ||
+      !sameJson(pulled.state.pluginUrls, local.pluginUrls);
+    if (needsReopen) {
+      await reopenSpace(spaceId);
+    } else if (s.tabs.length > 0) {
+      applyRemoteState(pulled.state);
+    }
+  } catch (err) {
+    console.error("Live sync failed:", err);
+  } finally {
+    pulling = false;
+  }
+}
+
+if (typeof window !== "undefined") {
+  const pull = () => {
+    if (document.visibilityState === "visible") void pullRemoteChanges();
+  };
+  setInterval(pull, SYNC_INTERVAL_MS);
+  document.addEventListener("visibilitychange", pull);
+  window.addEventListener("focus", pull);
+}
 
 // Publish the join graph inside DuckDB (querypad.relationships / querypad.keys) so it
 // can be queried with SQL and referenced by the AI assistant.

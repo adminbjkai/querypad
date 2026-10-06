@@ -25,12 +25,15 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   y-protocols and lib0 (plus lib0's dependency isomorphic.js); the Docker image copies
   just those modules for it — update the Dockerfile if the relay gains an import.
 
-## Browser data model
+## Workspace data model
 
-- **Spaces** (`src/lib/persistence/indexeddb.ts`): `querypad-spaces` index, one
-  `querypad-space:<id>` state record and `querypad-space-file:<id>:<table>` byte records per
-  space. Older layouts are migrated in `migrateLegacy`. Store writes always target the space
-  that was active when the change happened; switching flushes the debounced save first.
+- **Spaces** (`src/lib/persistence/index.ts`): saved on the server via `/api/store`
+  (`src/lib/server-store/fs-store.ts`, data dir `QUERYPAD_DATA_DIR`, default `.querypad-data`)
+  so every device shares them; falls back to IndexedDB (`browser.ts`) when the API is absent.
+  Records carry revs; `pullRemoteChanges` in the workspace store polls and applies other
+  devices' edits (never over pending local saves). The `querypad_ns` cookie selects a storage
+  namespace — e2e tests use it (`e2e/fixtures.ts`) to stay isolated. Store writes always target
+  the space that was active when the change happened; switching flushes the debounced save first.
 - **Catalog sync**: after any non-read-only statement, `syncCatalog` reconciles the store with
   `duckdb_tables()`/`duckdb_views()` (main schema only); new/changed tables are snapshotted to
   Parquet file entries. The `querypad` schema (relationships/keys) is internal and never listed.

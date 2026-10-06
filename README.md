@@ -151,8 +151,10 @@ Caveats (0)
 
 ## Web app: interactive analysis
 
-DuckDB runs in your tab (WebAssembly). Your data stays in your browser unless you
-explicitly share a link or join a live room.
+DuckDB runs in your tab (WebAssembly). Your spaces are saved on the QueryPad server you
+use, so every device you open it on sees the same workspace — and open tabs pick up changes
+made elsewhere within a few seconds. Served without its storage API (static hosting), it
+falls back to keeping everything in the browser.
 
 - **Drop anything** — CSV, TSV, Parquet, JSON/NDJSON, Excel; several at once, then JOIN them
 - **Understands before you ask** — every column is profiled (types, empties, distinct counts,
@@ -172,7 +174,7 @@ explicitly share a link or join a live room.
 - **Keys you can query** — loaded files have no declared PRIMARY/FOREIGN KEY constraints, so
   QueryPad publishes what it inferred as `querypad.relationships` and `querypad.keys`:
   `SELECT * FROM querypad.keys` lists every key column and what it references
-- **Spaces** — keep several saved workspaces in the browser: save the current one as a new
+- **Spaces, on every device** — keep several saved workspaces on the server: save the current one as a new
   space, start a fresh space from the sample template or empty, switch, rename, delete
 - **Results you can work with** — sort by any column, filter rows, click a cell to copy,
   one-click charts, export to CSV / JSON / Markdown / HTML / Excel / Parquet / clipboard
@@ -192,8 +194,13 @@ explicitly share a link or join a live room.
 <summary><strong>More web app details</strong></summary>
 
 - **Persistence** — each space's tables, views, tabs, AI conversations, history, pipelines and
-  join verdicts are saved in IndexedDB. Workspaces saved by earlier versions are migrated
-  into a space called "My workspace" on first load. The first visit creates a "Playground"
+  join verdicts are saved through `/api/store` to the server's data directory
+  (`QUERYPAD_DATA_DIR`, a Docker volume in the compose setup; `.querypad-data/` in dev).
+  Open clients poll every 3 s and apply edits from other devices; table, view and plugin
+  changes reopen the space. Spaces already kept in a browser's IndexedDB are uploaded the
+  first time that browser meets an empty server, and older layouts are migrated into a space
+  called "My workspace". Without the API the app keeps using IndexedDB. The server store has
+  no accounts of its own — protect the site (e.g. basic auth) if it's reachable publicly. The first visit creates a "Playground"
   space with two sample tables.
 - **Remote files** — load Parquet/CSV/JSON from any URL that allows cross-origin requests
 - **Plugin system** — ES-module plugins can add visualizations, exporters and file loaders
@@ -282,7 +289,7 @@ relay and everything else to the app. Optional server-side AI keys go in `.env.s
 | Framework | Next.js 16, React 19, TypeScript, Tailwind CSS v4 |
 | Editor | Monaco |
 | State | Zustand |
-| Persistence | IndexedDB (idb-keyval), one record set per space |
+| Persistence | Server file store (`/api/store`) with live sync; IndexedDB fallback |
 | Charts | Recharts |
 | AI | Groq, Ollama Cloud, OpenRouter, xAI, Anthropic, OpenAI — your key or the server's |
 | Collaboration | Yjs + y-websocket, self-hosted relay |

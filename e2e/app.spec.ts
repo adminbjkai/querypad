@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, isolate, type Page } from "./fixtures";
 
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
@@ -179,6 +179,7 @@ test.describe("QueryPad", () => {
 
   test("collaborates live through the relay", async ({ browser }) => {
     const ctxA = await browser.newContext();
+    await isolate(ctxA);
     await ctxA.grantPermissions(["clipboard-read", "clipboard-write"]);
     const a = await ctxA.newPage();
     await openWithSamples(a);
@@ -189,6 +190,7 @@ test.describe("QueryPad", () => {
     expect(invite).toMatch(/\?room=[A-Za-z0-9_-]+$/);
 
     const ctxB = await browser.newContext();
+    await isolate(ctxB);
     const b = await ctxB.newPage();
     await b.goto(invite);
     await expect(b.getByRole("button", { name: "Leave" })).toBeVisible({ timeout: 30_000 });

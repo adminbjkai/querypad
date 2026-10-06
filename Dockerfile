@@ -24,6 +24,9 @@ COPY --from=builder --chown=node:node /app/node_modules/yjs ./node_modules/yjs
 COPY --from=builder --chown=node:node /app/node_modules/y-protocols ./node_modules/y-protocols
 COPY --from=builder --chown=node:node /app/node_modules/lib0 ./node_modules/lib0
 COPY --from=builder --chown=node:node /app/node_modules/isomorphic.js ./node_modules/isomorphic.js
+# Saved spaces (mounted as a volume by docker-compose).
+RUN mkdir -p /data && chown node:node /data
+ENV QUERYPAD_DATA_DIR=/data
 USER node
 EXPOSE 3000 1999
 CMD ["node", "server.js"]

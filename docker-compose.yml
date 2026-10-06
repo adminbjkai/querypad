@@ -8,6 +8,9 @@ services:
       - .env.server
     ports:
       - "127.0.0.1:8059:3000"
+    volumes:
+      # Spaces, tabs, history and table files, shared by every device.
+      - querypad-data:/data
     mem_limit: 384m
 
   # Real-time collaboration relay, proxied by nginx at /collab/.
@@ -23,3 +26,6 @@ services:
     mem_limit: 192m
     depends_on:
       - querypad
+
+volumes:
+  querypad-data:
