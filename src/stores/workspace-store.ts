@@ -906,6 +906,8 @@ async function buildProfile(name: string): Promise<TableProfile | null> {
 // the space that was active when the change happened.
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+/** Counts local edits, so a pull can tell if one happened while it was fetching. */
+let localEdits = 0;
 let pendingSave: (() => Promise<void>) | null = null;
 
 function snapshotState(): PersistedState {
@@ -992,6 +994,7 @@ useWorkspaceStore.subscribe((state, prev) => {
     state.relationshipVerdicts !== prev.relationshipVerdicts ||
     state.relationshipOverrides !== prev.relationshipOverrides
   ) {
+    localEdits += 1;
     if (saveTimer) clearTimeout(saveTimer);
     pendingSave = () => saveStateNow(spaceId).catch(console.error);
     saveTimer = setTimeout(() => void flushPendingSave(), 400);
@@ -1062,8 +1065,11 @@ async function reopenSpace(spaceId: string): Promise<void> {
     if (useWorkspaceStore.getState().tabs.some((t) => t.id === keepTab)) {
       useWorkspaceStore.setState({ activeTabId: keepTab });
     }
-  } finally {
     useWorkspaceStore.setState({ _hydrated: true });
+  } catch (err) {
+    console.error("Failed to reload the space:", err);
+    // Never resume saving over a half-loaded space; the saved copy is intact, so reload it.
+    window.location.reload();
   }
 }
 
@@ -1074,6 +1080,7 @@ async function pullRemoteChanges(): Promise<void> {
   };
   if (pulling || !ready()) return;
   pulling = true;
+  const editsAtStart = localEdits;
   try {
     const spaceId = useWorkspaceStore.getState().spaceId!;
     const changes = await checkRemote(spaceId);
@@ -1085,18 +1092,18 @@ async function pullRemoteChanges(): Promise<void> {
       if (remoteSpaces.some((sp) => sp.id === spaceId)) {
         useWorkspaceStore.setState({ spaces: remoteSpaces });
       } else if (remoteSpaces.length > 0) {
-        // The open space was deleted on another device.
-        useWorkspaceStore.setState({ spaces: [...remoteSpaces, ...useWorkspaceStore.getState().spaces.filter((sp) => sp.id === spaceId)] });
+        // The open space was deleted on another device: move to one that still exists.
+        useWorkspaceStore.setState({ spaces: remoteSpaces });
         toast("This space was deleted on another device.", "info");
         await useWorkspaceStore.getState().switchSpace(remoteSpaces[0].id);
-        useWorkspaceStore.setState({ spaces: remoteSpaces });
         return;
       }
     }
 
     if (!changes.spaceChanged || (await inLiveRoom())) return;
     const pulled = await pullSpaceState(spaceId);
-    if (!pulled || !ready() || useWorkspaceStore.getState().spaceId !== spaceId) return;
+    // An edit made while fetching is newer than what came back; it will be saved instead.
+    if (!pulled || !ready() || localEdits !== editsAtStart || useWorkspaceStore.getState().spaceId !== spaceId) return;
     const s = useWorkspaceStore.getState();
     const local = snapshotState();
     const needsReopen =

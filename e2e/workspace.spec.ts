@@ -109,6 +109,7 @@ test.describe("Spaces", () => {
     await page.getByRole("button", { name: /Save as new space/ }).click();
     await page.getByLabel("New space name").fill("Analysis");
     await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByRole("dialog", { name: "Spaces" })).toHaveCount(0, { timeout: 20_000 });
     await expect(page.getByRole("button", { name: /^Space: Analysis/ })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: "notes", exact: true })).toBeVisible();
 
@@ -125,6 +126,7 @@ test.describe("Spaces", () => {
     await page.getByRole("button", { name: /New space from sample data/ }).click();
     await page.getByLabel("New space name").fill("Fresh");
     await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByRole("dialog", { name: "Spaces" })).toHaveCount(0, { timeout: 20_000 });
     await expect(page.getByRole("button", { name: /^Space: Fresh/ })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: "notes", exact: true })).toHaveCount(0);
@@ -134,6 +136,7 @@ test.describe("Spaces", () => {
     await page.getByRole("button", { name: /New empty space/ }).click();
     await page.getByLabel("New space name").fill("Blank");
     await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByRole("dialog", { name: "Spaces" })).toHaveCount(0, { timeout: 20_000 });
     await expect(page.getByText("Drop in your data files.")).toBeVisible({ timeout: 15_000 });
 
     // Rename and delete from the menu; the active space survives a reload.
@@ -159,6 +162,7 @@ test.describe("Spaces", () => {
 
 test.describe("Saved on the server", () => {
   test("two devices see the same workspace, live and after reload", async ({ browser }) => {
+    test.setTimeout(150_000);
     const ctxA = await browser.newContext();
     const ns = await isolate(ctxA);
     const a = await ctxA.newPage();
@@ -188,6 +192,7 @@ test.describe("Saved on the server", () => {
     await a.getByRole("button", { name: /New empty space/ }).click();
     await a.getByLabel("New space name").fill("From A");
     await a.getByRole("button", { name: "Create" }).click();
+    await expect(a.getByRole("dialog", { name: "Spaces" })).toHaveCount(0, { timeout: 20_000 });
     await expect(a.getByRole("button", { name: /^Space: From A/ })).toBeVisible({ timeout: 15_000 });
     await a.waitForTimeout(800);
     await b.getByRole("button", { name: /^Space: / }).click();
@@ -204,6 +209,23 @@ test.describe("Saved on the server", () => {
     await c.getByRole("button", { name: /^Playground/ }).click();
     await expect(c.getByRole("button", { name: "synced", exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(c.locator(".monaco-editor")).toContainText("CREATE TABLE synced");
+
+    // Deleting on B the space A has open moves A elsewhere, and the space stays gone
+    // even though A and C keep saving with their older space lists.
+    await b.getByRole("button", { name: /^Space: / }).click();
+    await b.getByRole("button", { name: "Delete From A" }).click({ force: true });
+    await b.getByRole("button", { name: "Confirm delete From A" }).click();
+    await expect(a.getByRole("button", { name: /^Space: Playground/ })).toBeVisible({ timeout: 20_000 });
+    await runSql(c, "SELECT 1 AS after_delete");
+    await a.waitForTimeout(4000);
+    for (const p of [a, b, c]) {
+      await p.reload();
+      await expect(p.getByRole("button", { name: /^Space: / })).toBeVisible({ timeout: 30_000 });
+      await p.getByRole("button", { name: /^Space: / }).click();
+      await expect(p.getByRole("button", { name: /^Playground/ })).toBeVisible();
+      await expect(p.getByRole("button", { name: /^From A/ })).toHaveCount(0);
+      await p.keyboard.press("Escape");
+    }
 
     await ctxA.close();
     await ctxB.close();

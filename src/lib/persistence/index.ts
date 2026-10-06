@@ -41,6 +41,12 @@ const ownSpaceRevs = new Map<string, Set<number>>();
 const fileVersions = new Map<string, Map<string, string>>();
 let inFlight = 0;
 let pendingIndexRev = 0;
+/** The space list as this client last sent or adopted it; saves send only the difference. */
+let syncedSpaces = new Map<string, string>();
+
+function rememberSpaces(spaces: SpaceMeta[]) {
+  syncedSpaces = new Map(spaces.map((sp) => [sp.id, JSON.stringify(sp)]));
+}
 
 function serverStorage(): Promise<boolean> {
   backend ??= fetch("/api/store", { cache: "no-store" })
@@ -101,6 +107,7 @@ export async function loadSpaceIndex(): Promise<SpaceIndex> {
   if (!(await serverStorage())) return browser.loadSpaceIndex();
   const status = await request<RemoteStatus>("/api/store");
   indexRev = status.index.rev;
+  rememberSpaces(status.index.spaces);
   if (status.index.spaces.length > 0) return { activeId: status.index.activeId, spaces: status.index.spaces };
   // First server visit from this browser: carry its existing spaces over.
   const local = await browser.loadSpaceIndex();
@@ -118,10 +125,15 @@ export async function loadSpaceIndex(): Promise<SpaceIndex> {
 
 export async function saveSpaceIndex(index: SpaceIndex): Promise<void> {
   if (!(await serverStorage())) return browser.saveSpaceIndex(index);
+  // Send only this device's changes, so a save never undoes another device's edits.
+  const upsert = index.spaces.filter((sp) => syncedSpaces.get(sp.id) !== JSON.stringify(sp));
+  const ids = new Set(index.spaces.map((sp) => sp.id));
+  const remove = [...syncedSpaces.keys()].filter((id) => !ids.has(id));
+  rememberSpaces(index.spaces);
   const { rev } = await request<{ rev: number }>("/api/store", {
-    method: "PUT",
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(index),
+    body: JSON.stringify({ activeId: index.activeId, upsert, remove }),
   });
   recordIndexWrite(rev);
 }
@@ -206,7 +218,11 @@ export async function checkRemote(spaceId: string | null): Promise<RemoteChanges
   pendingIndexRev = status.index.rev;
   const rev = spaceId ? status.revs[spaceId] : undefined;
   const spaceChanged = rev !== undefined && rev > (spaceRevs.get(spaceId!) ?? 0);
-  return { spaces, spaceChanged, ack: () => void (indexRev = Math.max(indexRev, pendingIndexRev)) };
+  const ack = () => {
+    indexRev = Math.max(indexRev, pendingIndexRev);
+    if (spaces) rememberSpaces(spaces);
+  };
+  return { spaces, spaceChanged, ack };
 }
 
 /**

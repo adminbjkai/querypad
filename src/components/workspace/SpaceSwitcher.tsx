@@ -96,7 +96,7 @@ export default function SpaceSwitcher() {
 
       {open && (
         <div className="qp-pop absolute left-0 top-full z-40 mt-1 w-[320px] rounded-xl border border-line bg-surface p-1.5 shadow-pop" role="dialog" aria-label="Spaces">
-          <p className="px-2 pb-1 pt-1 text-[12px] text-muted">Spaces in this browser</p>
+          <p className="px-2 pb-1 pt-1 text-[12px] text-muted">Your spaces — saved for every device</p>
           <ul className="max-h-[40vh] overflow-y-auto">
             {spaces.map((space) => {
               const active = space.id === spaceId;

@@ -1,4 +1,4 @@
-import { deleteSpace, isSafeId, readSpace, writeSpaceState } from "@/lib/server-store/fs-store";
+import { deleteSpace, isDeleted, isSafeId, readSpace, writeSpaceState } from "@/lib/server-store/fs-store";
 import { crossSiteError, json, namespaceOf } from "@/lib/server-store/http";
 
 export const runtime = "nodejs";
@@ -18,9 +18,11 @@ export async function PUT(req: Request, { params }: Ctx) {
   if (!isSafeId(id)) return json({ error: "Bad space id." }, 400);
   const blocked = crossSiteError(req);
   if (blocked) return blocked;
+  const ns = namespaceOf(req);
+  if (await isDeleted(ns, id)) return json({ error: "This space was deleted." }, 410);
   const state = await req.json().catch(() => null);
   if (!state || typeof state !== "object" || Array.isArray(state)) return json({ error: "Expected a state object." }, 400);
-  return json(await writeSpaceState(namespaceOf(req), id, state));
+  return json(await writeSpaceState(ns, id, state));
 }
 
 export async function DELETE(req: Request, { params }: Ctx) {
@@ -28,6 +30,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (!isSafeId(id)) return json({ error: "Bad space id." }, 400);
   const blocked = crossSiteError(req);
   if (blocked) return blocked;
-  await deleteSpace(namespaceOf(req), id);
+  const ns = namespaceOf(req);
+  await deleteSpace(ns, id);
   return json({ ok: true });
 }

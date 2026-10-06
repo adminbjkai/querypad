@@ -22,7 +22,16 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 export interface StoredIndex {
   rev: number;
   activeId: string | null;
-  spaces: unknown[];
+  spaces: { id: string }[];
+  /** Ids of deleted spaces; never revived by a device that hasn't seen the deletion yet. */
+  deleted?: string[];
+}
+
+/** A change to the space list. Devices send only what they changed, never the whole list. */
+export interface IndexPatch {
+  activeId?: string | null;
+  upsert?: { id: string }[];
+  remove?: string[];
 }
 
 export interface StoredSpace {
@@ -82,13 +91,27 @@ export async function readIndex(ns: string): Promise<StoredIndex> {
   return (await readJson<StoredIndex>(path.join(nsDir(ns), "index.json"))) ?? { rev: 0, activeId: null, spaces: [] };
 }
 
-export function writeIndex(ns: string, activeId: string | null, spaces: unknown[]): Promise<WriteResult> {
+export function patchIndex(ns: string, patch: IndexPatch): Promise<WriteResult & { index: StoredIndex }> {
   return withLock(ns, async () => {
     const current = await readIndex(ns);
+    const deleted = new Set([...(current.deleted ?? []), ...(patch.remove ?? [])]);
+    const spaces = current.spaces.filter((sp) => !deleted.has(sp.id));
+    for (const meta of patch.upsert ?? []) {
+      if (deleted.has(meta.id)) continue;
+      const at = spaces.findIndex((sp) => sp.id === meta.id);
+      if (at >= 0) spaces[at] = meta;
+      else spaces.push(meta);
+    }
+    const activeId = patch.activeId !== undefined && !deleted.has(patch.activeId ?? "") ? patch.activeId : current.activeId;
     const rev = current.rev + 1;
-    await writeJson(path.join(nsDir(ns), "index.json"), { rev, activeId, spaces });
-    return { rev, prevRev: current.rev };
+    const index: StoredIndex = { rev, activeId, spaces, deleted: [...deleted] };
+    await writeJson(path.join(nsDir(ns), "index.json"), index);
+    return { rev, prevRev: current.rev, index };
   });
+}
+
+export async function isDeleted(ns: string, id: string): Promise<boolean> {
+  return ((await readIndex(ns)).deleted ?? []).includes(id);
 }
 
 /** Current rev of every space that has saved state. */

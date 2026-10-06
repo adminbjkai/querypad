@@ -1,4 +1,4 @@
-import { deleteSpaceFile, isSafeId, openSpaceFile, writeSpaceFile } from "@/lib/server-store/fs-store";
+import { deleteSpaceFile, isDeleted, isSafeId, openSpaceFile, writeSpaceFile } from "@/lib/server-store/fs-store";
 import { crossSiteError, json, namespaceOf } from "@/lib/server-store/http";
 
 export const runtime = "nodejs";
@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 type Ctx = { params: Promise<{ id: string; name: string }> };
 
 async function target(params: Ctx["params"]) {
-  const { id, name } = await params;
-  const table = decodeURIComponent(name);
+  // Next already decodes route params; decoding again would mangle names containing "%".
+  const { id, name: table } = await params;
   return isSafeId(id) && table.length > 0 && table.length <= 512 ? { id, table } : null;
 }
 
@@ -28,6 +28,7 @@ export async function PUT(req: Request, { params }: Ctx) {
   const blocked = crossSiteError(req);
   if (blocked) return blocked;
   if (!req.body) return json({ error: "Missing file body." }, 400);
+  if (await isDeleted(namespaceOf(req), t.id)) return json({ error: "This space was deleted." }, 410);
   return json(await writeSpaceFile(namespaceOf(req), t.id, t.table, req.body));
 }
 

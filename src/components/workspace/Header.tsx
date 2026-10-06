@@ -96,7 +96,7 @@ export default function Header() {
               })
             }
             className={btn.ghost}
-            title="Keeps a copy as a new space in this browser"
+            title="Keeps a copy as a new space in your workspace"
           >
             Save as a new space
           </button>
