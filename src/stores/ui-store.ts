@@ -3,7 +3,9 @@ import { readPreference, writePreference } from "@/lib/preferences";
 
 export type Theme = "light" | "dark";
 export type SidebarPanel = "tables" | "joins" | "history" | "snippets";
-export type Dialog = "addFiles" | "collaborate" | "plugins" | "shortcuts" | null;
+/** Home is the AI-first start page; the workbench holds SQL tabs and pipelines. */
+export type WorkspacePage = "home" | "workbench";
+export type Dialog = "addFiles" | "collaborate" | "plugins" | "shortcuts" | "clearSpace" | null;
 
 export interface Toast {
   id: number;
@@ -13,8 +15,11 @@ export interface Toast {
 
 interface UiState {
   /** Navigation is a UI preference, never part of another device's saved space. */
-  workspacePage: "workbench" | "overview";
-  setWorkspacePage: (page: "workbench" | "overview") => void;
+  workspacePage: WorkspacePage;
+  setWorkspacePage: (page: WorkspacePage) => void;
+  /** The left navigation shows icons only (remembered). */
+  navCollapsed: boolean;
+  setNavCollapsed: (collapsed: boolean) => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
@@ -23,6 +28,10 @@ interface UiState {
   sidebarPanel: SidebarPanel;
   setSidebarOpen: (open: boolean) => void;
   showPanel: (panel: SidebarPanel) => void;
+  /** Open a panel, or close it when it is already the open one. */
+  togglePanel: (panel: SidebarPanel) => void;
+  /** Show or hide the side panel (from Home, this opens the workbench with it shown). */
+  toggleSidePanel: () => void;
 
   profileTable: string | null;
   setProfileTable: (name: string | null) => void;
@@ -63,6 +72,7 @@ interface UiState {
 
 const THEME_KEY = "querypad:theme";
 const SPLIT_KEY = "querypad:split";
+const NAV_KEY = "querypad:nav-collapsed";
 const ASSISTANT_KEY = "querypad:assistant-open";
 const ASSISTANT_WIDTH_KEY = "querypad:assistant-width";
 
@@ -88,6 +98,11 @@ let toastSeq = 0;
 export const useUiStore = create<UiState>((set, get) => ({
   workspacePage: "workbench",
   setWorkspacePage: (workspacePage) => set({ workspacePage }),
+  navCollapsed: readPreference(NAV_KEY) === "1",
+  setNavCollapsed: (navCollapsed) => {
+    writePreference(NAV_KEY, navCollapsed ? "1" : "0");
+    set({ navCollapsed });
+  },
   theme: initialTheme(),
   setTheme: (theme) => {
     document.documentElement.dataset.theme = theme;
@@ -100,7 +115,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarOpen: typeof window === "undefined" || window.innerWidth >= 768,
   sidebarPanel: "tables",
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
-  showPanel: (sidebarPanel) => set({ sidebarPanel, sidebarOpen: true, workspacePage: "workbench" }),
+  showPanel: (sidebarPanel) => set({ sidebarPanel, sidebarOpen: true }),
+  toggleSidePanel: () =>
+    set((s) => (s.workspacePage !== "workbench" ? { workspacePage: "workbench", sidebarOpen: true } : { sidebarOpen: !s.sidebarOpen })),
+  togglePanel: (panel) =>
+    set((s) => (s.sidebarOpen && s.sidebarPanel === panel ? { sidebarOpen: false } : { sidebarPanel: panel, sidebarOpen: true })),
 
   profileTable: null,
   setProfileTable: (profileTable) => set({ profileTable }),

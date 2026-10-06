@@ -33,8 +33,8 @@ function SpaceAvatar({ name }: { name: string }) {
   );
 }
 
-/** Header control for saved spaces: switch, create (copy / template / empty), rename, delete. */
-export default function SpaceSwitcher() {
+/** Navigation control for saved spaces: switch, create (copy / template / empty), rename, delete. */
+export default function SpaceSwitcher({ compact = false }: { compact?: boolean }) {
   const spaces = useWorkspaceStore((s) => s.spaces);
   const spaceId = useWorkspaceStore((s) => s.spaceId);
   const switchSpace = useWorkspaceStore((s) => s.switchSpace);
@@ -105,7 +105,9 @@ export default function SpaceSwitcher() {
       <button
         ref={triggerRef}
         onClick={() => setOpen(!open)}
-        className="flex h-8 max-w-[200px] items-center gap-1.5 rounded-lg px-2 text-[13px] text-ink hover:bg-sunken"
+        className={`flex h-9 items-center gap-2 rounded-lg text-[13px] text-ink transition-colors hover:bg-sunken ${
+          compact ? "w-9 justify-center" : "w-full px-2"
+        } ${open ? "bg-sunken" : ""}`}
         aria-label={`Space: ${current?.name ?? "none"}. Switch or save spaces`}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -113,12 +115,16 @@ export default function SpaceSwitcher() {
         title="Spaces: switch, save, or start fresh"
       >
         <SpaceAvatar name={current?.name ?? "Space"} />
-        <span className="truncate font-medium">{current?.name ?? "Space"}</span>
-        <Icon name="chevronDown" size={13} className="text-faint" />
+        {!compact && (
+          <>
+            <span className="min-w-0 flex-1 truncate text-left font-medium">{current?.name ?? "Space"}</span>
+            <Icon name="chevronDown" size={13} className="text-faint" />
+          </>
+        )}
       </button>
 
       {open && (
-        <div id={panelId} className="qp-pop absolute left-0 top-full z-40 mt-1 max-h-[min(75vh,36rem)] w-[320px] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-pop" role="dialog" aria-label="Spaces">
+        <div id={panelId} className="qp-pop absolute left-0 top-full z-50 mt-1 max-h-[min(75vh,36rem)] w-[320px] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-pop" role="dialog" aria-label="Spaces">
           <p className="px-2 pb-1 pt-1 text-[12px] text-muted">Your spaces — saved for every device</p>
           <ul className="max-h-[40vh] overflow-y-auto">
             {spaces.map((space) => {

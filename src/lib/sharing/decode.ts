@@ -78,15 +78,3 @@ export function decodeShare(encoded: string): DecodedShare {
   }
   return decodeV1(inflated);
 }
-
-// Legacy exports for backward compatibility
-export function decodeSharePayload(encoded: string): SharePayload {
-  const compressed = fromBase64Url(encoded);
-  const copy = new Uint8Array(compressed);
-  const json = pako.inflate(copy, { to: "string" });
-  return JSON.parse(json) as SharePayload;
-}
-
-export function decodeTableData(base64url: string): Uint8Array {
-  return fromBase64Url(base64url);
-}

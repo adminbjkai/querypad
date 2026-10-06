@@ -38,12 +38,12 @@ test("menus and command palette support keyboard navigation", async ({ page }) =
   await expect(more).toBeFocused();
   await page.keyboard.press(`${MOD}+p`);
   const search = page.getByRole("combobox", { name: "Search commands" });
-  await search.fill("workspace overview");
-  const option = page.getByRole("option", { name: /Workspace overview/i });
+  await search.fill("go to home");
+  const option = page.getByRole("option", { name: /Go to Home/i });
   await expect(option).toHaveAttribute("aria-selected", "true");
   await expect(search).toHaveAttribute("aria-activedescendant", await option.getAttribute("id") ?? "");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Playground", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What do you want to know/, level: 1 })).toBeVisible();
 });
 
 test("editor and result columns resize with the keyboard", async ({ page }) => {

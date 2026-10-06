@@ -54,9 +54,9 @@ export default function CommandPalette() {
     const ui = useUiStore.getState;
     const actions: Command[] = [
       { id: "run", group: "Actions", label: "Run query", detail: "execute selection", icon: "play", hint: `${MOD} ↵`, run: runActive },
-      { id: "overview", group: "Actions", label: "Workspace overview", detail: "datasets map relationships profile", icon: "chartScorecard", run: () => ui().setWorkspacePage("overview") },
+      { id: "home", group: "Actions", label: "Go to Home", detail: "overview datasets relationships ask", icon: "home", run: () => ui().setWorkspacePage("home") },
       { id: "ai", group: "Actions", label: "Ask AI to write SQL", icon: "sparkle", hint: `${MOD} K`, run: () => ui().openAi() },
-      { id: "assistant", group: "Actions", label: "Open the Assistant chat", detail: "ask questions explain help", icon: "sparkle", hint: `${MOD} I`, run: () => { ui().setWorkspacePage("workbench"); ui().setAssistantOpen(true); } },
+      { id: "assistant", group: "Actions", label: "Open the Assistant chat", detail: "ask questions explain help", icon: "sparkle", hint: `${MOD} I`, run: () => ui().setAssistantOpen(true) },
       { id: "new-tab", group: "Actions", label: "New query tab", icon: "plus", run: () => { ui().setWorkspacePage("workbench"); ws().addTab(); } },
       { id: "add", group: "Actions", label: "Add data files", detail: "import upload url", icon: "upload", run: () => ui().setDialog("addFiles") },
       { id: "joins", group: "Actions", label: "Show relationships", detail: "joins keys discover", icon: "join", run: () => ui().showPanel("joins") },
@@ -67,7 +67,8 @@ export default function CommandPalette() {
       { id: "share", group: "Actions", label: "Copy share link", detail: "url", icon: "link", run: () => void shareWorkspace() },
       { id: "context", group: "Actions", label: "Copy context for an agent", detail: "claude codex", icon: "copy", run: () => void copyAgentContext() },
       { id: "theme", group: "Actions", label: ui().theme === "dark" ? "Use light theme" : "Use dark theme", detail: "appearance", icon: ui().theme === "dark" ? "sun" : "moon", run: () => ui().toggleTheme() },
-      { id: "sidebar", group: "Actions", label: "Toggle sidebar", icon: "sidebar", hint: `${MOD} B`, run: () => ui().setSidebarOpen(!ui().sidebarOpen) },
+      { id: "sidebar", group: "Actions", label: "Show or hide the side panel", detail: "sidebar explorer", icon: "sidebar", hint: `${MOD} B`, run: () => ui().toggleSidePanel() },
+      { id: "nav", group: "Actions", label: ui().navCollapsed ? "Expand the navigation" : "Collapse the navigation", detail: "sidebar menu icons", icon: "sidebar", run: () => ui().setNavCollapsed(!ui().navCollapsed) },
       { id: "collab", group: "Actions", label: "Collaborate in a room", detail: "share live", icon: "users", run: () => ui().setDialog("collaborate") },
       { id: "plugins", group: "Actions", label: "Manage plugins", icon: "puzzle", run: () => ui().setDialog("plugins") },
       { id: "keys", group: "Actions", label: "Keyboard shortcuts", icon: "keyboard", hint: "?", run: () => ui().setDialog("shortcuts") },

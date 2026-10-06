@@ -25,6 +25,7 @@ const HOST = process.env.QUERYPAD_BRIDGE_HOST || "127.0.0.1";
 const PORT = Number(process.env.QUERYPAD_BRIDGE_PORT || 8062);
 const MAX_CONCURRENT = 3;
 const TIMEOUT_MS = 180_000;
+const MAX_LINE_CHARS = 8_000_000;
 const MAX_BODY = 400_000;
 
 if (TOKEN.length < 24) {
@@ -226,6 +227,11 @@ async function complete(req, res) {
     buffer += chunk.toString("utf8");
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
+    // A CLI that never ends a line would grow this without bound: stop it instead.
+    if (buffer.length > MAX_LINE_CHARS) {
+      buffer = "";
+      child.kill("SIGKILL");
+    }
     for (const line of lines) {
       const text = parse(line);
       if (text) {

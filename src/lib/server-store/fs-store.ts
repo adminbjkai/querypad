@@ -79,6 +79,31 @@ async function readJson<T>(file: string): Promise<T | null> {
   }
 }
 
+/**
+ * Records polled by every open client (index, space revs, snippets) are parsed once per version:
+ * writes replace the file (temp + rename), so a changed inode, size or mtime means a new version.
+ * `pick` keeps only what callers need (e.g. a space's rev, not its whole state).
+ */
+const parsed = new Map<string, { version: string; value: unknown }>();
+async function readJsonCached<T>(file: string, pick: (record: never) => T = (record) => record as T): Promise<T | null> {
+  let version: string;
+  try {
+    const info = await stat(file);
+    version = `${info.ino}:${info.size}:${info.mtimeMs}`;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    parsed.delete(file);
+    return null;
+  }
+  const hit = parsed.get(file);
+  if (hit?.version === version) return hit.value as T;
+  const record = await readJson<never>(file);
+  if (record === null) return null;
+  const value = pick(record);
+  parsed.set(file, { version, value });
+  return value;
+}
+
 /** Write via a temp file + rename so readers never see a half-written record. */
 async function writeJson(file: string, value: unknown): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true });
@@ -88,7 +113,7 @@ async function writeJson(file: string, value: unknown): Promise<void> {
 }
 
 export async function readIndex(ns: string): Promise<StoredIndex> {
-  return (await readJson<StoredIndex>(path.join(nsDir(ns), "index.json"))) ?? { rev: 0, activeId: null, spaces: [] };
+  return (await readJsonCached<StoredIndex>(path.join(nsDir(ns), "index.json"))) ?? { rev: 0, activeId: null, spaces: [] };
 }
 
 export function patchIndex(ns: string, patch: IndexPatch): Promise<WriteResult & { index: StoredIndex }> {
@@ -124,8 +149,8 @@ export async function readSpaceRevs(ns: string): Promise<Record<string, number>>
   }
   const revs: Record<string, number> = {};
   for (const id of ids) {
-    const record = await readJson<{ rev: number }>(path.join(spaceDir(ns, id), "state.json"));
-    if (record) revs[id] = record.rev;
+    const rev = await readJsonCached(path.join(spaceDir(ns, id), "state.json"), (record: { rev: number }) => record.rev);
+    if (rev !== null) revs[id] = rev;
   }
   return revs;
 }
@@ -232,7 +257,7 @@ export interface StoredSnippets {
 const snippetsFile = (ns: string) => path.join(nsDir(ns), "snippets.json");
 
 export async function readSnippets(ns: string): Promise<StoredSnippets> {
-  return (await readJson<StoredSnippets>(snippetsFile(ns))) ?? { rev: 0, snippets: [] };
+  return (await readJsonCached<StoredSnippets>(snippetsFile(ns))) ?? { rev: 0, snippets: [] };
 }
 
 export function patchSnippets(

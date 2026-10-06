@@ -9,7 +9,7 @@ const SHORTCUTS: [string, string[]][] = [
   ["Format SQL", ["Shift", "Alt", "F"]],
   ["Command palette", [MOD, "P"]],
   ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
-  ["Toggle sidebar", [MOD, "B"]],
+  ["Show or hide the side panel", [MOD, "B"]],
   ["Rename a tab", ["Double-click"]],
   ["Copy selected cells", [MOD, "C"]],
   ["Resize focused editor divider", ["↑", "↓"]],

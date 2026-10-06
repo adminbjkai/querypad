@@ -25,7 +25,7 @@ test.describe("QueryPad", () => {
     await expect(page.getByRole("columnheader", { name: /avg_salary/ })).toBeVisible();
     await expect(page.getByText("Engineering")).toBeVisible();
 
-    await page.getByRole("tab", { name: "History" }).click();
+    await page.getByRole("button", { name: "History", exact: true }).click();
     await expect(page.getByText("SELECT d.dept_name").first()).toBeVisible();
   });
 
@@ -56,7 +56,7 @@ test.describe("QueryPad", () => {
 
   test("discovers, explains, and accepts relationships", async ({ page }) => {
     await openWithSamples(page);
-    await page.getByRole("tab", { name: /Joins/ }).click();
+    await page.getByRole("button", { name: "Joins", exact: true }).click();
     await expect(page.getByText(/inferred from your data/)).toBeVisible({ timeout: 20_000 });
     await page.getByRole("button", { name: "Why?" }).first().click();
     await expect(page.getByText(/values are present in/).first()).toBeVisible();
@@ -114,11 +114,11 @@ test.describe("QueryPad", () => {
 
   test("switches between SQL and pipeline mode", async ({ page }) => {
     await openWithSamples(page);
-    await page.getByRole("tab", { name: "Pipeline" }).click();
+    await page.getByRole("button", { name: "Pipelines", exact: true }).click();
     await expect(page.getByRole("tab", { name: "Pipeline 1" })).toBeVisible();
     await page.getByRole("button", { name: "Add the first step" }).click();
     await expect(page.getByLabel("Step name (becomes a table name)")).toHaveValue("step_1");
-    await page.getByRole("tab", { name: "SQL" }).click();
+    await page.getByRole("button", { name: "SQL", exact: true }).click();
     await expect(page.getByRole("tab", { name: /Query 1/ })).toBeVisible();
   });
 
@@ -149,8 +149,7 @@ test.describe("QueryPad", () => {
     await openWithSamples(page);
     await page.getByRole("button", { name: "More" }).click();
     await page.getByRole("menuitem", { name: "Clear this space" }).click();
-    await page.getByRole("button", { name: "More" }).click();
-    await page.getByRole("menuitem", { name: "Click to confirm clear" }).click();
+    await page.getByRole("dialog", { name: "Clear this space?" }).getByRole("button", { name: "Clear space" }).click();
     await expect(page.getByText("Drop in your data files.")).toBeVisible({ timeout: 10_000 });
     await page.getByRole("button", { name: "Try sample data" }).click();
     await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 15_000 });
@@ -171,8 +170,7 @@ test.describe("QueryPad", () => {
     // Even clearing everything in the shared view must leave the owner's data alone.
     await viewer.getByRole("button", { name: "More" }).click();
     await viewer.getByRole("menuitem", { name: "Clear this space" }).click();
-    await viewer.getByRole("button", { name: "More" }).click();
-    await viewer.getByRole("menuitem", { name: "Click to confirm clear" }).click();
+    await viewer.getByRole("dialog", { name: "Clear this space?" }).getByRole("button", { name: "Clear space" }).click();
     await expect(viewer.getByText("Drop in your data files.")).toBeVisible({ timeout: 10_000 });
     await viewer.waitForTimeout(800);
 

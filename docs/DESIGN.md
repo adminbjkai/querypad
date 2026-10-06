@@ -1,15 +1,14 @@
 # QueryPad design system
 
-A clear global masthead frames a focused data workspace. Dense analysis surfaces retain
-room for data; Overview uses spacious cards to orient the user.
+A light, labeled navigation frames a focused data workspace (Snowsight-like). Dense analysis
+surfaces keep room for data; Home is spacious and AI-first: ask, then pick up where you left off.
 All colors are semantic tokens in `src/app/globals.css` (light + dark); never hardcode hex.
 
 ## Surfaces
 | Token | Use |
 |---|---|
 | `bg-paper` | page behind everything |
-| `bg-chrome` | docked chrome: activity rail, sidebars, tab strips, panel headers, status bar, assistant |
-| `--masthead*` | global header background, text, field, borders and actions; scoped `.qp-*` classes |
+| `bg-chrome` | docked chrome: navigation, side panels, tab strips, panel headers, status bar, assistant |
 | `bg-surface` | content: editor, results grid, cards, menus, dialogs |
 | `bg-raised` | subtle fills inside content (zebra, code blocks, inputs at rest) |
 | `bg-sunken` | hover / pressed fills |
@@ -26,8 +25,9 @@ only on floating layers (menus, popovers, palette, dialogs).
 Weights 400/500/600 only. `tabular-nums` on every number.
 
 ## Density (4px grid)
-Header 44 · activity rail 44 wide · tab strips & panel headers 36 · explorer rows 24 ·
-grid rows 28 / header 32 · status bar 24. Icons 16 (14 inline in dense rows).
+Navigation 228 wide (52 collapsed; always collapsed under 768px) · nav items 32 · page header 48 ·
+side panel 264 · tab strips & panel headers 36 · explorer rows 24 · grid rows 28 / header 32 ·
+status bar 24. Icons 16 (14 inline in dense rows).
 
 ## Radii & motion
 4 (chips, small inputs) · 6 (buttons, menu items, inputs) · 8 (menus, cards, popovers) · 12 (dialogs).
@@ -35,14 +35,22 @@ Hover/color 120ms; menus & panels 160ms `var(--ease-out)`; respect reduced motio
 
 ## States
 Hover = one fill step (`bg-sunken`). Selected = `bg-accent-soft` + `text-ink`, or a 2px accent bar.
+Navigation: the current item is a raised white card (`bg-surface`, hairline ring, accent icon and edge bar);
+pages carry `aria-current="page"`, panel toggles carry `aria-pressed`.
 Focus = `:focus-visible` 2px accent outline, offset 2. Disabled = 45% opacity.
 
 ## Patterns
+- Confirmation for destructive actions is a small dialog with a `btn.danger` action (never a toast race).
 - Empty state: 20px muted icon in a 36px rounded tile, 14px/500 title, one 13px muted line,
   one primary action + kbd hint.
 - Dialogs: trap Tab focus, restore the opener on close, support Escape and bounded content scrolling.
 - Menus: arrow keys, Home/End and Escape; initial focus on an enabled item.
 - Resize: pointer interaction plus keyboard adjustments and accessible values.
-- Overview: live catalog counts and semantic entities; never decorative or fabricated statistics.
+- Home: greeting, one composer that hands the question to the Assistant, suggestion chips, live
+  catalog counts, Recent tabs (datasets, queries, snippets, spaces) and the semantic model — never
+  decorative or fabricated statistics.
+- Assistant: user turns in soft right-aligned bubbles, replies as full-width prose, lookups as
+  compact collapsible rows; a rounded composer with the model picker and a round send button;
+  "All chats" lists every conversation in the space.
 - Loading: `.qp-skeleton` blocks sized like the real content (never spinners for layout).
 - Section label: `text-[11px] font-medium uppercase tracking-wide text-faint`.

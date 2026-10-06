@@ -4,31 +4,22 @@ import { BrandMark } from "./BrandMark";
 function LayoutSkeleton() {
   return (
     <div aria-hidden="true" className="flex min-h-0 flex-1 flex-col">
-      <div className="qp-masthead flex h-11 shrink-0 items-center gap-3 border-b px-3">
-        <BrandMark size={20} />
-        <div className="qp-skeleton h-4 w-28" />
-        <div className="ml-auto flex gap-2">
-          <div className="qp-skeleton h-6 w-16" />
-          <div className="qp-skeleton h-6 w-6" />
-        </div>
-      </div>
       <div className="flex min-h-0 flex-1">
-        <div className="hidden w-11 shrink-0 flex-col items-center gap-2 border-r border-line bg-chrome py-2 md:flex">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="qp-skeleton size-6" />
+        <div className="flex w-[52px] shrink-0 flex-col items-center gap-3 border-r border-line bg-chrome py-3 md:w-[228px] md:items-stretch md:px-3">
+          <div className="flex items-center gap-2">
+            <BrandMark size={20} />
+            <div className="qp-skeleton hidden h-4 w-20 md:block" />
+          </div>
+          <div className="qp-skeleton h-8 w-8 md:w-full" />
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="qp-skeleton h-5 w-6 md:w-3/4" />
           ))}
         </div>
-        <div className="hidden w-[264px] shrink-0 flex-col border-r border-line bg-chrome md:flex">
-          <div className="flex h-9 items-center border-b border-line px-3">
-            <div className="qp-skeleton h-3 w-16" />
-          </div>
-          <div className="flex flex-col gap-2 p-3">
-            {[70, 55, 80, 45, 62, 50].map((w, i) => (
-              <div key={i} className="qp-skeleton h-4" style={{ width: `${w}%`, marginLeft: i % 3 === 0 ? 0 : 14 }} />
-            ))}
-          </div>
-        </div>
         <div className="flex min-w-0 flex-1 flex-col bg-surface">
+          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-4">
+            <div className="qp-skeleton h-4 w-40" />
+            <div className="ml-auto qp-skeleton h-7 w-20" />
+          </div>
           <div className="flex h-9 shrink-0 items-end gap-1 border-b border-line bg-chrome px-2 pb-1.5">
             <div className="qp-skeleton h-5 w-24" />
           </div>

@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useAssistantStore, type AssistantMessage, type AssistantRun } from "@/stores/assistant-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore, toast } from "@/stores/ui-store";
 import { copyText } from "@/lib/export/clipboard";
 import ModelPicker from "@/components/ai/ModelPicker";
 import Markdown from "./Markdown";
+import ChatList from "./ChatList";
 import { Icon } from "@/components/ui/icons";
-import { MOD, Spinner, btn } from "@/components/ui/primitives";
+import { MOD, btn } from "@/components/ui/primitives";
 
 const SUGGESTIONS = [
   "Summarize the tables in this space",
@@ -38,22 +39,30 @@ function SqlCard({ sql, streaming }: { sql: string; streaming: boolean }) {
   );
 }
 
+/** Calm animated "working" indicator; motion stops under prefers-reduced-motion. */
+function Working({ label }: { label: string }) {
+  return (
+    <p className="flex items-center gap-2 text-[12px] text-muted">
+      <span className="qp-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+      {label}
+    </p>
+  );
+}
+
 function RunCard({ run }: { run: AssistantRun | undefined; sql: string }) {
   const [open, setOpen] = useState(false);
-  if (!run) {
-    return (
-      <p className="flex items-center gap-1.5 text-[12px] text-muted">
-        <Spinner className="size-3 text-accent" /> Looking at the data…
-      </p>
-    );
-  }
+  if (!run) return <Working label="Looking at the data…" />;
   const r = run.result;
   return (
-    <div className="rounded-lg border border-line bg-surface">
+    <div className="my-1 rounded-lg border border-line bg-raised/50">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[12px] text-muted hover:text-ink" aria-expanded={open}>
         <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
         <Icon name="table" size={12} />
-        <span className="flex-1">
+        <span className="flex-1 tabular-nums">
           {run.error ? <span className="text-danger">Lookup failed</span> : `Looked at the data · ${r?.rowCount.toLocaleString()} rows · ${r?.executionTimeMs} ms`}
         </span>
       </button>
@@ -62,7 +71,7 @@ function RunCard({ run }: { run: AssistantRun | undefined; sql: string }) {
           <pre className="overflow-auto rounded bg-raised px-2 py-1.5 font-mono text-[11px] leading-4 text-ink">{run.sql}</pre>
           {run.error && <p className="text-[12px] text-danger">{run.error}</p>}
           {r && r.columns.length > 0 && (
-            <div className="max-h-48 overflow-auto rounded border border-line">
+            <div className="max-h-48 overflow-auto rounded border border-line bg-surface">
               <table className="w-full text-[11px]">
                 <thead className="sticky top-0 bg-raised">
                   <tr>
@@ -93,18 +102,49 @@ function RunCard({ run }: { run: AssistantRun | undefined; sql: string }) {
   );
 }
 
+const timeLabel = (at: number) => new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
 function Reply({ message, streaming }: { message: Pick<AssistantMessage, "id" | "content" | "run">; streaming: boolean }) {
   return (
-    <Markdown
-      text={message.content}
-      renderCode={(lang, code) => {
-        if (lang === "sql-run") return <RunCard run={message.run} sql={code} />;
-        if (lang === "sql" || lang === "") return <SqlCard sql={code} streaming={streaming} />;
-        return <pre className="overflow-auto rounded-lg border border-line bg-raised px-3 py-2 font-mono text-[12px]">{code}</pre>;
-      }}
-    />
+    <div className="text-[14px] leading-6 text-ink">
+      <Markdown
+        text={message.content}
+        renderCode={(lang, code) => {
+          if (lang === "sql-run") return <RunCard run={message.run} sql={code} />;
+          if (lang === "sql" || lang === "") return <SqlCard sql={code} streaming={streaming} />;
+          return <pre className="overflow-auto rounded-lg border border-line bg-raised px-3 py-2 font-mono text-[12px]">{code}</pre>;
+        }}
+      />
+    </div>
   );
 }
+
+/** Small line above an answer: who wrote it, with the time revealed on hover or focus. */
+function ReplyHeader({ model, at }: { model?: string; at?: number }) {
+  return (
+    <div className="mb-1 flex items-center gap-1.5 text-[11px] text-faint">
+      <Icon name="sparkle" size={11} className="text-accent" />
+      <span className="font-medium">{model ?? "Assistant"}</span>
+      {at !== undefined && <span className="tabular-nums opacity-0 transition-opacity group-hover/msg:opacity-100 group-focus-within/msg:opacity-100">{timeLabel(at)}</span>}
+    </div>
+  );
+}
+
+const MessageItem = memo(function MessageItem({ message, header }: { message: AssistantMessage; header: boolean }) {
+  if (message.role === "user") {
+    return (
+      <li className="flex justify-end" data-testid="assistant-user">
+        <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-3 py-2 text-[13px] leading-5 text-ink">{message.content}</p>
+      </li>
+    );
+  }
+  return (
+    <li className="group/msg" data-testid="assistant-reply">
+      {header && <ReplyHeader model={message.model} at={message.at} />}
+      <Reply message={message} streaming={false} />
+    </li>
+  );
+});
 
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 760;
@@ -167,9 +207,19 @@ function ResizeHandle() {
   );
 }
 
+const STARTERS = SUGGESTIONS;
+
+const ADD_CONTEXT = [
+  "About the query in the editor: ",
+  "About the current result: ",
+  "About the open tabs: ",
+];
+
 /** The side Assistant: a chat that sees the whole workspace and answers questions about it. */
 export default function AssistantPanel() {
   const messages = useAssistantStore((s) => s.messages);
+  const conversations = useAssistantStore((s) => s.conversations);
+  const activeId = useAssistantStore((s) => s.activeId);
   const draft = useAssistantStore((s) => s.draft);
   const status = useAssistantStore((s) => s.status);
   const error = useAssistantStore((s) => s.error);
@@ -179,8 +229,11 @@ export default function AssistantPanel() {
   const activeTab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const [text, setText] = useState("");
   const [hasNewContent, setHasNewContent] = useState(false);
+  const [showChats, setShowChats] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const plusRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   const busy = status !== "idle";
 
@@ -192,14 +245,34 @@ export default function AssistantPanel() {
     inputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (!plusOpen) return;
+    const onDown = (e: MouseEvent) => !plusRef.current?.contains(e.target as Node) && setPlusOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPlusOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [plusOpen]);
+
   // Follow the conversation while the reader is at the bottom; if they scrolled up, leave them
   // there and offer a jump to the latest reply once something new arrives (streamed or whole).
-  const seenRef = useRef({ count: messages.length, draft });
+  // Opening another chat always starts at its end.
+  const seenRef = useRef({ count: messages.length, draft, activeId });
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
+    const switched = seenRef.current.activeId !== activeId;
     const grew = messages.length > seenRef.current.count || (draft !== "" && draft !== seenRef.current.draft);
-    seenRef.current = { count: messages.length, draft };
+    seenRef.current = { count: messages.length, draft, activeId };
+    if (switched) {
+      followLatestRef.current = true;
+      container.scrollTop = container.scrollHeight;
+      const frame = window.requestAnimationFrame(() => setHasNewContent(false));
+      return () => window.cancelAnimationFrame(frame);
+    }
     if (followLatestRef.current) {
       container.scrollTop = container.scrollHeight;
     } else if (grew) {
@@ -208,7 +281,7 @@ export default function AssistantPanel() {
       });
       return () => window.cancelAnimationFrame(frame);
     }
-  }, [messages.length, draft, status]);
+  }, [messages.length, draft, status, activeId]);
 
   const handleScroll = () => {
     const container = scrollRef.current;
@@ -226,7 +299,8 @@ export default function AssistantPanel() {
     void useAssistantStore.getState().send(value);
   };
 
-  const visible = messages.filter((m) => m.role !== "tool");
+  const visible = useMemo(() => messages.filter((m) => m.role !== "tool"), [messages]);
+  const lastIsAssistant = visible[visible.length - 1]?.role === "assistant";
 
   return (
     <aside
@@ -235,13 +309,25 @@ export default function AssistantPanel() {
       aria-label="Assistant"
     >
       <ResizeHandle />
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-chrome px-3">
-        <Icon name="sparkle" size={15} className="text-accent" />
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line bg-chrome px-3">
+        <Icon name="sparkle" size={15} className="mr-1 text-accent" />
         <h2 className="text-[13px] font-semibold text-ink">Assistant</h2>
         <span className="flex-1" />
-        <ModelPicker compact />
         <button
-          onClick={() => useAssistantStore.getState().reset()}
+          onClick={() => setShowChats((v) => !v)}
+          className={`${btn.icon} ${showChats ? "bg-sunken text-ink" : ""}`}
+          title="All chats"
+          aria-label="All chats"
+          aria-pressed={showChats}
+        >
+          <Icon name="chat" size={15} />
+        </button>
+        <button
+          onClick={() => {
+            useAssistantStore.getState().newChat();
+            setShowChats(false);
+            inputRef.current?.focus();
+          }}
           disabled={visible.length === 0 && !busy}
           className={btn.icon}
           title="New conversation"
@@ -254,124 +340,156 @@ export default function AssistantPanel() {
         </button>
       </div>
 
-      <div className="relative min-h-0 flex-1">
-        <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-y-auto px-3 py-3" aria-live="polite">
-        {visible.length === 0 && !busy && (
-          <div className="px-1 pt-6">
-            <p className="text-[14px] font-semibold text-ink">Ask about your data</p>
-            <p className="mt-1 text-[13px] leading-5 text-muted">
-              I can see your {tableCount} {tableCount === 1 ? "table" : "tables"}, joins, open tabs, results, history and snippets. Ask me anything —
-              I&apos;ll look things up with read-only queries when I need actual values, and answer here.
-            </p>
-            <div className="mt-4 flex flex-col gap-1.5">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => send(s)}
-                  className="rounded-lg border border-line px-3 py-2 text-left text-[13px] text-ink hover:border-line-strong hover:bg-raised"
-                >
-                  {s}
-                </button>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {showChats && <ChatList conversations={conversations} activeId={activeId} onClose={() => setShowChats(false)} />}
+        <div className="relative min-h-0 flex-1" inert={showChats}>
+          <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-y-auto px-3 py-3" aria-live="polite">
+            {visible.length === 0 && !busy && (
+              <div className="px-1 pt-8">
+                <p className="text-[15px] font-semibold text-ink">Ask about your data</p>
+                <p className="mt-1 text-[13px] leading-5 text-muted">
+                  I can see your {tableCount} {tableCount === 1 ? "table" : "tables"}, joins, open tabs, results, history and snippets, and I run read-only queries when I need
+                  actual values.
+                </p>
+                <div className="mt-4 flex flex-col gap-1.5">
+                  {STARTERS.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => send(s)}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-[13px] text-ink transition-colors hover:border-line-strong hover:bg-raised"
+                    >
+                      {s}
+                      <Icon name="chevronRight" size={13} className="text-faint" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <ol className="space-y-4">
+              {visible.map((m, i) => (
+                <MessageItem key={m.id} message={m} header={visible[i - 1]?.role !== "assistant"} />
               ))}
+              {busy && (
+                <li className="group/msg" data-testid="assistant-streaming">
+                  {!lastIsAssistant && <ReplyHeader model={undefined} />}
+                  {draft ? <Reply message={{ id: "draft", content: draft }} streaming /> : <Working label={status === "running-query" ? "Looking at the data…" : "Thinking…"} />}
+                </li>
+              )}
+            </ol>
+            {error && <p className="mt-3 rounded-md bg-danger-soft px-2.5 py-1.5 text-[12px] text-danger">{error}</p>}
+          </div>
+          {hasNewContent && (
+            <button
+              onClick={() => {
+                followLatestRef.current = true;
+                if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                setHasNewContent(false);
+              }}
+              className={`${btn.secondary} absolute bottom-3 left-1/2 z-10 -translate-x-1/2 shadow-pop`}
+              aria-label="Scroll to latest response"
+            >
+              <Icon name="chevronDown" size={13} />
+              New response
+            </button>
+          )}
+        </div>
+
+        <div className="shrink-0 px-3 pb-2 pt-1" inert={showChats}>
+          {!busy && visible.length > 0 && (
+            <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Quick questions">
+              {[
+                activeTab?.query.trim() && "Explain the query in the editor",
+                activeTab?.error && "Why did my query fail?",
+                activeTab?.result && "Summarize this result",
+                activeTab?.result && "What chart fits this result?",
+                "Any data quality issues?",
+              ]
+                .filter((q): q is string => !!q)
+                .map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => send(q)}
+                    className="shrink-0 rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] text-muted transition-colors hover:border-line-strong hover:text-ink"
+                  >
+                    {q}
+                  </button>
+                ))}
+            </div>
+          )}
+          <div className="rounded-2xl border border-line bg-surface shadow-sm transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
+            <textarea
+              ref={inputRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              rows={Math.min(6, Math.max(2, text.split("\n").length))}
+              placeholder="Ask anything about your data…"
+              title="Enter to send · Shift+Enter for a new line"
+              className="block w-full resize-none bg-transparent px-3.5 pt-3 text-[13px] leading-5 text-ink outline-none placeholder:text-faint"
+              aria-label="Message the assistant"
+            />
+            <div className="flex items-center gap-2 px-2 pb-2 pt-1">
+              <div className="qp-menu-up relative" ref={plusRef}>
+                <button
+                  onClick={() => setPlusOpen((o) => !o)}
+                  className="inline-flex size-8 items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-line-strong hover:bg-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  aria-label="Add context"
+                  aria-expanded={plusOpen}
+                  aria-haspopup="menu"
+                  title="Add context"
+                >
+                  <Icon name="plus" size={15} />
+                </button>
+                {plusOpen && (
+                  <div role="menu" aria-label="Add context" className="qp-pop absolute left-0 z-50 w-56 rounded-xl border border-line bg-surface p-1 shadow-pop">
+                    {ADD_CONTEXT.map((c) => (
+                      <button
+                        key={c}
+                        role="menuitem"
+                        onClick={() => {
+                          setText((t) => (t ? t : c));
+                          setPlusOpen(false);
+                          inputRef.current?.focus();
+                        }}
+                        className="flex w-full rounded-md px-2.5 py-1.5 text-left text-[13px] text-ink hover:bg-raised"
+                      >
+                        {c.replace(/: $/, "")}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="flex-1" />
+              <div className="qp-menu-up min-w-0">
+                <ModelPicker compact />
+              </div>
+              {busy ? (
+                <button
+                  onClick={() => useAssistantStore.getState().stop()}
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-ink hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  <Icon name="stop" size={11} /> Stop
+                </button>
+              ) : (
+                <button
+                  onClick={() => send()}
+                  disabled={!text.trim()}
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                  aria-label="Send message"
+                  title="Send (Enter)"
+                >
+                  <Icon name="arrowUp" size={15} />
+                </button>
+              )}
             </div>
           </div>
-        )}
-
-        <ol className="space-y-4">
-          {visible.map((m) =>
-            m.role === "user" ? (
-              <li key={m.id} className="flex justify-end" data-testid="assistant-user">
-                <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-soft px-3 py-2 text-[13px] leading-5 text-ink">
-                  {m.content}
-                </p>
-              </li>
-            ) : (
-              <li key={m.id} data-testid="assistant-reply">
-                <Reply message={m} streaming={false} />
-              </li>
-            )
-          )}
-          {busy && (
-            <li data-testid="assistant-streaming">
-              {draft ? (
-                <Reply message={{ id: "draft", content: draft }} streaming />
-              ) : (
-                <p className="flex items-center gap-1.5 text-[12px] text-muted">
-                  <Spinner className="size-3 text-accent" />
-                  {status === "running-query" ? "Looking at the data…" : "Thinking…"}
-                </p>
-              )}
-            </li>
-          )}
-        </ol>
-        {error && <p className="mt-3 rounded-md bg-danger-soft px-2.5 py-1.5 text-[12px] text-danger">{error}</p>}
-        </div>
-        {hasNewContent && (
-          <button
-            onClick={() => {
-              followLatestRef.current = true;
-              if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-              setHasNewContent(false);
-            }}
-            className={`${btn.secondary} absolute bottom-3 left-1/2 z-10 -translate-x-1/2 shadow-pop`}
-            aria-label="Scroll to latest response"
-          >
-            <Icon name="chevronDown" size={13} />
-            New response
-          </button>
-        )}
-      </div>
-
-      <div className="shrink-0 border-t border-line p-2.5">
-        {!busy && visible.length > 0 && (
-          <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Quick questions">
-            {[
-              activeTab?.query.trim() && "Explain the query in the editor",
-              activeTab?.error && "Why did my query fail?",
-              activeTab?.result && "Summarize this result",
-              activeTab?.result && "What chart fits this result?",
-              "Any data quality issues?",
-            ]
-              .filter((q): q is string => !!q)
-              .map((q) => (
-                <button
-                  key={q}
-                  onClick={() => send(q)}
-                  className="shrink-0 rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] text-muted transition-colors hover:border-line-strong hover:text-ink"
-                >
-                  {q}
-                </button>
-              ))}
-          </div>
-        )}
-        <div className="rounded-xl border border-line bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            rows={Math.min(6, Math.max(2, text.split("\n").length))}
-            placeholder="Ask anything about your data or this workspace…"
-            className="block w-full resize-none bg-transparent px-3 pt-2.5 text-[13px] leading-5 text-ink outline-none placeholder:text-faint"
-            aria-label="Message the assistant"
-          />
-          <div className="flex items-center justify-between px-2 pb-1.5">
-            <span className="text-[11px] text-faint">Enter to send · Shift+Enter for a new line</span>
-            {busy ? (
-              <button onClick={() => useAssistantStore.getState().stop()} className={`${btn.secondary} h-7`}>
-                <Icon name="stop" size={12} /> Stop
-              </button>
-            ) : (
-              <button onClick={() => send()} disabled={!text.trim()} className={`${btn.primary} h-7`} aria-label="Send message">
-                Send
-              </button>
-            )}
-          </div>
+          <p className="mt-1.5 text-center text-[11px] text-faint">AI can make mistakes — check important results.</p>
         </div>
       </div>
     </aside>

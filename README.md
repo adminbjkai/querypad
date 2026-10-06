@@ -156,6 +156,11 @@ use, so every device you open it on sees the same workspace — and open tabs pi
 made elsewhere within a few seconds. Served without its storage API (static hosting), it
 falls back to keeping everything in the browser.
 
+- **Start from Home** — an AI-first start page: ask a question about your data in one box
+  (it goes to the Assistant), pick a suggestion, or pick up where you left off in the Recent
+  tabs (datasets with search and sorting, queries, snippets, spaces), with live catalog counts
+  and the semantic model below. A labeled navigation on the left (Home, SQL, Pipelines;
+  Tables, Joins; History, Snippets) collapses to icons and remembers it
 - **Drop anything** — CSV, TSV, Parquet, JSON/NDJSON, Excel; several at once, then JOIN them
 - **Understands before you ask** — every column is profiled (types, empties, distinct counts,
   ranges, top values) and joins between tables are inferred in the background
@@ -170,7 +175,8 @@ falls back to keeping everything in the browser.
   tables with value hints, joins, open tabs, the current result, recent runs, snippets and
   spaces. It answers in the chat — looking things up with read-only queries when it needs
   actual values — and never changes your workspace. Drag its edge to resize it, or collapse
-  it to a slim strip. One conversation per space
+  it to a slim strip. Every space keeps its chats: start a new one any time and reopen older
+  ones from "All chats"
 - **AI models without API keys** — on a self-hosted server, QueryPad can use the AI CLIs
   already signed in on that machine: Claude Sonnet 5.5, Codex GPT-6 Luna and Grok 4.7 (each
   with a low/medium effort toggle), plus Cursor's Grok 4.7 Medium Fast (256k) and Composer
@@ -197,11 +203,8 @@ falls back to keeping everything in the browser.
 - **Charts and column stats like Snowsight** — a chart builder (bar, line, area, scatter,
   pie, scorecard; date buckets, aggregations, group-by, stacking, PNG download) and a stats
   pane listing every column with its distribution
-- **Workspace overview** — a live catalog with search and sorting, row and profile counts,
-  relationship review status, semantic entities, and recent queries. Preview a dataset,
-  inspect its columns, start a query, or copy agent context from one place
 - **Explorer, history and status bar** — a searchable explorer for tables, views and columns
-  on a slim activity rail; history search with a succeeded/failed filter; a status bar with
+  that opens beside the navigation; history search with a succeeded/failed filter; a status bar with
   the engine, space, storage location, last result and the active AI model; Format SQL
   (Shift+Alt+F)
 - **Search everything** — Ctrl/⌘+P finds tables, columns, snippets, history, tabs and spaces,
@@ -214,9 +217,9 @@ falls back to keeping everything in the browser.
   never touches your spaces ("Save as a new space" keeps a copy)
 - **Agent context** — copy schema, profiles, the current SQL and its results for Claude Code,
   Codex or any agent
-- **A considered design system** ([`docs/DESIGN.md`](docs/DESIGN.md)) with a navy masthead,
-  semantic surface colors, Inter + JetBrains Mono, matching light and dark themes,
-  skeleton loading, and a home screen for empty spaces
+- **A considered design system** ([`docs/DESIGN.md`](docs/DESIGN.md)): a light, Snowsight-like
+  frame (labeled navigation, page header with breadcrumb), semantic surface colors, Inter +
+  JetBrains Mono, matching light and dark themes and skeleton loading
 - **Light and dark themes**, keyboard-first (press `?` for shortcuts), works on phones
 
 <details>
@@ -225,10 +228,11 @@ falls back to keeping everything in the browser.
 - **Persistence** — each space's tables, views, tabs, SQL-generation conversations, history, pipelines and
   join verdicts are saved through `/api/store` to the server's data directory
   (`QUERYPAD_DATA_DIR`, a Docker volume in the compose setup; `.querypad-data/` in dev).
-  Open clients poll every 3 s and apply edits from other devices; table, view and plugin
+  Open clients poll every 3 s while in use (every 15 s when idle, at once on focus) and apply
+  edits from other devices; table, view and plugin
   changes reopen the space. Spaces already kept in a browser's IndexedDB are uploaded the
   first time that browser meets an empty server, and older layouts are migrated into a space
-  called "My workspace". Assistant chat conversations stay in localStorage per space. Without the API the app keeps using IndexedDB. The server store has
+  called "My workspace". Assistant chats stay in localStorage per space (up to 30). Without the API the app keeps using IndexedDB. The server store has
   no accounts of its own — protect the site (e.g. basic auth) if it's reachable publicly. The first visit creates a "Playground"
   space with two sample tables.
 - **Remote files** — load Parquet/CSV/JSON from any URL that allows cross-origin requests

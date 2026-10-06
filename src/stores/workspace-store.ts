@@ -1023,7 +1023,10 @@ useWorkspaceStore.subscribe((state, prev) => {
 // and apply them here: state-only edits (tabs, history, verdicts…) in place, anything that
 // touches tables, views or plugins by reopening the space. Never pull over unsaved work.
 
-const SYNC_INTERVAL_MS = 3000;
+/** Poll for other devices' edits often while someone is using the app, rarely when it sits idle. */
+const SYNC_ACTIVE_MS = 3000;
+const SYNC_IDLE_MS = 15000;
+const IDLE_AFTER_MS = 60000;
 /** Set while remote state is applied, so the save subscription doesn't echo it back. */
 let applyingRemote = false;
 let pulling = false;
@@ -1147,7 +1150,18 @@ if (typeof window !== "undefined") {
   const pull = () => {
     if (document.visibilityState === "visible") void pullRemoteChanges();
   };
-  setInterval(pull, SYNC_INTERVAL_MS);
+  let lastActivity = Date.now();
+  const markActive = () => {
+    const wasIdle = Date.now() - lastActivity >= IDLE_AFTER_MS;
+    lastActivity = Date.now();
+    if (wasIdle) pull();
+  };
+  for (const event of ["pointerdown", "keydown", "wheel"]) window.addEventListener(event, markActive, { capture: true, passive: true });
+  const tick = () => {
+    pull();
+    setTimeout(tick, Date.now() - lastActivity < IDLE_AFTER_MS ? SYNC_ACTIVE_MS : SYNC_IDLE_MS);
+  };
+  setTimeout(tick, SYNC_ACTIVE_MS);
   document.addEventListener("visibilitychange", pull);
   window.addEventListener("focus", pull);
 }

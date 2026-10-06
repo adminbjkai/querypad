@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   // Pin the project root (a lockfile further up the tree would otherwise be picked).
   outputFileTracingRoot: process.cwd(),
   turbopack: { root: process.cwd() },
+  // The dev badge would sit on top of the navigation's bottom controls.
+  devIndicators: false,
   // next/image optimization is unused, so its native `sharp` binaries (~33 MB) stay out.
   outputFileTracingExcludes: { "*": ["node_modules/@img/**", "node_modules/sharp/**"] },
   async headers() {

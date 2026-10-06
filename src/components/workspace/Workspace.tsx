@@ -12,9 +12,9 @@ import { useUiStore } from "@/stores/ui-store";
 import { importAndReport } from "@/lib/import";
 import { runActive } from "@/lib/workspace-actions";
 import { readPreference, writePreference } from "@/lib/preferences";
-import Header from "./Header";
+import NavRail from "./NavRail";
+import PageHeader from "./PageHeader";
 import StatusBar from "./StatusBar";
-import EmptyState from "./EmptyState";
 import Splash from "./Splash";
 import Sidebar from "@/components/sidebar/Sidebar";
 import SqlWorkbench from "@/components/editor/SqlWorkbench";
@@ -23,12 +23,13 @@ import { Icon } from "@/components/ui/icons";
 import { btn } from "@/components/ui/primitives";
 
 const PipelineView = dynamic(() => import("@/components/pipeline/PipelineView"), { ssr: false });
-const WorkspaceOverview = dynamic(() => import("./WorkspaceOverview"), { ssr: false });
+const Home = dynamic(() => import("./Home"), { ssr: false });
 const CommandPalette = dynamic(() => import("./CommandPalette"), { ssr: false });
 const AddFilesDialog = dynamic(() => import("@/components/dropzone/AddFilesDialog"), { ssr: false });
 const CollaborateDialog = dynamic(() => import("@/components/collaboration/CollaborateDialog"), { ssr: false });
 const PluginManager = dynamic(() => import("@/components/plugins/PluginManager"), { ssr: false });
 const ShortcutsDialog = dynamic(() => import("./ShortcutsDialog"), { ssr: false });
+const ClearSpaceDialog = dynamic(() => import("./ClearSpaceDialog"), { ssr: false });
 const SnippetDialog = dynamic(() => import("@/components/editor/SnippetDialog"), { ssr: false });
 const AssistantPanel = dynamic(() => import("@/components/assistant/AssistantPanel"), { ssr: false });
 const AssistantRail = dynamic(() => import("@/components/assistant/AssistantPanel").then((m) => m.AssistantRail), { ssr: false });
@@ -48,6 +49,8 @@ export default function Workspace() {
   const everHydrated = useRef(false);
   if (hydrated) everHydrated.current = true;
   const tables = useWorkspaceStore((s) => s.tables);
+  const dataCount = useWorkspaceStore((s) => s.tables.length + s.views.length);
+  const spaceId = useWorkspaceStore((s) => s.spaceId);
   const viewMode = useWorkspaceStore((s) => s.viewMode);
   const workspacePage = useUiStore((s) => s.workspacePage);
 
@@ -102,6 +105,23 @@ export default function Workspace() {
       )
     );
   }, [hydrated, isSharedPage]);
+
+  // An empty space shows Home (where data is added); data arriving — added, or by switching away
+  // from an empty space — opens the workbench.
+  const seenData = useRef<{ space: string | null; count: number } | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    const prev = seenData.current;
+    seenData.current = { space: spaceId, count: dataCount };
+    const setPage = useUiStore.getState().setWorkspacePage;
+    if (!prev) {
+      if (dataCount === 0) setPage("home");
+    } else if (prev.count === 0 && dataCount > 0) {
+      setPage("workbench");
+    } else if (dataCount === 0 && (prev.count > 0 || prev.space !== spaceId)) {
+      setPage("home");
+    }
+  }, [hydrated, spaceId, dataCount]);
 
   // Understand the data up front: infer joins in the background once 2+ tables exist.
   const discoveryStatus = useWorkspaceStore((s) => s.discovery.status);
@@ -169,7 +189,7 @@ export default function Workspace() {
         ui.setAssistantOpen(!ui.assistantOpen);
       } else if (mod && key === "b") {
         e.preventDefault();
-        ui.setSidebarOpen(!ui.sidebarOpen);
+        ui.toggleSidePanel();
       } else if (mod && e.key === "Enter" && !isTypingTarget(e.target)) {
         e.preventDefault();
         runActive();
@@ -196,52 +216,42 @@ export default function Workspace() {
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">
-      <Header />
-
-      {onlySampleTables && !welcomeDismissed && !isSharedPage && (
-        <div
-          role="note"
-          className="qp-pop fixed bottom-10 left-1/2 z-30 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-xl border border-line bg-surface py-2 pl-3 pr-2 text-[13px] text-ink shadow-pop"
-        >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
-            <Icon name="sparkle" size={14} />
-          </span>
-          <span className="min-w-0">
-            You&apos;re exploring two sample tables. Drop your own files anywhere and they&apos;ll replace them.
-          </span>
-          <button onClick={() => setDialog("addFiles")} className={`${btn.secondary} h-7 shrink-0`}>
-            Use my own data
-          </button>
-          <button
-            onClick={() => {
-              setWelcomeDismissed(true);
-              writePreference(WELCOME_KEY, "1");
-            }}
-            className={btn.icon}
-            aria-label="Dismiss"
-          >
-            <Icon name="x" size={14} />
-          </button>
-        </div>
-      )}
 
       <div className="flex min-h-0 flex-1">
-        {workspacePage === "overview" && tables.length > 0 ? (
-          <main id="workspace-content" className="min-w-0 flex-1 overflow-y-auto" tabIndex={-1}>
-            <WorkspaceOverview />
+        <NavRail />
+        {workspacePage === "workbench" && <Sidebar />}
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          <PageHeader />
+          <main id="workspace-content" className="flex min-h-0 min-w-0 flex-1 flex-col" tabIndex={-1}>
+            {workspacePage === "home" ? <Home /> : viewMode === "sql" ? <SqlWorkbench /> : <PipelineView />}
           </main>
-        ) : tables.length === 0 ? (
-          <div className="flex min-w-0 flex-1 flex-col">
-            <EmptyState />
-          </div>
-        ) : (
-          <>
-            <Sidebar />
-            <main id="workspace-content" className="flex min-w-0 flex-1 flex-col" tabIndex={-1}>
-              {viewMode === "sql" ? <SqlWorkbench /> : <PipelineView />}
-            </main>
-          </>
-        )}
+          {onlySampleTables && !welcomeDismissed && !isSharedPage && (
+            <div
+              role="note"
+              className="qp-pop absolute bottom-4 left-1/2 z-20 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface py-2 pl-3 pr-2 text-[13px] text-ink shadow-pop"
+            >
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
+                <Icon name="sparkle" size={14} />
+              </span>
+              <span className="min-w-0 max-w-md flex-1 basis-52">
+                You&apos;re exploring two sample tables. Drop your own files anywhere and they&apos;ll replace them.
+              </span>
+              <button onClick={() => setDialog("addFiles")} className={`${btn.secondary} h-7 shrink-0`}>
+                Use my own data
+              </button>
+              <button
+                onClick={() => {
+                  setWelcomeDismissed(true);
+                  writePreference(WELCOME_KEY, "1");
+                }}
+                className={btn.icon}
+                aria-label="Dismiss"
+              >
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+          )}
+        </div>
         {!isSharedPage && (assistantOpen ? <AssistantPanel /> : <AssistantRail />)}
       </div>
       <StatusBar />
@@ -259,6 +269,7 @@ export default function Workspace() {
       {dialog === "collaborate" && <CollaborateDialog onClose={() => setDialog(null)} />}
       {dialog === "plugins" && <PluginManager onClose={() => setDialog(null)} />}
       {dialog === "shortcuts" && <ShortcutsDialog onClose={() => setDialog(null)} />}
+      {dialog === "clearSpace" && <ClearSpaceDialog onClose={() => setDialog(null)} />}
       {snippetDraft && <SnippetDialog key={snippetDraft.id ?? "new"} draft={snippetDraft} />}
       <Toaster />
     </div>

@@ -60,7 +60,7 @@ WHERE FALSE;`
     await expect(page.getByRole("button", { name: "employee_bio", exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("3 tables")).toBeVisible();
 
-    await page.getByRole("tab", { name: /Joins/ }).click();
+    await page.getByRole("button", { name: "Joins", exact: true }).click();
     await expect(page.getByText("employee_bio.emp_id")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("name match")).toBeVisible();
 
@@ -86,13 +86,13 @@ WHERE FALSE;`
 
   test("inferred keys are queryable with SQL", async ({ page }) => {
     await openWithSamples(page);
-    await page.getByRole("tab", { name: /Joins/ }).click();
+    await page.getByRole("button", { name: "Joins", exact: true }).click();
     await expect(page.getByText(/inferred from your data/)).toBeVisible({ timeout: 20_000 });
     await runSql(page, "SELECT table_name, column_name, key_type, references_table FROM querypad.keys ORDER BY table_name");
     await expect(page.getByRole("gridcell", { name: "primary key" })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("gridcell", { name: "foreign key" })).toBeVisible();
     // Internal tables never show up as user tables.
-    await page.getByRole("tab", { name: "Tables" }).click();
+    await page.getByRole("button", { name: "Tables", exact: true }).click();
     await expect(page.getByText("2 tables")).toBeVisible();
   });
 });
@@ -259,7 +259,7 @@ test.describe("Snippet library", () => {
     await dialog.getByLabel("Snippet description").fill("Departments by budget");
     await dialog.getByRole("button", { name: "Save snippet" }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(a.getByRole("tab", { name: "Snippets" })).toHaveAttribute("aria-selected", "true");
+    await expect(a.getByRole("button", { name: "Snippets", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(a.getByRole("region", { name: "Folder Reports" })).toBeVisible();
     await expect(a.getByRole("button", { name: "Snippet Biggest budgets" })).toBeVisible();
 
@@ -277,7 +277,7 @@ test.describe("Snippet library", () => {
     await isolate(ctxB, ns);
     const b = await ctxB.newPage();
     await openWithSamples(b);
-    await b.getByRole("tab", { name: "Snippets" }).click();
+    await b.getByRole("button", { name: "Snippets", exact: true }).click();
     await expect(b.getByRole("button", { name: "Snippet Biggest budgets" })).toBeVisible({ timeout: 15_000 });
 
     // Edit on A (rename); B picks it up live.
@@ -313,7 +313,7 @@ test.describe("Snippet library", () => {
     await expect(a.getByRole("button", { name: "Snippet Top budgets" })).toHaveCount(0, { timeout: 15_000 });
     await a.reload();
     await expect(a.getByRole("button", { name: /^Space: / })).toBeVisible({ timeout: 30_000 });
-    await a.getByRole("tab", { name: "Snippets" }).click();
+    await a.getByRole("button", { name: "Snippets", exact: true }).click();
     await expect(a.getByRole("button", { name: "Snippet Headcount" })).toBeVisible({ timeout: 15_000 });
     await expect(a.getByRole("button", { name: "Snippet Top budgets" })).toHaveCount(0);
 
@@ -558,7 +558,7 @@ test.describe("Upgrading saved data", () => {
     await expect(page.getByRole("button", { name: /^Space: My workspace/ })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("button", { name: "depts", exact: true })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Saved tab/ })).toBeVisible();
-    await page.getByRole("tab", { name: "History" }).click();
+    await page.getByRole("button", { name: "History", exact: true }).click();
     await expect(page.getByText("SELECT 'from v0.7'")).toBeVisible();
     // Old records are gone; reloading keeps everything.
     await page.reload();

@@ -52,7 +52,11 @@ const PATHS = {
   chartArea: "M4 20h16M4 16l4-5 4 3 4-6 4 4v8H4z",
   chartScatter: "M4 4v16h16M8 14h.01M11 9h.01M14 15h.01M17 8h.01M16 12h.01",
   chartPie: "M12 3a9 9 0 109 9h-9V3zM15 3.5A9 9 0 0120.5 9H15V3.5z",
+  arrowUp: "M12 19V5M6 11l6-6 6 6",
   chartScorecard: "M4 5h16v14H4zM9 9v6M9 9l-1.5 1.2M13 9h3v3h-3v3h3",
+  chat: "M5 5h14v10H10l-4 4v-4H5z",
+  home: "M4 10.5L12 4l8 6.5V20h-5.5v-5.5h-5V20H4z",
+  code: "M9 8l-4 4 4 4M15 8l4 4-4 4",
 } as const;
 
 export type IconName = keyof typeof PATHS;

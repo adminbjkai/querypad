@@ -7,7 +7,7 @@ runs DuckDB-Wasm; the CLI runs native DuckDB. Keep runtime-specific imports at t
 
 | Layer | Location | Responsibility |
 | --- | --- | --- |
-| Web shell | `src/components/workspace` | Navigation, overview, spaces, status, command palette |
+| Web shell | `src/components/workspace`, `src/components/home` | Navigation rail, page header, Home, spaces, status, command palette |
 | Analysis UI | `src/components/editor`, `results`, `sidebar`, `pipeline`, `assistant` | Interactive workflows over store state |
 | Shared UI | `src/components/ui`, `src/lib/hooks` | Semantic controls, dialogs, menus, focus lifecycle |
 | Workspace actions | `src/lib/workspace-actions.ts` | Cross-component run, preview, snippet, share, context actions |
@@ -20,20 +20,22 @@ runs DuckDB-Wasm; the CLI runs native DuckDB. Keep runtime-specific imports at t
 
 Shared discovery and AI code uses relative imports so the CLI can execute under tsx.
 Discovery consumes a `QueryRunner`, not either DuckDB implementation. The browser
-Overview derives its entities with `buildSemanticModel`, filters rejected joins, and reads
+Home derives its entities with `buildSemanticModel`, filters rejected joins, and reads
 existing profiles; it does not maintain a second catalog or launch its own profiling loop.
 
 ## State ownership
 
 - `workspace-store`: spaces, tables/views, profiles, relationship verdicts, SQL tabs,
   results, query history, pipelines and plugins. DuckDB's main catalog is authoritative.
-- `ui-store`: theme, visible surface/panels, dialogs, sizes, cursor and toasts. Overview
-  versus workbench is session UI state; it never changes a remote device's saved space.
+- `ui-store`: theme, current page (Home or workbench), the open side panel, navigation
+  collapse, dialogs, sizes, cursor and toasts. The page is session UI state; it never changes a
+  remote device's saved space. An empty space shows Home; data arriving opens the workbench.
 - `ai-store`: current model, effort and available providers. The status bar subscribes
   directly, avoiding a second cached model label or periodic UI polling.
-- `assistant-store`: answer-only conversation, streaming and tool execution. Conversations
-  are localStorage records scoped to a space; the SQL-writing assistant stores its thread
-  with the query tab instead.
+- `assistant-store`: answer-only chats, streaming and tool execution. Each space keeps up to
+  30 chats in localStorage (`querypad:assistant:v2:<space>`); answers always land in the chat
+  they started in. It follows the open space itself, so Home can send before the panel opens.
+  The SQL-writing assistant stores its thread with the query tab instead.
 - `snippet-store`: a shared cross-space snippet library, with timestamp merges and deletion
   tombstones.
 
@@ -46,7 +48,9 @@ subscribe to the store fields they use rather than the entire store.
 `/api/store` writes to `QUERYPAD_DATA_DIR` (default `.querypad-data`). When the API is absent,
 spaces use IndexedDB. Revisions let clients pull changes without overwriting pending
 local writes. Debounced saves capture their target space; switching flushes pending work.
-The `querypad_ns` cookie isolates server workspaces during tests.
+The `querypad_ns` cookie isolates server workspaces during tests. Clients poll every 3 s while
+someone is using the page and every 15 s when it sits idle; the server parses each polled
+record (index, space revs, snippets) once per file version (inode, size, mtime).
 
 The status bar reports the selected storage backend and browser connectivity; neither
 signal proves that a particular write has completed. UI preferences use best-effort
@@ -58,13 +62,13 @@ disabled; only the server-side bridge module can reach them. Keep this boundary 
 
 ## Loading and rendering
 
-The browser workspace is dynamically loaded without server rendering. Optional overview,
+The browser workspace is dynamically loaded without server rendering. Optional Home,
 pipeline, chart, assistant, and dialog surfaces load on demand. Results virtualize rows;
 filtering is deferred to keep text input responsive. Profiling and relationship discovery
 remain shared work in the workspace store rather than per-component duplicate queries.
 
-Use semantic CSS tokens for both themes. Global masthead tokens are distinct from data
-surfaces. Dialogs share focus containment and restoration; menus provide arrow-key
+Use semantic CSS tokens for both themes; the frame (navigation, page header) uses the same
+surface tokens as everything else. Dialogs share focus containment and restoration; menus provide arrow-key
 navigation. Resize handles expose keyboard controls and current values.
 
 ## Verification

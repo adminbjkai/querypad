@@ -11,15 +11,10 @@ import RelationshipsPanel from "./RelationshipsPanel";
 import HistoryPanel from "./HistoryPanel";
 import SnippetsPanel from "./SnippetsPanel";
 import PanelHeader, { SearchBox } from "./PanelHeader";
-import { Icon, type IconName } from "@/components/ui/icons";
+import { Icon } from "@/components/ui/icons";
 import { btn } from "@/components/ui/primitives";
 
-const PANELS: { id: SidebarPanel; label: string; icon: IconName }[] = [
-  { id: "tables", label: "Tables", icon: "table" },
-  { id: "joins", label: "Joins", icon: "join" },
-  { id: "history", label: "History", icon: "history" },
-  { id: "snippets", label: "Snippets", icon: "bookmark" },
-];
+const PANEL_LABEL: Record<SidebarPanel, string> = { tables: "Tables", joins: "Joins", history: "History", snippets: "Snippets" };
 
 /** A table or view is listed when its name or any column name contains the (lowercased) filter. */
 function matchesFilter(table: TableInfo, q: string): boolean {
@@ -42,7 +37,6 @@ export default function Sidebar() {
   const verdicts = useWorkspaceStore((s) => s.relationshipVerdicts);
   const open = useUiStore((s) => s.sidebarOpen);
   const panel = useUiStore((s) => s.sidebarPanel);
-  const showPanel = useUiStore((s) => s.showPanel);
   const setOpen = useUiStore((s) => s.setSidebarOpen);
   const setDialog = useUiStore((s) => s.setDialog);
   const profileTable = useUiStore((s) => s.profileTable);
@@ -69,38 +63,10 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Small screens: the sidebar floats over the workbench. */}
-      <div className="fixed inset-0 top-20 z-30 bg-scrim md:hidden" onClick={() => setOpen(false)} />
-      <div className="fixed bottom-6 left-0 top-20 z-30 flex md:static md:z-auto">
-        <aside className="flex h-full border-r border-line bg-chrome" aria-label="Workspace sidebar">
-          <div role="tablist" aria-orientation="vertical" aria-label="Sidebar panels" className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-line bg-chrome py-2">
-            {PANELS.map((p) => {
-              const selected = panel === p.id;
-              const joinCount = p.id === "joins" && discovery.status === "ready" ? discovery.relationships.length : 0;
-              return (
-                <button
-                  key={p.id}
-                  role="tab"
-                  aria-selected={selected}
-                  aria-label={p.label}
-                  title={p.label}
-                  onClick={() => showPanel(p.id)}
-                  className={`relative flex size-8 items-center justify-center rounded-md transition-colors ${
-                    selected ? "bg-accent-soft text-accent ring-1 ring-line" : "text-muted hover:bg-sunken hover:text-ink"
-                  }`}
-                >
-                  {selected && <span className="absolute -left-[5px] top-2 h-5 w-0.5 rounded-r bg-accent" />}
-                  <Icon name={p.icon} size={16} />
-                  {joinCount > 0 && (
-                    <span className="absolute -right-0.5 top-0.5 min-w-[14px] rounded-full bg-join-soft px-1 text-center text-[10px] font-medium leading-[14px] tabular-nums text-join">
-                      {joinCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
+      {/* Small screens: the panel floats over the work area, beside the icon rail. */}
+      <div className="fixed inset-0 left-[52px] z-30 bg-scrim md:hidden" onClick={() => setOpen(false)} />
+      <div className="fixed bottom-6 left-[52px] top-0 z-30 flex md:static md:z-auto">
+        <aside className="qp-slide-in flex h-full border-r border-line bg-chrome" aria-label={`${PANEL_LABEL[panel]} panel`}>
           <div className="flex w-[264px] min-w-0 flex-col bg-chrome">
             {panel === "tables" && (
               <div className="flex min-h-0 flex-1 flex-col">

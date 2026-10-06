@@ -7,6 +7,37 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.14.0 — A Snowsight-style frame, an AI-first Home and chats you can return to
+
+Modelled on Snowflake Snowsight's navigation and AI home.
+
+- **Navigation**: one labeled left navigation replaces the dark header and the icon rail —
+  Home, SQL and Pipelines; Tables and Joins; History and Snippets (with counts) — plus the space
+  switcher, search (Ctrl/⌘+P), New query, theme, shortcuts and More. It collapses to icons
+  (remembered) and is always icon-only on phones. Data and library items open their panel
+  beside it; click again (or Ctrl/⌘+B) to hide it
+- **Page header**: a light bar with a breadcrumb (space › page) and Collaborate, Share and
+  Assistant
+- **Home**: an AI-first start page — a greeting, one composer that hands the question to the
+  Assistant, suggestion chips, workspace totals, Recent tabs (datasets with search and sort,
+  queries, snippets, spaces) and the semantic model. Empty spaces show the drop zone, sample
+  data and load-from-URL there. It replaces the separate empty screen and overview
+- **Assistant chats**: every space keeps up to 30 chats — start a new one, reopen or delete
+  older ones from "All chats" (searchable; deleting asks for a second click). When browser storage fills up, older lookup rows and then the oldest chats make room. A rounded composer with the model picker, user
+  turns in bubbles, replies as prose with the model that wrote them, and compact lookup rows
+- **Clear this space** asks in a small dialog instead of a second menu click
+- **Editor works offline**: Monaco is served by the app itself, never from a CDN
+- **Accessibility**: dialogs trap and restore focus, menus have arrow/Home/End keys, editor and
+  column dividers resize from the keyboard; UI preferences survive blocked storage
+- **Lighter on the server**: open tabs poll for other devices' edits every 3 s only while
+  someone is using them (15 s when idle, at once on focus), and the server parses each polled
+  record once per file version instead of on every poll
+- Fixed: the space bar did nothing in pipeline step editors; "Scroll to latest response" didn't
+  appear for replies that arrived in one piece
+- Cleanup: removed the navy masthead styles, the old header, empty screen and overview, unused
+  share-decoding and provider helpers; the local AI bridge stops a CLI whose output never ends
+  a line; `docs/ARCHITECTURE.md` describes the code layout
+
 ## v0.13.0 — A Snowsight-grade look and feel
 
 A design pass modelled on Snowflake Snowsight, MotherDuck, Databricks SQL and the

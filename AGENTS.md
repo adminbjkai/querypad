@@ -44,7 +44,7 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
 - **Assistant** (`src/stores/assistant-store.ts`, `src/lib/ai/assistant-context.ts`): answer-only chat; context is
   rebuilt from the stores on every message; `sql-run` blocks auto-run only when
   `autoRunRejection` allows (one plain query over loaded tables — no writes, settings, files
-  or URLs). It never changes the workspace. Conversations live in localStorage per space.
+  or URLs). It never changes the workspace. Each space keeps several chats in localStorage.
 - **Catalog sync**: after any non-read-only statement, `syncCatalog` reconciles the store with
   `duckdb_tables()`/`duckdb_views()` (main schema only); new/changed tables are snapshotted to
   Parquet file entries. The `querypad` schema (relationships/keys) is internal and never listed.
@@ -61,6 +61,9 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   `KindGlyph`, `Icon`). Toasts: `toast()` from `src/stores/ui-store.ts`.
 - Cross-component actions (run, share, preview) live in `src/lib/workspace-actions.ts`;
   the editor is reachable through `src/lib/editor-bridge.ts`.
+- Shell: `NavRail` (left, labeled, collapsible) → side panel (`Sidebar`, workbench only) →
+  `PageHeader` + page (`Home` or the workbench) → Assistant. Nav pages use `aria-current`,
+  panel toggles `aria-pressed`; e2e selects them as buttons by name.
 
 ## Release and verification
 

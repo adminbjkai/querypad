@@ -10,6 +10,8 @@ import { Icon, type IconName } from "./icons";
 export const btn = {
   primary:
     "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md bg-accent text-on-accent text-[13px] font-medium shadow-sm hover:bg-accent-hover active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[background-color,transform,box-shadow]",
+  danger:
+    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md bg-danger text-on-accent text-[13px] font-medium shadow-sm hover:brightness-95 active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[filter,transform]",
   secondary:
     "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md border border-line bg-surface text-ink text-[13px] shadow-sm hover:border-line-strong hover:bg-raised active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[background-color,border-color,transform]",
   ghost:
@@ -130,11 +132,14 @@ export function Menu({
   trigger,
   items,
   align = "right",
+  side = "bottom",
   label,
 }: {
   trigger: (props: { open: boolean; toggle: () => void }) => ReactNode;
   items: (MenuItem | "divider")[];
   align?: "left" | "right";
+  /** Open below the trigger, or above it (for triggers near the bottom of the screen). */
+  side?: "bottom" | "top";
   label: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -189,9 +194,9 @@ export function Menu({
           aria-label={label}
           ref={menuRef}
           onKeyDown={handleMenuKeyDown}
-          className={`qp-pop absolute top-full z-40 mt-1 min-w-[200px] rounded-lg border border-line bg-surface p-1 shadow-pop ${
-            align === "right" ? "right-0" : "left-0"
-          }`}
+          className={`qp-pop absolute z-40 min-w-[200px] rounded-lg border border-line bg-surface p-1 shadow-pop ${
+            side === "top" ? "bottom-full mb-1" : "top-full mt-1"
+          } ${align === "right" ? "right-0" : "left-0"}`}
         >
           {items.map((item, i) =>
             item === "divider" ? (
@@ -206,7 +211,7 @@ export function Menu({
                   setOpen(false);
                   item.onSelect();
                 }}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] disabled:opacity-40 ${
+                className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-[13px] disabled:opacity-40 ${
                   item.danger ? "text-danger hover:bg-danger-soft" : "text-ink hover:bg-raised"
                 }`}
               >

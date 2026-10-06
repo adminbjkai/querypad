@@ -157,9 +157,5 @@ export function getAiProviderConfig(provider: AiProvider): AiProviderConfig {
   return AI_PROVIDER_CONFIGS[provider];
 }
 
-export function isLocalProvider(provider: AiProvider): boolean {
-  return AI_PROVIDER_CONFIGS[provider].kind === "local";
-}
-
 /** Providers that work with an API key (everything except the host's signed-in CLIs). */
 export const KEY_PROVIDER_OPTIONS = AI_PROVIDER_OPTIONS.filter((p) => p.kind !== "local");

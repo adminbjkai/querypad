@@ -16,7 +16,7 @@ async function setMonacoValue(page: Page, editorIndex: number, sql: string) {
 test.describe("Workspace polish regressions", () => {
   test("pipeline results stay attached to their pipeline and clear when its steps change", async ({ page }) => {
     await openWithSamples(page);
-    await page.getByRole("tab", { name: "Pipeline" }).click();
+    await page.getByRole("button", { name: "Pipelines", exact: true }).click();
     await page.getByRole("button", { name: "Add the first step" }).click();
     await setMonacoValue(page, 0, "SELECT 1 AS value");
     await page.getByRole("button", { name: "Run pipeline" }).click();
