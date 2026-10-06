@@ -7,10 +7,12 @@ import { runActive, previewTable, shareWorkspace, copyAgentContext, insertSnippe
 import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { MOD } from "@/components/ui/primitives";
+import { insertAtCursor } from "@/lib/editor-bridge";
+import { quoteIdent } from "@/lib/duckdb/sql-utils";
 
 interface Command {
   id: string;
-  group: "Actions" | "Spaces" | "Snippets" | "Tables" | "Tabs" | "History";
+  group: "Actions" | "Spaces" | "Snippets" | "Tables" | "Columns" | "Tabs" | "History";
   label: string;
   detail?: string;
   icon: IconName;
@@ -124,6 +126,21 @@ export default function CommandPalette() {
         run: () => ui().setProfileTable(t.name),
       },
     ]);
+    // Columns: found by name (or type), insert the qualified name at the cursor.
+    const columnCommands: Command[] = [...tables, ...views].flatMap((t) =>
+      t.columns.map((c) => ({
+        id: `column:${t.name}.${c.name}`,
+        group: "Columns" as const,
+        label: `${t.name}.${c.name}`,
+        detail: `${c.type.toLowerCase()} column`,
+        icon: "insert" as const,
+        hint: c.type.toLowerCase(),
+        run: () => {
+          ws().setViewMode("sql");
+          if (!insertAtCursor(quoteIdent(c.name))) ws().addTab(`SELECT ${quoteIdent(c.name)}\nFROM ${quoteIdent(t.name)}\nLIMIT 100`);
+        },
+      }))
+    );
     const tabCommands: Command[] = tabs.map((t) => ({
       id: `tab:${t.id}`,
       group: "Tabs",
@@ -143,11 +160,12 @@ export default function CommandPalette() {
       icon: "history",
       run: () => ws().addTab(h.sql),
     }));
-    return [...actions, ...spaceCommands, ...snippetCommands, ...tableCommands, ...viewCommands, ...tabCommands, ...historyCommands];
+    return [...actions, ...spaceCommands, ...snippetCommands, ...tableCommands, ...columnCommands, ...viewCommands, ...tabCommands, ...historyCommands];
   }, [tables, views, tabs, history, spaces, spaceId, snippets]);
 
   const visible = useMemo(() => {
-    if (!query.trim()) return commands.filter((c) => c.group !== "History").slice(0, 40);
+    // Columns and history only show up once you search, so the list starts short.
+    if (!query.trim()) return commands.filter((c) => c.group !== "History" && c.group !== "Columns").slice(0, 40);
     return commands.filter((c) => matches(c, query)).slice(0, 60);
   }, [commands, query]);
 
@@ -193,7 +211,7 @@ export default function CommandPalette() {
                 close();
               }
             }}
-            placeholder="Type a command, table, or past query"
+            placeholder="Search tables, columns, snippets, history, or type a command"
             className="h-11 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-faint"
             aria-label="Search commands"
             role="combobox"

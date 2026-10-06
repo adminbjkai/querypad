@@ -323,11 +323,11 @@ test.describe("Snippet library", () => {
 });
 
 test.describe("Assistant panel", () => {
-  test("looks at the data on its own, answers, and applies an action on click", async ({ page }) => {
+  test("answers in the chat after looking at the data; collapses and resizes", async ({ page }) => {
     const bodies: { provider: string; effort?: string; input: string; system: string }[] = [];
     const replies = [
       "Let me count them.\n```sql-run\nSELECT COUNT(*) AS n FROM employees\n```",
-      'There are **12** employees.\n\n```action\n{"type":"run_in_tab","title":"All employees","sql":"SELECT * FROM employees ORDER BY emp_id"}\n```',
+      "There are **12** employees.\n\n```sql\nSELECT COUNT(*) FROM employees\n```",
     ];
     await page.route("**/api/complete", async (route: Route) => {
       if (route.request().method() === "GET") {
@@ -357,17 +357,62 @@ test.describe("Assistant panel", () => {
     expect(bodies[1].input).toContain("QueryPad ran your sql-run query (1 rows");
     expect(bodies[1].input).toMatch(/n\n12/);
 
-    // Actions wait for a click.
-    await expect(panel.getByText("Run in a new tab “All employees”")).toBeVisible();
-    await panel.getByRole("button", { name: "Apply" }).click();
-    await expect(page.getByRole("tab", { name: /All employees/ })).toBeVisible();
-    await expect(page.getByRole("columnheader", { name: /hire_date/ })).toBeVisible({ timeout: 15_000 });
-    await expect(panel.getByRole("button", { name: "Done" })).toBeVisible();
+    // Answer-only: SQL comes as a copyable block, nothing to apply; the editor is untouched.
+    await expect(panel.getByRole("button", { name: "Copy SQL" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Apply" })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: /Query 1/ })).toBeVisible();
+    expect(bodies[0].system).not.toContain("App actions");
+
+    // Resize by dragging the left edge.
+    const before = (await panel.boundingBox())!.width;
+    const handle = panel.getByRole("separator", { name: "Resize assistant" });
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(box.x - 120, box.y + 200, { steps: 6 });
+    await page.mouse.up();
+    expect((await panel.boundingBox())!.width).toBeGreaterThan(before + 80);
+
+    // Collapse to the rail and back.
+    await panel.getByRole("button", { name: "Collapse assistant" }).click();
+    await expect(panel).toHaveCount(0);
+    await page.getByRole("button", { name: "Open assistant" }).click();
+    await expect(page.getByRole("complementary", { name: "Assistant" })).toBeVisible();
 
     // The conversation is kept for this space.
     await page.waitForTimeout(500);
     await page.reload();
     await expect(page.getByRole("complementary", { name: "Assistant" }).getByText("There are")).toBeVisible({ timeout: 30_000 });
+  });
+});
+
+test.describe("Search", () => {
+  test("finds columns and inserts them", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("button", { name: "New tab" }).click();
+    await page.keyboard.press(`${MOD}+p`);
+    await page.getByLabel("Search commands").fill("hire_date");
+    await page.getByRole("option", { name: /employees\.hire_date/ }).click();
+    await expect(page.locator(".monaco-editor")).toContainText("hire_date");
+  });
+});
+
+test.describe("Charts", () => {
+  test("builds a chart with aggregation and switches types", async ({ page }) => {
+    await openWithSamples(page);
+    await runSql(page, "SELECT d.dept_name, e.salary FROM employees e JOIN departments d ON e.dept_id = d.dept_id");
+    await expect(page.getByRole("columnheader", { name: /salary/ })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("tab", { name: "Chart" }).click();
+    const settings = page.getByRole("complementary", { name: "Chart settings" });
+    await expect(settings).toBeVisible();
+    await page.getByRole("radio", { name: "Bar", exact: true }).click();
+    await settings.getByLabel("X axis column").selectOption("dept_name");
+    await settings.getByLabel("Series 1 column").selectOption("salary");
+    await settings.getByLabel("Series 1 aggregation").selectOption("avg");
+    await expect(page.locator(".recharts-bar-rectangle").first()).toBeVisible();
+    await expect(page.locator(".recharts-bar-rectangle")).toHaveCount(4);
+    await page.getByRole("radio", { name: "Scorecard" }).click();
+    await expect(page.locator(".recharts-bar-rectangle")).toHaveCount(0);
   });
 });
 

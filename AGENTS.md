@@ -41,10 +41,10 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
 - **Snippets** (`src/stores/snippet-store.ts`): one library shared by all spaces, stored in
   `snippets.json` via `PATCH /api/store/snippets` (per-snippet upsert by `updatedAt`, tombstoned
   removals) or the `querypad-snippets` IndexedDB key; refreshed when the poll reports a new rev.
-- **Assistant** (`src/stores/assistant-store.ts`, `src/lib/ai/assistant-context.ts`): context is
-  rebuilt from the stores on every message; `sql-run` blocks auto-run only as one read-only
-  statement (`isReadOnlyStatement`); everything else is an `action` block applied on click
-  (`src/lib/assistant-actions.ts`). Conversations live in localStorage per space.
+- **Assistant** (`src/stores/assistant-store.ts`, `src/lib/ai/assistant-context.ts`): answer-only chat; context is
+  rebuilt from the stores on every message; `sql-run` blocks auto-run only when
+  `autoRunRejection` allows (one plain query over loaded tables — no writes, settings, files
+  or URLs). It never changes the workspace. Conversations live in localStorage per space.
 - **Catalog sync**: after any non-read-only statement, `syncCatalog` reconciles the store with
   `duckdb_tables()`/`duckdb_views()` (main schema only); new/changed tables are snapshotted to
   Parquet file entries. The `querypad` schema (relationships/keys) is internal and never listed.

@@ -8,7 +8,7 @@ import { MAX_RESULT_ROWS } from "@/lib/duckdb/queries";
 import { detectChartConfig, type ChartConfig } from "@/lib/charts/detect";
 import type { QueryResult } from "@/types";
 import DataTable from "./DataTable";
-import ColumnInspector from "./ColumnInspector";
+import ColumnStatsPane from "./ColumnStatsPane";
 import DetailsView from "./DetailsView";
 import ExportMenu from "./ExportMenu";
 import { resultMeta } from "./result-meta";
@@ -203,7 +203,7 @@ export default function ResultsPanel() {
           )}
         </div>
         {showTable && inspectedColumn && (
-          <ColumnInspector
+          <ColumnStatsPane
             result={result}
             column={inspectedColumn}
             onColumnChange={(column) => patch({ inspectCol: column })}

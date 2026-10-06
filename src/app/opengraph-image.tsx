@@ -7,7 +7,7 @@ export const contentType = "image/png";
 const INK = "#1b2433";
 const PAPER = "#eef1f4";
 const JOIN = "#b86e00";
-const ACCENT = "#2f44c8";
+const ACCENT = "#1a6ce7";
 
 function Table({ name, cols, x, y }: { name: string; cols: [string, string][]; x: number; y: number }) {
   return (

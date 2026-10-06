@@ -166,12 +166,11 @@ falls back to keeping everything in the browser.
 - **Tables you create with SQL are first-class** — `CREATE TABLE`, `CREATE VIEW`, `INSERT`,
   `ALTER`, `DROP`… the sidebar follows DuckDB's catalog, and new or changed tables are saved
   (as Parquet snapshots) so they survive reloads, travel in share links and sync to rooms
-- **The Assistant** — Ctrl/⌘+I opens a chat panel beside the editor that sees the whole
-  workspace: tables with value hints, joins, open tabs, the current result, recent runs,
-  snippets and spaces. It looks things up on its own with read-only queries (shown as
-  "Looked at the data"), answers in Markdown with runnable SQL, and offers app actions —
-  run in a tab, replace the query, save a snippet, preview or profile a table, accept a join,
-  switch space — that happen only when you click **Apply**. One conversation per space
+- **The Assistant** — Ctrl/⌘+I opens a chat on the right that sees the whole workspace:
+  tables with value hints, joins, open tabs, the current result, recent runs, snippets and
+  spaces. It answers in the chat — looking things up with read-only queries when it needs
+  actual values — and never changes your workspace. Drag its edge to resize it, or collapse
+  it to a slim strip. One conversation per space
 - **AI models without API keys** — on a self-hosted server, QueryPad can use the AI CLIs
   already signed in on that machine: Claude Sonnet 5.5, Codex GPT-6 Luna and Grok 4.7 (each
   with a low/medium effort toggle), plus Cursor's Grok 4.7 Medium Fast (256k) and Composer
@@ -192,14 +191,17 @@ falls back to keeping everything in the browser.
 - **A results grid like a desktop tool** — sticky headers and row numbers, resizable
   columns, NULLs marked, keyboard cell navigation with Ctrl/⌘+C, a per-column menu (sort, copy
   name or values, inspect), a column inspector with distribution, nulls, distinct values and
-  top values, a Details view with the SQL and timings, one-click charts, and export to CSV /
+  top values, a Details view with the SQL and timings, and export to CSV /
   JSON / Markdown / HTML / Excel / Parquet / clipboard
+- **Charts and column stats like Snowsight** — a chart builder (bar, line, area, scatter,
+  pie, scorecard; date buckets, aggregations, group-by, stacking, PNG download) and a stats
+  pane listing every column with its distribution
 - **Explorer, history and status bar** — a searchable explorer for tables, views and columns
   on a slim activity rail; history search with a succeeded/failed filter; a status bar with
   the engine, space, sync state, last result and the active AI model; Format SQL
   (Shift+Alt+F)
-- **Command palette** — Ctrl/⌘+P to run anything, open a space, insert a snippet, jump to a
-  tab, preview or profile a table, or reopen a past query
+- **Search everything** — Ctrl/⌘+P finds tables, columns, snippets, history, tabs and spaces,
+  and runs any command
 - **History** — each space keeps its last 100 runs with row counts, timings and failures
 - **Pipelines** — chain named SQL steps that build on each other, shown as a dependency graph
 - **Live collaboration** — start a room, send the invite link, and edit the same tabs with

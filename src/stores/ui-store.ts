@@ -41,6 +41,9 @@ interface UiState {
   /** The side Assistant chat panel (remembered across reloads). */
   assistantOpen: boolean;
   setAssistantOpen: (open: boolean) => void;
+  /** Width of the Assistant panel in px (drag its left edge; remembered). */
+  assistantWidth: number;
+  setAssistantWidth: (width: number) => void;
 
   /** Editor share of the vertical split, 0.15–0.85. */
   editorFraction: number;
@@ -54,6 +57,13 @@ interface UiState {
 const THEME_KEY = "querypad:theme";
 const SPLIT_KEY = "querypad:split";
 const ASSISTANT_KEY = "querypad:assistant-open";
+const ASSISTANT_WIDTH_KEY = "querypad:assistant-width";
+
+function initialAssistantWidth(): number {
+  if (typeof window === "undefined") return 400;
+  const saved = Number(localStorage.getItem(ASSISTANT_WIDTH_KEY));
+  return saved >= 300 && saved <= 760 ? saved : 400;
+}
 
 function initialTheme(): Theme {
   if (typeof document === "undefined") return "light";
@@ -104,6 +114,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAssistantOpen: (assistantOpen) => {
     localStorage.setItem(ASSISTANT_KEY, assistantOpen ? "1" : "0");
     set({ assistantOpen });
+  },
+  assistantWidth: initialAssistantWidth(),
+  setAssistantWidth: (assistantWidth) => {
+    localStorage.setItem(ASSISTANT_WIDTH_KEY, String(Math.round(assistantWidth)));
+    set({ assistantWidth });
   },
 
   editorFraction: initialSplit(),

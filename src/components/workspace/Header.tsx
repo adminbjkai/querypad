@@ -111,7 +111,7 @@ export default function Header() {
           aria-label="Open command palette"
         >
           <Icon name="search" size={14} />
-          <span className="hidden flex-1 text-left sm:inline">Jump to a table, run a command…</span>
+          <span className="hidden flex-1 text-left sm:inline">Search tables, columns, snippets, history…</span>
           <span className="hidden gap-0.5 sm:flex">
             <Kbd>{MOD}</Kbd>
             <Kbd>P</Kbd>

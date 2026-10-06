@@ -7,6 +7,22 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.12.0 — Snowsight-style charts and stats, an answer-only Assistant you can resize
+
+- **Chart builder**: chart on the left, "Chart settings" on the right — bar, horizontal bar,
+  line, area, scatter, pie/donut and scorecard; X column with date buckets (day to year);
+  several Y series each with an aggregation (sum, average, count, min, max, count distinct);
+  group/color by; sort; stacked, legend and value labels; Download PNG. Defaults to one
+  sensible series, computed in the browser from the result
+- **Column stats pane** beside the results grid: every column with its type, unique count,
+  null share and a sparkline (histogram or top values); click one for full details
+- **Assistant**: now answer-only — it looks things up with read-only queries and replies in
+  the chat (SQL comes with a Copy button) but never changes your workspace. Drag its left
+  edge to resize (remembered); collapse it to a slim strip on the right edge
+- **Search** (Ctrl/⌘+P or the header): now finds columns too, alongside tables, snippets,
+  history, tabs and spaces
+- A Snowsight-style blue accent in both themes
+
 ## v0.11.0 — A pro workspace, an Assistant that sees everything, and AI without keys
 
 ### AI models without API keys

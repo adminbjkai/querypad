@@ -37,14 +37,11 @@ interface AssistantState {
   draft: string;
   status: "idle" | "thinking" | "running-query";
   error: string | null;
-  /** Ids of action blocks the user already applied (`messageId:index`). */
-  applied: Record<string, boolean>;
   spaceId: string | null;
   loadFor: (spaceId: string | null) => void;
   send: (text: string) => Promise<void>;
   stop: () => void;
   reset: () => void;
-  markApplied: (key: string) => void;
 }
 
 const MAX_ROUNDS = 3;
@@ -99,7 +96,7 @@ async function runReadOnly(sql: string): Promise<AssistantRun> {
     return {
       sql,
       result: null,
-      error: `Not run automatically because ${reason}. Only single plain queries over loaded tables run without a click — give the user this SQL in a sql block instead.`,
+      error: `Not run automatically because ${reason}. Only single plain queries over loaded tables run without a click — show the user this SQL in a sql block instead.`,
     };
   }
   try {
@@ -117,7 +114,6 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
   draft: "",
   status: "idle",
   error: null,
-  applied: {},
   spaceId: null,
 
   loadFor: (spaceId) => {
@@ -131,7 +127,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
         messages = [];
       }
     }
-    set({ spaceId, messages, draft: "", status: "idle", error: null, applied: {} });
+    set({ spaceId, messages, draft: "", status: "idle", error: null });
   },
 
   send: async (text) => {
@@ -211,11 +207,10 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
 
   reset: () => {
     get().stop();
-    set({ messages: [], draft: "", error: null, applied: {} });
+    set({ messages: [], draft: "", error: null });
     persist(get().spaceId, []);
   },
 
-  markApplied: (key) => set({ applied: { ...get().applied, [key]: true } }),
 }));
 
 // Stop an answer in progress when the space changes, even if the panel is closed — later

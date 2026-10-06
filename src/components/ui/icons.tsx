@@ -47,6 +47,12 @@ const PATHS = {
   panelRight: "M4 5h16v14H4zM15 5v14",
   info: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v5M12 8h.01",
   format: "M4 6h16M4 10h10M4 14h16M4 18h10",
+  chartHBar: "M4 4v16M4 7h12M4 12h8M4 17h15",
+  chartLine: "M4 4v16h16M7 15l4-5 3 3 5-6",
+  chartArea: "M4 20h16M4 16l4-5 4 3 4-6 4 4v8H4z",
+  chartScatter: "M4 4v16h16M8 14h.01M11 9h.01M14 15h.01M17 8h.01M16 12h.01",
+  chartPie: "M12 3a9 9 0 109 9h-9V3zM15 3.5A9 9 0 0120.5 9H15V3.5z",
+  chartScorecard: "M4 5h16v14H4zM9 9v6M9 9l-1.5 1.2M13 9h3v3h-3v3h3",
 } as const;
 
 export type IconName = keyof typeof PATHS;

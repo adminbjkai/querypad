@@ -2,31 +2,19 @@ import type { QueryResult } from "../../types";
 import { buildWorkspaceContext, type WorkspaceContextInput } from "./workspace-context";
 
 /**
- * The side Assistant: a chat that sees the whole workspace and can look at data on its own
- * (read-only queries the app runs automatically) and propose app actions the user applies
- * with one click. Pure functions so prompts and parsing can be unit-tested.
+ * The side Assistant: a chat that answers questions about the whole workspace. It can look
+ * at data on its own (read-only queries the app runs automatically, see autoRunRejection) but
+ * never changes anything — it only replies in the chat. Pure functions so prompts and parsing
+ * can be unit-tested.
  */
 
-export const ASSISTANT_SYSTEM_PROMPT = `You are the QueryPad Assistant, built into QueryPad — a local-first data workspace where the user's files are DuckDB tables. You see the live workspace state (tables, columns with value hints, inferred joins, open tabs, the current result, recent runs, saved snippets, spaces) in the context of each message. Help the user understand their data, answer questions, explain and fix SQL, and drive the app.
+export const ASSISTANT_SYSTEM_PROMPT = `You are the QueryPad Assistant, a chat panel inside QueryPad — a local-first data workspace where the user's files are DuckDB tables. Each message comes with the live workspace state: tables, columns with value hints, inferred joins, open tabs and their SQL, the current result, recent runs and errors, saved snippets and spaces. Answer the user's questions about their data, their queries and the app.
 
-Answer in concise Markdown. Lead with the answer; avoid filler. Use real names from the context, exactly as spelled.
+Answer in concise Markdown. Lead with the answer, then the detail that supports it; no filler. Use real table and column names exactly as spelled. Use small Markdown tables for figures.
 
-Looking at data yourself: when a question needs actual values, put ONE read-only DuckDB query (SELECT, WITH … SELECT, DESCRIBE, SUMMARIZE, SHOW) in a fenced block with the language \`sql-run\` and stop writing. QueryPad runs it immediately and sends you the result; then continue. Keep these queries small (aggregate or LIMIT 50). Never put writes in sql-run.
+You only reply in the chat — you can't click, edit the query or change the workspace. When SQL would help, show it in a \`\`\`sql block the user can copy. Only join on the listed joins; QueryPad's inferred keys are queryable as querypad.relationships and querypad.keys.
 
-SQL for the user: put it in a \`\`\`sql block. The user can run, insert or save it. Only join on the listed joins; QueryPad's inferred keys are queryable as querypad.relationships and querypad.keys.
-
-App actions: to do something in the app, add a fenced block with the language \`action\` holding one JSON object. The user applies it with one click. Available:
-{"type":"run_in_tab","title":"…","sql":"…"}      open SQL in a new tab and run it
-{"type":"open_tab","title":"…","sql":"…"}        open SQL in a new tab
-{"type":"replace_query","sql":"…"}              replace the SQL in the current tab
-{"type":"save_snippet","name":"…","sql":"…","folder":"…"}
-{"type":"preview_table","table":"…"}
-{"type":"profile_table","table":"…"}
-{"type":"show_panel","panel":"tables|joins|history|snippets"}
-{"type":"discover_joins"}
-{"type":"set_join","from":"table.column","to":"table.column","verdict":"accepted|rejected"}
-{"type":"switch_space","name":"…"}
-Offer an action when it saves the user a step; don't describe clicks the user could avoid.`;
+Looking at data yourself: when the answer needs actual values you don't have, put ONE plain read-only DuckDB query (SELECT, WITH … SELECT, DESCRIBE, SUMMARIZE) over the loaded tables in a fenced block with the language \`sql-run\` and stop writing. QueryPad runs it and sends you the result; then finish your answer from it. Keep these small (aggregate, or LIMIT 50). Don't use sql-run for anything else.`;
 
 export interface AssistantTab {
   title: string;
@@ -108,50 +96,6 @@ export function runResultMessage(sql: string, result: QueryResult | null, error:
   if (error) return `QueryPad ran your sql-run query and it failed:\n${error}\nFix it or answer without it.`;
   if (!result) return "QueryPad did not run the query.";
   return `QueryPad ran your sql-run query (${result.rowCount} rows, ${result.executionTimeMs} ms):\n${resultPreview(result, 50)}\nContinue your answer for the user.`;
-}
-
-export type AssistantAction =
-  | { type: "run_in_tab" | "open_tab"; title?: string; sql: string }
-  | { type: "replace_query"; sql: string }
-  | { type: "save_snippet"; name: string; sql: string; folder?: string }
-  | { type: "preview_table" | "profile_table"; table: string }
-  | { type: "show_panel"; panel: "tables" | "joins" | "history" | "snippets" }
-  | { type: "discover_joins" }
-  | { type: "set_join"; from: string; to: string; verdict: "accepted" | "rejected" }
-  | { type: "switch_space"; name: string };
-
-/** Validate one action block's JSON; null if it isn't a known, well-formed action. */
-export function parseAction(json: string): AssistantAction | null {
-  let value: unknown;
-  try {
-    value = JSON.parse(json);
-  } catch {
-    return null;
-  }
-  if (!value || typeof value !== "object") return null;
-  const a = value as Record<string, unknown>;
-  const str = (k: string) => typeof a[k] === "string" && (a[k] as string).trim().length > 0;
-  switch (a.type) {
-    case "run_in_tab":
-    case "open_tab":
-    case "replace_query":
-      return str("sql") ? (a as AssistantAction) : null;
-    case "save_snippet":
-      return str("name") && str("sql") ? (a as AssistantAction) : null;
-    case "preview_table":
-    case "profile_table":
-      return str("table") ? (a as AssistantAction) : null;
-    case "show_panel":
-      return ["tables", "joins", "history", "snippets"].includes(a.panel as string) ? (a as AssistantAction) : null;
-    case "discover_joins":
-      return { type: "discover_joins" };
-    case "set_join":
-      return str("from") && str("to") && (a.verdict === "accepted" || a.verdict === "rejected") ? (a as AssistantAction) : null;
-    case "switch_space":
-      return str("name") ? (a as AssistantAction) : null;
-    default:
-      return null;
-  }
 }
 
 // --- What the assistant may run without asking --------------------------------------

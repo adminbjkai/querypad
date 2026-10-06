@@ -17,9 +17,9 @@
   --ink: #1b2433;
   --muted: #5c6878;
   --faint: #8c97a4;
-  --accent: #2f44c8;
-  --accent-hover: #2536a6;
-  --accent-soft: #e6e9fb;
+  --accent: #1a6ce7;
+  --accent-hover: #1558c2;
+  --accent-soft: #e6f0fd;
   --on-accent: #ffffff;
   --join: #b86e00;
   --join-soft: #fbefd9;
@@ -49,10 +49,10 @@
   --ink: #e2e8ef;
   --muted: #95a2b2;
   --faint: #66748a;
-  --accent: #8090ff;
-  --accent-hover: #9aa7ff;
-  --accent-soft: #1e2650;
-  --on-accent: #0d1330;
+  --accent: #58a6ff;
+  --accent-hover: #79b8ff;
+  --accent-soft: #14294a;
+  --on-accent: #0b1a33;
   --join: #f0b041;
   --join-soft: #3a2a0c;
   --ok: #4cc38a;
@@ -169,4 +169,14 @@
 .qp-col-resize:hover::after,
 .qp-col-resize:active::after {
   background: var(--accent);
+}
+
+/* Chart numerals line up in axes, labels and tooltips. */
+.qp-chart text,
+.qp-chart .recharts-tooltip-wrapper {
+  font-variant-numeric: tabular-nums;
+}
+.qp-chart .recharts-surface:focus,
+.qp-chart .recharts-wrapper:focus {
+  outline: none;
 }

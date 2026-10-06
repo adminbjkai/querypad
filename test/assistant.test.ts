@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   buildAssistantContext,
   extractRunRequest,
-  parseAction,
   resultPreview,
   runResultMessage,
 } from "../src/lib/ai/assistant-context";
@@ -23,20 +22,6 @@ test("extractRunRequest finds the sql-run block only", () => {
   assert.equal(extractRunRequest("Looking.\n```sql-run\nSELECT 1\n```"), "SELECT 1");
   assert.equal(extractRunRequest("```sql\nSELECT 1\n```"), null);
   assert.equal(extractRunRequest("no blocks"), null);
-});
-
-test("parseAction accepts known actions and rejects malformed ones", () => {
-  assert.deepEqual(parseAction('{"type":"run_in_tab","title":"x","sql":"SELECT 1"}'), {
-    type: "run_in_tab",
-    title: "x",
-    sql: "SELECT 1",
-  });
-  assert.equal(parseAction('{"type":"run_in_tab"}'), null);
-  assert.equal(parseAction('{"type":"drop_everything"}'), null);
-  assert.equal(parseAction('{"type":"show_panel","panel":"nope"}'), null);
-  assert.equal(parseAction('{"type":"set_join","from":"a.b","to":"c.d","verdict":"maybe"}'), null);
-  assert.equal(parseAction("not json"), null);
-  assert.deepEqual(parseAction('{"type":"discover_joins","extra":1}'), { type: "discover_joins" });
 });
 
 test("result previews show NULLs and the row count", () => {

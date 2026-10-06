@@ -67,7 +67,7 @@ test.describe("QueryPad", () => {
   test("command palette previews a table in a new tab", async ({ page }) => {
     await openWithSamples(page);
     await page.keyboard.press(`${MOD}+p`);
-    await page.getByPlaceholder("Type a command, table, or past query").fill("preview depart");
+    await page.getByLabel("Search commands").fill("preview depart");
     await page.keyboard.press("Enter");
     await expect(page.getByRole("tab", { name: /Query 2/ })).toBeVisible();
     await expect(page.getByRole("columnheader", { name: /budget/ })).toBeVisible({ timeout: 15_000 });

@@ -28,6 +28,7 @@ const PluginManager = dynamic(() => import("@/components/plugins/PluginManager")
 const ShortcutsDialog = dynamic(() => import("./ShortcutsDialog"), { ssr: false });
 const SnippetDialog = dynamic(() => import("@/components/editor/SnippetDialog"), { ssr: false });
 const AssistantPanel = dynamic(() => import("@/components/assistant/AssistantPanel"), { ssr: false });
+const AssistantRail = dynamic(() => import("@/components/assistant/AssistantPanel").then((m) => m.AssistantRail), { ssr: false });
 
 const WELCOME_KEY = "querypad:welcome-dismissed";
 
@@ -224,7 +225,7 @@ export default function Workspace() {
             </main>
           </>
         )}
-        {assistantOpen && !isSharedPage && <AssistantPanel />}
+        {!isSharedPage && (assistantOpen ? <AssistantPanel /> : <AssistantRail />)}
       </div>
       <StatusBar />
 
