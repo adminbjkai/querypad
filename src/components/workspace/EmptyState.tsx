@@ -33,7 +33,7 @@ function SectionLabel({ children }: { children: string }) {
 
 function IconTile({ name }: { name: IconName }) {
   return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-line bg-raised text-accent">
       <Icon name={name} size={18} />
     </span>
   );
@@ -56,24 +56,27 @@ export default function EmptyState() {
   const topSnippets = snippets.slice(0, 5);
 
   return (
-    <div className="flex flex-1 justify-center overflow-y-auto bg-surface px-5 py-10 sm:py-14">
-      <div className="w-full max-w-3xl">
-        <h1 className="text-[20px] font-semibold leading-7 tracking-[-0.01em] text-ink">Start with your data</h1>
-        <p className="mt-1 text-[13px] leading-5 text-muted">
-          Load files into DuckDB right in your browser. QueryPad works out how they join, then you query in SQL or plain English.
-        </p>
+    <div className="flex flex-1 justify-center overflow-y-auto bg-surface px-5 py-8 sm:py-12">
+      <div className="w-full max-w-4xl">
+        <div className="mb-6 max-w-2xl">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">Your local data workspace</p>
+          <h1 className="text-[25px] font-semibold leading-tight tracking-[-0.025em] text-ink sm:text-[30px]">Start with your data</h1>
+          <p className="mt-2 text-[14px] leading-6 text-muted">
+            Bring your files together. QueryPad profiles each dataset, maps how they connect, and helps you explore with SQL or plain English.
+          </p>
+        </div>
 
-        <div className="mt-6">
+        <div className="qp-welcome-drop">
           <DropTarget tall title="Drop in your data files." />
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 transition-colors hover:border-line-strong">
             <div className="flex items-start gap-3">
               <IconTile name="table" />
               <div className="min-w-0">
-                <p className="text-[14px] font-medium leading-5 text-ink">Try a sample</p>
-                <p className="text-[13px] leading-5 text-muted">Two linked tables, ready to query and join.</p>
+                <p className="text-[14px] font-semibold leading-5 text-ink">Explore with sample data</p>
+                <p className="mt-0.5 text-[13px] leading-5 text-muted">See profiling, relationships, and SQL in action.</p>
               </div>
             </div>
             <button
@@ -88,12 +91,12 @@ export default function EmptyState() {
               Try sample data
             </button>
           </div>
-          <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+          <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 transition-colors hover:border-line-strong">
             <div className="flex items-start gap-3">
               <IconTile name="link" />
               <div className="min-w-0">
-                <p className="text-[14px] font-medium leading-5 text-ink">Load from URL</p>
-                <p className="text-[13px] leading-5 text-muted">A public CSV, Parquet or JSON file.</p>
+                <p className="text-[14px] font-semibold leading-5 text-ink">Connect a public file</p>
+                <p className="mt-0.5 text-[13px] leading-5 text-muted">Load a CSV, Parquet, or JSON file from a URL.</p>
               </div>
             </div>
             <UrlInput />
@@ -101,7 +104,7 @@ export default function EmptyState() {
         </div>
 
         {(recent.length > 0 || topSnippets.length > 0) && (
-          <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <div className="mt-9 grid gap-6 md:grid-cols-2">
             {recent.length > 0 && (
               <section aria-label="Recent spaces">
                 <SectionLabel>Recent spaces</SectionLabel>

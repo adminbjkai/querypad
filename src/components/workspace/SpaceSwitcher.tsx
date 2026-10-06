@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useWorkspaceStore, PLAYGROUND_NAME, type SpaceTemplate } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
@@ -51,15 +51,23 @@ export default function SpaceSwitcher() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   const current = spaces.find((s) => s.id === spaceId);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setOpen(false);
+      requestAnimationFrame(() => triggerRef.current?.focus());
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    ref.current?.querySelector<HTMLElement>("[data-space-action]")?.focus();
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
@@ -95,10 +103,13 @@ export default function SpaceSwitcher() {
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
         className="flex h-8 max-w-[200px] items-center gap-1.5 rounded-lg px-2 text-[13px] text-ink hover:bg-sunken"
         aria-label={`Space: ${current?.name ?? "none"}. Switch or save spaces`}
         aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-controls={panelId}
         title="Spaces: switch, save, or start fresh"
       >
         <SpaceAvatar name={current?.name ?? "Space"} />
@@ -107,7 +118,7 @@ export default function SpaceSwitcher() {
       </button>
 
       {open && (
-        <div className="qp-pop absolute left-0 top-full z-40 mt-1 w-[320px] rounded-xl border border-line bg-surface p-1.5 shadow-pop" role="dialog" aria-label="Spaces">
+        <div id={panelId} className="qp-pop absolute left-0 top-full z-40 mt-1 max-h-[min(75vh,36rem)] w-[320px] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-pop" role="dialog" aria-label="Spaces">
           <p className="px-2 pb-1 pt-1 text-[12px] text-muted">Your spaces — saved for every device</p>
           <ul className="max-h-[40vh] overflow-y-auto">
             {spaces.map((space) => {
@@ -130,6 +141,7 @@ export default function SpaceSwitcher() {
                   ) : (
                     <>
                       <button
+                        data-space-action
                         disabled={busy}
                         onClick={() => (active ? setOpen(false) : void run(() => switchSpace(space.id), `Opened ${space.name}.`))}
                         className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left"

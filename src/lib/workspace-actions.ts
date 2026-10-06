@@ -1,5 +1,5 @@
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { toast } from "@/stores/ui-store";
+import { toast, useUiStore } from "@/stores/ui-store";
 import { buildShareUrl } from "@/lib/sharing/encode";
 import { buildAgentContext } from "@/lib/agent/context";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
@@ -15,24 +15,28 @@ const activeTab = () => ws().tabs.find((t) => t.id === ws().activeTabId);
 
 /** Run the editor selection if there is one, otherwise the whole active tab. */
 export function runActive(): void {
+  useUiStore.getState().setWorkspacePage("workbench");
   const selection = getSelectedText()?.trim();
   void ws().runQuery(undefined, selection || undefined);
 }
 
 /** Open a new tab previewing a table and run it. */
 export function previewTable(name: string): void {
+  useUiStore.getState().setWorkspacePage("workbench");
   ws().setViewMode("sql");
   if (ws().addTab(`SELECT *\nFROM ${quoteIdent(name)}\nLIMIT 100`)) void ws().runQuery();
 }
 
 /** Insert snippet SQL at the editor cursor (or open it in a new tab if there's no editor). */
 export function insertSnippet(sql: string): void {
+  useUiStore.getState().setWorkspacePage("workbench");
   if (ws().viewMode !== "sql") ws().setViewMode("sql");
   if (!insertAtCursor(sql)) ws().addTab(sql);
 }
 
 /** Open snippet SQL in a new tab, optionally running it straight away. */
 export function openSnippet(sql: string, title: string, run = false): void {
+  useUiStore.getState().setWorkspacePage("workbench");
   ws().setViewMode("sql");
   if (!ws().addTab(sql)) return;
   ws().renameTab(ws().activeTabId, title);

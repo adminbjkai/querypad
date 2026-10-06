@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "blob-report/**",
     ".playwright-mcp/**",
+    // Vendored browser assets copied at install time (DuckDB-Wasm, Monaco).
+    "public/duckdb/**",
+    "public/monaco/**",
   ]),
 ]);
 

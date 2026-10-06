@@ -39,13 +39,13 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
   };
 
   return (
-    <div className="group/table px-1.5 pt-0.5">
-      <div className="flex h-6 items-center rounded-md transition-colors hover:bg-sunken">
+    <div className="qp-table-entry group/table px-1.5 pt-1">
+      <div className="flex h-7 items-center rounded-md transition-colors hover:bg-sunken">
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={isExpanded}
           aria-label={table.name}
-          className="flex min-w-0 flex-1 items-center h-6 gap-1.5 px-1.5 text-left"
+          className="flex h-7 min-w-0 flex-1 items-center gap-1.5 px-1.5 text-left"
         >
           <Icon name="chevronRight" size={13} className={`text-faint transition-transform ${isExpanded ? "rotate-90" : ""}`} />
           <span className="truncate font-mono text-[12px] font-medium text-ink">{table.name}</span>
@@ -53,7 +53,7 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
             {isView ? "view" : table.rowCount.toLocaleString()}
           </span>
         </button>
-        <div className="flex shrink-0 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/table:opacity-100">
+        <div className="qp-table-actions flex shrink-0 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/table:opacity-100">
           <button onClick={() => previewTable(table.name)} className="rounded p-1 text-muted hover:bg-line hover:text-ink" title="Preview rows in a new tab" aria-label={`Preview ${table.name}`}>
             <Icon name="play" size={13} />
           </button>
@@ -85,7 +85,7 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
               <li key={col.name}>
                 <button
                   onClick={() => insert(quoteIfNeeded(col.name))}
-                  className="flex h-6 w-full items-center gap-1 rounded px-1 text-left transition-colors hover:bg-sunken"
+                  className="flex h-7 w-full items-center gap-1 rounded px-1 text-left transition-colors hover:bg-sunken"
                   title={`Insert ${col.name} — ${col.type}`}
                 >
                   <KindGlyph type={col.type} />

@@ -7,7 +7,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
 COPY scripts ./scripts
 # Skip the native CLI addon (@duckdb/node-api) download; the web image never loads it.
-RUN npm ci --ignore-scripts && node scripts/copy-duckdb-wasm.mjs
+RUN npm ci --ignore-scripts && node scripts/copy-duckdb-wasm.mjs && node scripts/copy-editor-assets.mjs
 COPY . .
 RUN npm run build
 

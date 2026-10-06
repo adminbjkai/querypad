@@ -40,9 +40,24 @@ export default function TabBar() {
               key={tab.id}
               role="tab"
               aria-selected={selected}
-              tabIndex={0}
+              tabIndex={selected ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
-              onKeyDown={(e) => e.key === "Enter" && setActiveTab(tab.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setActiveTab(tab.id);
+                  return;
+                }
+                const index = tabs.findIndex((item) => item.id === tab.id);
+                const nextIndex = e.key === "ArrowRight" ? (index + 1) % tabs.length : e.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+                if (nextIndex >= 0) {
+                  e.preventDefault();
+                  const next = tabs[nextIndex];
+                  setActiveTab(next.id);
+                  requestAnimationFrame(() => document.getElementById(`query-tab-${next.id}`)?.focus());
+                }
+              }}
+              id={`query-tab-${tab.id}`}
               onDoubleClick={() => {
                 setEditingId(tab.id);
                 setEditValue(tab.title);
@@ -83,7 +98,7 @@ export default function TabBar() {
                     e.stopPropagation();
                     removeTab(tab.id);
                   }}
-                  className={`rounded p-0.5 text-faint hover:bg-sunken hover:text-ink ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}
+                  className={`rounded p-0.5 text-faint hover:bg-sunken hover:text-ink focus-visible:opacity-100 ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}
                   aria-label={`Close ${tab.title}`}
                 >
                   <Icon name="x" size={12} />

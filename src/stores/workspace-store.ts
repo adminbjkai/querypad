@@ -89,6 +89,16 @@ function columnSignature(table: TableInfo): string {
   return table.columns.map((c) => `${c.name}:${c.type}`).join("|");
 }
 
+function withoutPipelineResults(
+  pipelines: Pipeline[],
+  results: Record<string, PipelineExecutionResult>,
+  pipelineId: string,
+): Record<string, PipelineExecutionResult> {
+  const stepIds = new Set(pipelines.find((pipeline) => pipeline.id === pipelineId)?.steps.map((step) => step.id) ?? []);
+  if (stepIds.size === 0) return results;
+  return Object.fromEntries(Object.entries(results).filter(([stepId]) => !stepIds.has(stepId)));
+}
+
 /** Everything that belongs to one space (reset when switching or clearing). */
 function emptySpaceData() {
   const tab = createTab(1);
@@ -195,7 +205,8 @@ interface WorkspaceState {
   addPipelineStep: (pipelineId: string) => void;
   removePipelineStep: (pipelineId: string, stepId: string) => void;
   updatePipelineStep: (pipelineId: string, stepId: string, patch: Partial<PipelineStep>) => void;
-  setPipelineResults: (results: Record<string, PipelineExecutionResult>) => void;
+  /** Replace or invalidate results for one pipeline while preserving other pipelines' results. */
+  setPipelineResults: (pipelineId: string, results: Record<string, PipelineExecutionResult> | null) => void;
   setViewMode: (mode: "sql" | "pipeline") => void;
 
   // Plugins
@@ -657,7 +668,6 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return {
         pipelines: [...state.pipelines, pipeline],
         activePipelineId: pipeline.id,
-        pipelineResults: {},
       };
     }),
 
@@ -668,11 +678,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return {
         pipelines,
         activePipelineId: wasActive ? pipelines[0]?.id ?? null : state.activePipelineId,
-        pipelineResults: wasActive ? {} : state.pipelineResults,
+        pipelineResults: withoutPipelineResults(state.pipelines, state.pipelineResults, id),
       };
     }),
 
-  setActivePipeline: (id) => set({ activePipelineId: id, pipelineResults: {} }),
+  setActivePipeline: (id) => set({ activePipelineId: id }),
 
   addPipelineStep: (pipelineId) =>
     set((state) => ({
@@ -685,6 +695,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         };
         return { ...p, steps: [...p.steps, step] };
       }),
+      pipelineResults: withoutPipelineResults(state.pipelines, state.pipelineResults, pipelineId),
     })),
 
   removePipelineStep: (pipelineId, stepId) =>
@@ -692,6 +703,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       pipelines: state.pipelines.map((p) =>
         p.id === pipelineId ? { ...p, steps: p.steps.filter((s) => s.id !== stepId) } : p
       ),
+      pipelineResults: withoutPipelineResults(state.pipelines, state.pipelineResults, pipelineId),
     })),
 
   updatePipelineStep: (pipelineId, stepId, patch) =>
@@ -701,9 +713,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           ? { ...p, steps: p.steps.map((s) => (s.id === stepId ? { ...s, ...patch } : s)) }
           : p
       ),
+      pipelineResults: withoutPipelineResults(state.pipelines, state.pipelineResults, pipelineId),
     })),
 
-  setPipelineResults: (pipelineResults) => set({ pipelineResults }),
+  setPipelineResults: (pipelineId, results) =>
+    set((state) => {
+      const retained = withoutPipelineResults(state.pipelines, state.pipelineResults, pipelineId);
+      return { pipelineResults: results ? { ...retained, ...results } : retained };
+    }),
 
   setViewMode: (viewMode) =>
     set((state) => {

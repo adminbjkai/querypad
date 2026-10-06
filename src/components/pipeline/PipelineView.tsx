@@ -4,6 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { executePipeline } from "@/lib/pipeline/execute";
+import { toast } from "@/stores/ui-store";
 import PipelineStepCard from "./PipelineStepCard";
 import PipelineResults from "./PipelineResults";
 import { Icon } from "@/components/ui/icons";
@@ -31,12 +32,24 @@ export default function PipelineView() {
 
   const run = async () => {
     if (!pipeline) return;
+    const snapshot = pipeline;
+    const spaceId = useWorkspaceStore.getState().spaceId;
     setRunning(true);
+    setResults(snapshot.id, null);
     try {
-      const out = await executePipeline(pipeline.steps);
-      setResults(Object.fromEntries(out.map((r) => [r.stepId, r])));
+      const out = await executePipeline(snapshot.steps);
+      const current = useWorkspaceStore.getState();
+      const unchanged = current.spaceId === spaceId && current.pipelines.find((p) => p.id === snapshot.id) === snapshot;
+      if (!unchanged) return;
+      setResults(snapshot.id, Object.fromEntries(out.map((r) => [r.stepId, r])));
       const failed = out.find((r) => r.error);
-      setSelectedStepId((failed ?? out[out.length - 1])?.stepId ?? null);
+      if (current.activePipelineId === snapshot.id) {
+        setSelectedStepId((failed ?? out[out.length - 1])?.stepId ?? null);
+      }
+    } catch (error) {
+      if (useWorkspaceStore.getState().spaceId === spaceId) {
+        toast(`Pipeline could not run: ${error instanceof Error ? error.message : String(error)}`, "error");
+      }
     } finally {
       setRunning(false);
     }

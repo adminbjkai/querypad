@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { readPreference, writePreference } from "@/lib/preferences";
 
 export type Theme = "light" | "dark";
 export type SidebarPanel = "tables" | "joins" | "history" | "snippets";
@@ -11,6 +12,9 @@ export interface Toast {
 }
 
 interface UiState {
+  /** Navigation is a UI preference, never part of another device's saved space. */
+  workspacePage: "workbench" | "overview";
+  setWorkspacePage: (page: "workbench" | "overview") => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
@@ -64,7 +68,7 @@ const ASSISTANT_WIDTH_KEY = "querypad:assistant-width";
 
 function initialAssistantWidth(): number {
   if (typeof window === "undefined") return 400;
-  const saved = Number(localStorage.getItem(ASSISTANT_WIDTH_KEY));
+  const saved = Number(readPreference(ASSISTANT_WIDTH_KEY));
   return saved >= 300 && saved <= 760 ? saved : 400;
 }
 
@@ -75,17 +79,19 @@ function initialTheme(): Theme {
 
 function initialSplit(): number {
   if (typeof window === "undefined") return 0.45;
-  const saved = Number(localStorage.getItem(SPLIT_KEY));
+  const saved = Number(readPreference(SPLIT_KEY));
   return saved >= 0.15 && saved <= 0.85 ? saved : 0.45;
 }
 
 let toastSeq = 0;
 
 export const useUiStore = create<UiState>((set, get) => ({
+  workspacePage: "workbench",
+  setWorkspacePage: (workspacePage) => set({ workspacePage }),
   theme: initialTheme(),
   setTheme: (theme) => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem(THEME_KEY, theme);
+    writePreference(THEME_KEY, theme);
     set({ theme });
   },
   toggleTheme: () => get().setTheme(get().theme === "dark" ? "light" : "dark"),
@@ -94,7 +100,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarOpen: typeof window === "undefined" || window.innerWidth >= 768,
   sidebarPanel: "tables",
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
-  showPanel: (sidebarPanel) => set({ sidebarPanel, sidebarOpen: true }),
+  showPanel: (sidebarPanel) => set({ sidebarPanel, sidebarOpen: true, workspacePage: "workbench" }),
 
   profileTable: null,
   setProfileTable: (profileTable) => set({ profileTable }),
@@ -107,29 +113,29 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   aiOpen: false,
   aiSeed: null,
-  openAi: (seed) => set({ aiOpen: true, aiSeed: seed ?? null }),
+  openAi: (seed) => set({ aiOpen: true, aiSeed: seed ?? null, workspacePage: "workbench" }),
   closeAi: () => set({ aiOpen: false, aiSeed: null }),
 
   dialog: null,
   setDialog: (dialog) => set({ dialog }),
 
-  assistantOpen: typeof window !== "undefined" && localStorage.getItem(ASSISTANT_KEY) === "1" && window.innerWidth >= 1024,
+  assistantOpen: typeof window !== "undefined" && readPreference(ASSISTANT_KEY) === "1" && window.innerWidth >= 1024,
   setAssistantOpen: (assistantOpen) => {
-    localStorage.setItem(ASSISTANT_KEY, assistantOpen ? "1" : "0");
+    writePreference(ASSISTANT_KEY, assistantOpen ? "1" : "0");
     set({ assistantOpen });
   },
   cursor: null,
   setCursor: (cursor) => set({ cursor }),
   assistantWidth: initialAssistantWidth(),
   setAssistantWidth: (assistantWidth) => {
-    localStorage.setItem(ASSISTANT_WIDTH_KEY, String(Math.round(assistantWidth)));
+    writePreference(ASSISTANT_WIDTH_KEY, String(Math.round(assistantWidth)));
     set({ assistantWidth });
   },
 
   editorFraction: initialSplit(),
   setEditorFraction: (fraction) => {
     const clamped = Math.min(0.85, Math.max(0.15, fraction));
-    localStorage.setItem(SPLIT_KEY, clamped.toFixed(3));
+    writePreference(SPLIT_KEY, clamped.toFixed(3));
     set({ editorFraction: clamped });
   },
 

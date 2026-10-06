@@ -3,9 +3,9 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
+import { modelLabel, useAiStore } from "@/stores/ai-store";
+import { isServerBacked } from "@/lib/persistence";
 import { Icon } from "@/components/ui/icons";
-
-const AI_LABEL_KEY = "querypad:ai-model-label";
 
 function subscribeOnline(callback: () => void) {
   window.addEventListener("online", callback);
@@ -16,25 +16,22 @@ function subscribeOnline(callback: () => void) {
   };
 }
 
-/** The AI model label is written by the assistant; poll gently since same-tab writes fire no event. */
-function subscribeAiLabel(callback: () => void) {
-  window.addEventListener("storage", callback);
-  const timer = window.setInterval(callback, 2000);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.clearInterval(timer);
-  };
-}
-
-const readAiLabel = () => localStorage.getItem(AI_LABEL_KEY);
-
 /** A 24px status strip: engine, space and sync state on the left, last result and AI model on the right. */
 export default function StatusBar() {
   const dbReady = useWorkspaceStore((s) => s.dbReady);
   const spaceName = useWorkspaceStore((s) => s.spaces.find((sp) => sp.id === s.spaceId)?.name ?? null);
   const tab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
-  const aiLabel = useSyncExternalStore(subscribeAiLabel, readAiLabel, () => null);
+  const aiLabel = useAiStore((s) => s.loaded ? modelLabel(s.provider, s.efforts[s.provider]) : null);
+  const persistEnabled = useWorkspaceStore((s) => s.persistEnabled);
+  const workspacePage = useUiStore((s) => s.workspacePage);
+  const [storage, setStorage] = useState<"server" | "browser" | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void isServerBacked().then((server) => { if (active) setStorage(server ? "server" : "browser"); });
+    return () => { active = false; };
+  }, []);
   const cursor = useUiStore((s) => s.cursor);
   const viewMode = useWorkspaceStore((s) => s.viewMode);
   const [version, setVersion] = useState<string | null>(null);
@@ -66,25 +63,25 @@ export default function StatusBar() {
   }
 
   return (
-    <footer className="flex h-6 shrink-0 items-center gap-4 border-t border-line bg-chrome px-3 text-[11px] text-muted" aria-label="Status bar">
-      <span className="flex items-center gap-1.5" title={dbReady ? "DuckDB-Wasm is running in your browser" : "DuckDB is starting"}>
+    <footer className="flex h-6 shrink-0 items-center gap-2 overflow-hidden sm:gap-4 border-t border-line bg-chrome px-3 text-[11px] text-muted" aria-label="Status bar">
+      <span className="flex shrink-0 items-center gap-1.5" title={dbReady ? "DuckDB-Wasm is running in your browser" : "DuckDB is starting"}>
         <span className={`size-1.5 rounded-full ${dbReady ? "bg-ok" : "bg-warn"}`} aria-hidden="true" />
         DuckDB{version ? ` ${version}` : ""} {dbReady ? "ready" : "starting"}
       </span>
       {spaceName && (
-        <span className="flex min-w-0 items-center gap-1.5" title="Current space">
+        <span className="hidden min-w-0 items-center gap-1.5 sm:flex" title="Current space">
           <Icon name="folder" size={12} className="text-faint" />
           <span className="max-w-[180px] truncate">{spaceName}</span>
         </span>
       )}
-      <span className="flex items-center gap-1.5">
-        <Icon name={online ? "check" : "alert"} size={12} className={online ? "text-faint" : "text-warn"} />
-        {online ? "Synced to server" : "Offline"}
+      <span className="flex shrink-0 items-center gap-1.5" title="Storage location and network connectivity; this is not a save confirmation">
+        <Icon name={online ? "folder" : "alert"} size={12} className={online ? "text-faint" : "text-warn"} />
+        {!persistEnabled ? "Shared session" : !online ? "Offline" : storage === "server" ? "Server storage" : storage === "browser" ? "Browser storage" : "Checking storage…"}
       </span>
 
       <span className="ml-auto" />
-      {viewMode === "sql" && cursor && (
-        <span className="shrink-0 tabular-nums" title="Cursor position">
+      {workspacePage === "workbench" && viewMode === "sql" && cursor && (
+        <span className="hidden shrink-0 tabular-nums lg:inline" title="Cursor position">
           Ln {cursor.line}, Col {cursor.column}
           {cursor.selected > 0 && ` (${cursor.selected.toLocaleString()} selected)`}
         </span>
@@ -95,7 +92,7 @@ export default function StatusBar() {
         </span>
       )}
       {aiLabel && (
-        <span className="flex shrink-0 items-center gap-1.5" title="AI model">
+        <span className="hidden max-w-64 shrink-0 items-center gap-1.5 truncate xl:flex" title="AI model">
           <Icon name="sparkle" size={12} className="text-faint" />
           {aiLabel}
         </span>

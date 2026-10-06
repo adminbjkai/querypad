@@ -10,8 +10,6 @@ import {
 import { fetchServerProviders, getApiKey, getStoredAiProvider, setAiProvider } from "@/lib/ai/api-key";
 
 const EFFORT_KEY = "querypad:ai:efforts";
-/** Read by the status bar to show the active model. */
-const LABEL_KEY = "querypad:ai-model-label";
 
 /** Preferred defaults when the user hasn't chosen: signed-in CLIs first, Claude first. */
 const PREFERENCE: AiProvider[] = [
@@ -53,11 +51,6 @@ export function modelLabel(provider: AiProvider, effort?: AiEffort): string {
   return config.efforts?.length ? `${base} · ${effort ?? config.efforts[0]}` : base;
 }
 
-function publishLabel(state: Pick<AiState, "provider" | "efforts">) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(LABEL_KEY, modelLabel(state.provider, state.efforts[state.provider]));
-}
-
 export const useAiStore = create<AiState>((set, get) => ({
   provider: DEFAULT_AI_PROVIDER,
   efforts: readEfforts(),
@@ -73,20 +66,17 @@ export const useAiStore = create<AiState>((set, get) => ({
     const provider =
       stored && usable(stored) ? stored : (PREFERENCE.find((id) => available.includes(id)) ?? stored ?? DEFAULT_AI_PROVIDER);
     set({ serverProviders: available, provider, loaded: true });
-    publishLabel(get());
   },
 
   setProvider: (provider) => {
     setAiProvider(provider);
     set({ provider });
-    publishLabel(get());
   },
 
   setEffort: (provider, effort) => {
     const efforts = { ...get().efforts, [provider]: effort };
     localStorage.setItem(EFFORT_KEY, JSON.stringify(efforts));
     set({ efforts });
-    publishLabel(get());
   },
 }));
 

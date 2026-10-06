@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
 import { runActive, previewTable, shareWorkspace, copyAgentContext, insertSnippet, openSnippet } from "@/lib/workspace-actions";
 import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { MOD } from "@/components/ui/primitives";
+import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { insertAtCursor } from "@/lib/editor-bridge";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
 
@@ -43,23 +44,26 @@ export default function CommandPalette() {
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
 
-  useEffect(() => inputRef.current?.focus(), []);
+  useFocusTrap(dialogRef, true, inputRef);
 
   const commands = useMemo<Command[]>(() => {
     const ws = useWorkspaceStore.getState;
     const ui = useUiStore.getState;
     const actions: Command[] = [
       { id: "run", group: "Actions", label: "Run query", detail: "execute selection", icon: "play", hint: `${MOD} ↵`, run: runActive },
+      { id: "overview", group: "Actions", label: "Workspace overview", detail: "datasets map relationships profile", icon: "chartScorecard", run: () => ui().setWorkspacePage("overview") },
       { id: "ai", group: "Actions", label: "Ask AI to write SQL", icon: "sparkle", hint: `${MOD} K`, run: () => ui().openAi() },
-      { id: "assistant", group: "Actions", label: "Open the Assistant chat", detail: "ask questions explain help", icon: "sparkle", hint: `${MOD} I`, run: () => ui().setAssistantOpen(true) },
-      { id: "new-tab", group: "Actions", label: "New query tab", icon: "plus", run: () => ws().addTab() },
+      { id: "assistant", group: "Actions", label: "Open the Assistant chat", detail: "ask questions explain help", icon: "sparkle", hint: `${MOD} I`, run: () => { ui().setWorkspacePage("workbench"); ui().setAssistantOpen(true); } },
+      { id: "new-tab", group: "Actions", label: "New query tab", icon: "plus", run: () => { ui().setWorkspacePage("workbench"); ws().addTab(); } },
       { id: "add", group: "Actions", label: "Add data files", detail: "import upload url", icon: "upload", run: () => ui().setDialog("addFiles") },
       { id: "joins", group: "Actions", label: "Show relationships", detail: "joins keys discover", icon: "join", run: () => ui().showPanel("joins") },
       { id: "history", group: "Actions", label: "Show query history", icon: "history", run: () => ui().showPanel("history") },
       { id: "snippet:save", group: "Actions", label: "Save query as snippet", detail: "bookmark library selection", icon: "bookmark", hint: `${MOD} ⇧ S`, run: () => void saveCurrentAsSnippet() },
       { id: "snippets", group: "Actions", label: "Show snippet library", detail: "saved sql", icon: "bookmark", run: () => ui().showPanel("snippets") },
-      { id: "mode", group: "Actions", label: ws().viewMode === "sql" ? "Switch to pipeline mode" : "Switch to SQL mode", icon: "flow", run: () => ws().setViewMode(ws().viewMode === "sql" ? "pipeline" : "sql") },
+      { id: "mode", group: "Actions", label: ws().viewMode === "sql" ? "Switch to pipeline mode" : "Switch to SQL mode", icon: "flow", run: () => { ui().setWorkspacePage("workbench"); ws().setViewMode(ws().viewMode === "sql" ? "pipeline" : "sql"); } },
       { id: "share", group: "Actions", label: "Copy share link", detail: "url", icon: "link", run: () => void shareWorkspace() },
       { id: "context", group: "Actions", label: "Copy context for an agent", detail: "claude codex", icon: "copy", run: () => void copyAgentContext() },
       { id: "theme", group: "Actions", label: ui().theme === "dark" ? "Use light theme" : "Use dark theme", detail: "appearance", icon: ui().theme === "dark" ? "sun" : "moon", run: () => ui().toggleTheme() },
@@ -123,7 +127,7 @@ export default function CommandPalette() {
         label: `Profile ${t.name}`,
         detail: "stats nulls distinct",
         icon: "profile" as const,
-        run: () => ui().setProfileTable(t.name),
+        run: () => { ui().showPanel("tables"); ui().setProfileTable(t.name); },
       },
     ]);
     // Columns: found by name (or type), insert the qualified name at the cursor.
@@ -136,6 +140,7 @@ export default function CommandPalette() {
         icon: "insert" as const,
         hint: c.type.toLowerCase(),
         run: () => {
+          ui().setWorkspacePage("workbench");
           ws().setViewMode("sql");
           if (!insertAtCursor(quoteIdent(c.name))) ws().addTab(`SELECT ${quoteIdent(c.name)}\nFROM ${quoteIdent(t.name)}\nLIMIT 100`);
         },
@@ -148,6 +153,7 @@ export default function CommandPalette() {
       detail: t.query.slice(0, 80),
       icon: "file",
       run: () => {
+        ui().setWorkspacePage("workbench");
         ws().setViewMode("sql");
         ws().setActiveTab(t.id);
       },
@@ -158,7 +164,7 @@ export default function CommandPalette() {
       label: h.sql.replace(/\s+/g, " ").slice(0, 90),
       detail: h.error ? "failed" : `${h.rowCount?.toLocaleString()} rows`,
       icon: "history",
-      run: () => ws().addTab(h.sql),
+      run: () => { ui().setWorkspacePage("workbench"); ws().addTab(h.sql); },
     }));
     return [...actions, ...spaceCommands, ...snippetCommands, ...tableCommands, ...columnCommands, ...viewCommands, ...tabCommands, ...historyCommands];
   }, [tables, views, tabs, history, spaces, spaceId, snippets]);
@@ -184,11 +190,12 @@ export default function CommandPalette() {
   let lastGroup = "";
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-scrim p-4 pt-[14vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-3 pt-[8vh] sm:p-6 sm:pt-[10vh]"
       onMouseDown={(e) => e.target === e.currentTarget && close()}
     >
-      <div role="dialog" aria-label="Command palette" className="qp-pop w-full max-w-xl overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
-        <div className="flex items-center gap-2 border-b border-line px-3">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${listId}-title`} tabIndex={-1} className="qp-pop flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-dialog sm:max-h-[calc(100dvh-3rem)]">
+        <h2 id={`${listId}-title`} className="sr-only">Command palette</h2>
+        <div className="flex shrink-0 items-center gap-2 border-b border-line px-3">
           <Icon name="search" className="text-faint" />
           <input
             ref={inputRef}
@@ -200,7 +207,7 @@ export default function CommandPalette() {
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setIndex((i) => Math.min(i + 1, visible.length - 1));
+                setIndex((i) => Math.min(i + 1, Math.max(visible.length - 1, 0)));
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
                 setIndex((i) => Math.max(i - 1, 0));
@@ -216,25 +223,33 @@ export default function CommandPalette() {
             aria-label="Search commands"
             role="combobox"
             aria-expanded="true"
-            aria-controls="qp-palette-list"
+            aria-controls={listId}
+            aria-activedescendant={visible.length ? `${listId}-option-${selected}` : undefined}
           />
         </div>
-        <div ref={listRef} id="qp-palette-list" role="listbox" className="max-h-[52vh] overflow-y-auto p-1.5">
-          {visible.length === 0 && <p className="px-3 py-6 text-center text-[13px] text-muted">Nothing matches “{query}”.</p>}
+        <div ref={listRef} id={listId} role="listbox" aria-label="Commands" className="min-h-0 overflow-y-auto p-1.5">
+          {visible.length === 0 && (
+            <div className="px-3 py-9 text-center">
+              <p className="text-[13px] font-medium text-ink">No matches found</p>
+              <p className="mt-1 text-[12px] text-muted">Try a table, column, snippet, or action name.</p>
+            </div>
+          )}
           {visible.map((command, i) => {
             const header = command.group !== lastGroup;
             lastGroup = command.group;
             return (
               <div key={command.id}>
                 {header && <p className="px-2.5 pb-1 pt-2 text-[11px] font-medium text-faint">{command.group}</p>}
-                <button
+                <div
+                  id={`${listId}-option-${i}`}
                   data-index={i}
                   role="option"
                   aria-selected={i === selected}
+                  tabIndex={-1}
                   onMouseMove={() => setIndex(i)}
                   onClick={() => choose(command)}
-                  className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] ${
-                    i === selected ? "bg-accent-soft text-ink" : "text-ink"
+                  className={`flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] ${
+                    i === selected ? "bg-accent-soft text-ink" : "text-ink hover:bg-raised"
                   }`}
                 >
                   <Icon name={command.icon} className={i === selected ? "text-accent" : "text-muted"} />
@@ -242,7 +257,7 @@ export default function CommandPalette() {
                     {command.label}
                   </span>
                   {command.hint && <span className="text-[11px] text-faint">{command.hint}</span>}
-                </button>
+                </div>
               </div>
             );
           })}

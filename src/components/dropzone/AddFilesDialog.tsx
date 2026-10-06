@@ -14,7 +14,7 @@ export default function AddFilesDialog({ onClose }: { onClose: () => void }) {
           <UrlInput onAdded={onClose} />
         </div>
         <p className="text-[12px] leading-5 text-faint">
-          Files never leave your browser. Tables are named after the file; loading a file with the same name replaces that table.
+          Queries run in your browser. Saved spaces use this server’s storage when available. Loading a file with the same name replaces that table.
         </p>
       </div>
     </Dialog>

@@ -11,7 +11,9 @@ const SHORTCUTS: [string, string[]][] = [
   ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
   ["Toggle sidebar", [MOD, "B"]],
   ["Rename a tab", ["Double-click"]],
-  ["Copy a cell", ["Click cell"]],
+  ["Copy selected cells", [MOD, "C"]],
+  ["Resize focused editor divider", ["↑", "↓"]],
+  ["Resize focused column handle", ["←", "→"]],
   ["Sort a column", ["Click header"]],
   ["This list", ["?"]],
 ];

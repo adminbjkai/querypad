@@ -178,8 +178,10 @@ export default function AssistantPanel() {
   const width = useUiStore((s) => s.assistantWidth);
   const activeTab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
   const [text, setText] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const [hasNewContent, setHasNewContent] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const followLatestRef = useRef(true);
   const busy = status !== "idle";
 
   useEffect(() => {
@@ -190,12 +192,36 @@ export default function AssistantPanel() {
     inputRef.current?.focus();
   }, []);
 
+  // Follow the conversation while the reader is at the bottom; if they scrolled up, leave them
+  // there and offer a jump to the latest reply once something new arrives (streamed or whole).
+  const seenRef = useRef({ count: messages.length, draft });
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
+    const container = scrollRef.current;
+    if (!container) return;
+    const grew = messages.length > seenRef.current.count || (draft !== "" && draft !== seenRef.current.draft);
+    seenRef.current = { count: messages.length, draft };
+    if (followLatestRef.current) {
+      container.scrollTop = container.scrollHeight;
+    } else if (grew) {
+      const frame = window.requestAnimationFrame(() => {
+        if (!followLatestRef.current) setHasNewContent(true);
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
   }, [messages.length, draft, status]);
+
+  const handleScroll = () => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 48;
+    followLatestRef.current = nearBottom;
+    if (nearBottom) setHasNewContent(false);
+  };
 
   const send = (value = text) => {
     if (!value.trim() || busy) return;
+    followLatestRef.current = true;
+    setHasNewContent(false);
     setText("");
     void useAssistantStore.getState().send(value);
   };
@@ -205,7 +231,7 @@ export default function AssistantPanel() {
   return (
     <aside
       style={{ width }}
-      className="relative flex h-full shrink-0 flex-col border-l border-line bg-surface max-md:fixed max-md:top-11 max-md:bottom-6 max-md:right-0 max-md:z-30 max-md:!w-full"
+      className="relative flex h-full shrink-0 flex-col border-l border-line bg-surface max-md:fixed max-md:top-20 max-md:bottom-6 max-md:right-0 max-md:z-30 max-md:h-auto max-md:!w-full"
       aria-label="Assistant"
     >
       <ResizeHandle />
@@ -228,7 +254,8 @@ export default function AssistantPanel() {
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-live="polite">
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-y-auto px-3 py-3" aria-live="polite">
         {visible.length === 0 && !busy && (
           <div className="px-1 pt-6">
             <p className="text-[14px] font-semibold text-ink">Ask about your data</p>
@@ -278,7 +305,21 @@ export default function AssistantPanel() {
           )}
         </ol>
         {error && <p className="mt-3 rounded-md bg-danger-soft px-2.5 py-1.5 text-[12px] text-danger">{error}</p>}
-        <div ref={endRef} />
+        </div>
+        {hasNewContent && (
+          <button
+            onClick={() => {
+              followLatestRef.current = true;
+              if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+              setHasNewContent(false);
+            }}
+            className={`${btn.secondary} absolute bottom-3 left-1/2 z-10 -translate-x-1/2 shadow-pop`}
+            aria-label="Scroll to latest response"
+          >
+            <Icon name="chevronDown" size={13} />
+            New response
+          </button>
+        )}
       </div>
 
       <div className="shrink-0 border-t border-line p-2.5">

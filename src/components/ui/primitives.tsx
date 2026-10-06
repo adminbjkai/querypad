@@ -1,24 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { classifyType } from "@/lib/duckdb/sql-utils";
+import { isTopFocusScope, useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import type { ProfileColumnKind } from "@/types";
 import { Icon, type IconName } from "./icons";
 
 /** Shared button looks. Hierarchy: one primary action per area, quiet everything else. */
 export const btn = {
   primary:
-    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md bg-accent text-on-accent text-[13px] font-medium hover:bg-accent-hover disabled:opacity-45 disabled:pointer-events-none transition-colors",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md bg-accent text-on-accent text-[13px] font-medium shadow-sm hover:bg-accent-hover active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[background-color,transform,box-shadow]",
   secondary:
-    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md border border-line bg-surface text-ink text-[13px] hover:border-line-strong hover:bg-raised disabled:opacity-45 disabled:pointer-events-none transition-colors",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md border border-line bg-surface text-ink text-[13px] shadow-sm hover:border-line-strong hover:bg-raised active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[background-color,border-color,transform]",
   ghost:
-    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-7 px-2 rounded-md text-muted text-[13px] hover:text-ink hover:bg-sunken disabled:opacity-40 disabled:pointer-events-none transition-colors",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-7 px-2 rounded-md text-muted text-[13px] hover:text-ink hover:bg-sunken disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-colors",
   icon:
-    "inline-flex items-center justify-center size-7 rounded-md text-muted hover:text-ink hover:bg-sunken disabled:opacity-40 disabled:pointer-events-none transition-colors",
+    "inline-flex items-center justify-center size-7 rounded-md text-muted hover:text-ink hover:bg-sunken disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-colors",
 };
 
 export const input =
-  "h-8 w-full rounded-md border border-line bg-surface px-2.5 text-[13px] text-ink placeholder:text-faint outline-none focus:border-accent focus:ring-2 focus:ring-accent-soft transition-colors";
+  "h-8 w-full rounded-md border border-line bg-surface px-2.5 text-[13px] text-ink shadow-sm placeholder:text-faint outline-none hover:border-line-strong focus:border-accent focus:ring-2 focus:ring-accent-soft transition-[border-color,box-shadow]";
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
@@ -77,33 +78,39 @@ export function Dialog({
   width?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useFocusTrap(ref);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isTopFocusScope(ref.current)) {
+        e.stopPropagation();
+        onClose();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    const focusable = ref.current?.querySelector<HTMLElement>("input, button:not([data-close]), select, textarea");
-    focusable?.focus();
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-scrim p-4 pt-[12vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-3 pt-[8vh] sm:p-6 sm:pt-[10vh]"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
-        className={`qp-pop w-full ${width} rounded-xl border border-line bg-surface shadow-dialog`}
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className={`qp-pop flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden ${width} rounded-xl border border-line bg-surface shadow-dialog sm:max-h-[calc(100dvh-3rem)]`}
       >
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
+          <h2 id={titleId} className="text-sm font-semibold text-ink">{title}</h2>
           <button data-close onClick={onClose} className={btn.icon} aria-label="Close">
             <Icon name="x" />
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="min-h-0 overflow-y-auto p-4">{children}</div>
       </div>
     </div>
   );
@@ -132,20 +139,46 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const close = useCallback((restoreFocus = false) => {
+    setOpen(false);
+    if (restoreFocus) requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>("button, [role='button']")?.focus());
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    menuRef.current?.querySelector<HTMLElement>("[role='menuitem']:not(:disabled)")?.focus();
     const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (!ref.current?.contains(e.target as Node)) close();
     };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close(true);
+      }
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, close]);
+
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const menuItems = Array.from(menuRef.current?.querySelectorAll<HTMLElement>("[role='menuitem']:not(:disabled)") ?? []);
+    if (!menuItems.length) return;
+    const current = menuItems.indexOf(document.activeElement as HTMLElement);
+    let next = current;
+    if (event.key === "ArrowDown") next = current < 0 ? 0 : (current + 1) % menuItems.length;
+    else if (event.key === "ArrowUp") next = current < 0 ? menuItems.length - 1 : (current - 1 + menuItems.length) % menuItems.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = menuItems.length - 1;
+    else return;
+    event.preventDefault();
+    menuItems[next].focus();
+  };
 
   return (
     <div className="relative" ref={ref}>
@@ -154,6 +187,8 @@ export function Menu({
         <div
           role="menu"
           aria-label={label}
+          ref={menuRef}
+          onKeyDown={handleMenuKeyDown}
           className={`qp-pop absolute top-full z-40 mt-1 min-w-[200px] rounded-lg border border-line bg-surface p-1 shadow-pop ${
             align === "right" ? "right-0" : "left-0"
           }`}
@@ -167,6 +202,7 @@ export function Menu({
                 role="menuitem"
                 disabled={item.disabled}
                 onClick={() => {
+                  ref.current?.querySelector<HTMLElement>("button, [role='button']")?.focus();
                   setOpen(false);
                   item.onSelect();
                 }}

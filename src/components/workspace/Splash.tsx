@@ -4,7 +4,7 @@ import { BrandMark } from "./BrandMark";
 function LayoutSkeleton() {
   return (
     <div aria-hidden="true" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-11 shrink-0 items-center gap-3 border-b border-line bg-chrome px-3">
+      <div className="qp-masthead flex h-11 shrink-0 items-center gap-3 border-b px-3">
         <BrandMark size={20} />
         <div className="qp-skeleton h-4 w-28" />
         <div className="ml-auto flex gap-2">

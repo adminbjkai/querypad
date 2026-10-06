@@ -35,6 +35,7 @@ yarn-error.log*
 
 # generated wasm files
 /public/duckdb/
+/public/monaco/
 
 # querypad CLI inspection artifacts
 .querypad/

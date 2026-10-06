@@ -132,6 +132,13 @@ export default function PipelineDag({
         proOptions={{ hideAttribution: true }}
         nodesDraggable={false}
         nodesConnectable={false}
+        // A read-only graph: React Flow's window-level key bindings (Space to pan, Backspace to
+        // delete…) would otherwise swallow those keys while typing in the step editors.
+        panActivationKeyCode={null}
+        deleteKeyCode={null}
+        selectionKeyCode={null}
+        multiSelectionKeyCode={null}
+        zoomActivationKeyCode={null}
         style={{ background: "transparent" }}
       >
         <Controls showInteractive={false} />

@@ -92,13 +92,14 @@ export default function ResultsPanel() {
 
   if (error && !isExecuting) {
     return (
-      <div className="h-full overflow-auto bg-surface p-4">
-        <div className="max-w-3xl rounded-lg border border-danger/40 bg-danger-soft/50 p-3">
+      <div className="h-full overflow-auto bg-surface p-4" role="alert">
+        <div className="max-w-3xl rounded-lg border border-danger/40 bg-danger-soft/50 p-4">
           <p className="flex items-center gap-2 text-[13px] font-semibold text-danger">
             <Icon name="alert" size={15} />
             The query failed
           </p>
-          <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-ink">{error.message}</pre>
+          <p className="mt-1 text-[12px] text-muted">DuckDB could not run this statement. Review the error, then edit and run it again.</p>
+          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-danger/20 bg-surface/70 p-3 font-mono text-[12px] leading-5 text-ink">{error.message}</pre>
           <button onClick={() => openAi("Fix the current query so it runs.")} className={`${btn.secondary} mt-3`}>
             <Icon name="wand" size={14} />
             Fix with AI
@@ -118,13 +119,18 @@ export default function ResultsPanel() {
             Running…
           </p>
         ) : (
-          <div className="text-[13px] leading-6 text-muted">
-            <span className="mx-auto mb-2 flex size-9 items-center justify-center rounded-lg bg-raised text-faint">
+          <div className="max-w-md text-[13px] leading-6 text-muted">
+            <span className="mx-auto mb-3 flex size-11 items-center justify-center rounded-xl border border-line bg-raised text-muted shadow-sm">
               <Icon name="table" size={18} />
             </span>
-            <p className="font-medium text-ink">No results yet</p>
-            <p>
-              Run with <Kbd>{MOD}</Kbd> <Kbd>Enter</Kbd>, ask AI with <Kbd>{MOD}</Kbd> <Kbd>K</Kbd>, or press <Kbd>?</Kbd> for shortcuts.
+            <p className="font-semibold text-ink">Your query results will appear here</p>
+            <p className="mt-1">Explore your data with SQL, then sort, filter, inspect and export the result.</p>
+            <p className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+              Run with <Kbd>{MOD}</Kbd> <Kbd>Enter</Kbd>
+              <span aria-hidden="true" className="mx-1 text-faint">·</span>
+              Ask AI with <Kbd>{MOD}</Kbd> <Kbd>K</Kbd>
+              <span aria-hidden="true" className="mx-1 text-faint">·</span>
+              Press <Kbd>?</Kbd> for shortcuts
             </p>
           </div>
         )}
@@ -158,14 +164,14 @@ export default function ResultsPanel() {
   return (
     <div className="relative flex h-full flex-col bg-surface">
       {scanLine}
-      <div className="flex h-9 shrink-0 items-center gap-3 overflow-hidden border-b border-line bg-chrome px-2">
-        <div className="flex h-full items-center" role="tablist" aria-label="Result view">
+      <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line bg-chrome px-2 py-1">
+        <div className="flex h-8 max-w-full min-w-0 shrink-0 items-center overflow-x-auto" role="tablist" aria-label="Result view">
           {viewButton("table", "Table")}
           {viewButton("chart", "Chart", !chartConfig)}
           {viewButton("details", "Details")}
           {pluginViews.map((v) => viewButton(v.key, v.label))}
         </div>
-        <p className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[12px] tabular-nums text-muted">
+        <p className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap text-[12px] tabular-nums text-muted">
           <span>
             <span className="font-medium text-ink">{result.rowCount.toLocaleString()}</span> {result.rowCount === 1 ? "row" : "rows"}
           </span>
@@ -174,7 +180,7 @@ export default function ResultsPanel() {
             <span className="font-medium text-ink">{result.columns.length}</span> {result.columns.length === 1 ? "column" : "columns"}
           </span>
           <span aria-hidden="true" className="text-faint">·</span>
-          <span>{result.executionTimeMs.toLocaleString()} ms</span>
+          <span className="hidden md:inline">{result.executionTimeMs.toLocaleString()} ms</span>
           {truncated && (
             <span
               className="rounded bg-warn-soft px-1.5 py-0.5 text-[11px] font-medium text-warn"
@@ -184,7 +190,7 @@ export default function ResultsPanel() {
             </span>
           )}
         </p>
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           {current.view === "table" && (
             <label className="relative">
               <Icon name="filter" size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
@@ -192,7 +198,7 @@ export default function ResultsPanel() {
                 value={current.filter}
                 onChange={(e) => patch({ filter: e.target.value })}
                 placeholder="Filter rows"
-                className="h-7 w-36 rounded-md border border-line bg-raised pl-7 pr-2 text-[12px] text-ink outline-none placeholder:text-faint focus:w-52 focus:border-accent transition-[width]"
+                className="h-7 w-28 rounded-md border border-line bg-raised pl-7 pr-2 text-[12px] text-ink outline-none placeholder:text-faint transition-[width] focus:w-44 focus:border-accent sm:w-36"
                 aria-label="Filter rows"
               />
             </label>

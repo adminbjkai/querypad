@@ -197,9 +197,12 @@ falls back to keeping everything in the browser.
 - **Charts and column stats like Snowsight** — a chart builder (bar, line, area, scatter,
   pie, scorecard; date buckets, aggregations, group-by, stacking, PNG download) and a stats
   pane listing every column with its distribution
+- **Workspace overview** — a live catalog with search and sorting, row and profile counts,
+  relationship review status, semantic entities, and recent queries. Preview a dataset,
+  inspect its columns, start a query, or copy agent context from one place
 - **Explorer, history and status bar** — a searchable explorer for tables, views and columns
   on a slim activity rail; history search with a succeeded/failed filter; a status bar with
-  the engine, space, sync state, last result and the active AI model; Format SQL
+  the engine, space, storage location, last result and the active AI model; Format SQL
   (Shift+Alt+F)
 - **Search everything** — Ctrl/⌘+P finds tables, columns, snippets, history, tabs and spaces,
   and runs any command
@@ -211,21 +214,21 @@ falls back to keeping everything in the browser.
   never touches your spaces ("Save as a new space" keeps a copy)
 - **Agent context** — copy schema, profiles, the current SQL and its results for Claude Code,
   Codex or any agent
-- **A considered design system** ([`docs/DESIGN.md`](docs/DESIGN.md)) in the spirit of
-  Snowsight and Linear: tinted chrome, hairlines, Inter + JetBrains Mono, matching light and
-  dark themes, skeleton loading, a home screen for empty spaces
+- **A considered design system** ([`docs/DESIGN.md`](docs/DESIGN.md)) with a navy masthead,
+  semantic surface colors, Inter + JetBrains Mono, matching light and dark themes,
+  skeleton loading, and a home screen for empty spaces
 - **Light and dark themes**, keyboard-first (press `?` for shortcuts), works on phones
 
 <details>
 <summary><strong>More web app details</strong></summary>
 
-- **Persistence** — each space's tables, views, tabs, AI conversations, history, pipelines and
+- **Persistence** — each space's tables, views, tabs, SQL-generation conversations, history, pipelines and
   join verdicts are saved through `/api/store` to the server's data directory
   (`QUERYPAD_DATA_DIR`, a Docker volume in the compose setup; `.querypad-data/` in dev).
   Open clients poll every 3 s and apply edits from other devices; table, view and plugin
   changes reopen the space. Spaces already kept in a browser's IndexedDB are uploaded the
   first time that browser meets an empty server, and older layouts are migrated into a space
-  called "My workspace". Without the API the app keeps using IndexedDB. The server store has
+  called "My workspace". Assistant chat conversations stay in localStorage per space. Without the API the app keeps using IndexedDB. The server store has
   no accounts of its own — protect the site (e.g. basic auth) if it's reachable publicly. The first visit creates a "Playground"
   space with two sample tables.
 - **Remote files** — load Parquet/CSV/JSON from any URL that allows cross-origin requests
@@ -234,7 +237,9 @@ falls back to keeping everything in the browser.
   10,000 rows (Parquet export writes them all)
 - **What the AI receives** — table and view schemas, column hints (value ranges and the
   values of low-cardinality columns), joins, the last 12 runs, the editor's SQL, and up to 8
-  earlier turns. Whole rows are never sent; column hints can include a few example values.
+  earlier turns for SQL generation. Column hints can include example values. The answer-only
+  Assistant also receives a bounded preview of the active result and results of its allowed
+  read-only queries, plus snippet context.
 
 </details>
 
@@ -249,6 +254,9 @@ falls back to keeping everything in the browser.
 | Save query as a snippet | Ctrl/⌘ + Shift + S |
 | Format SQL | Shift + Alt + F |
 | Toggle sidebar | Ctrl/⌘ + B |
+| Resize editor/results split | Focus separator, then ↑ / ↓; Home / End |
+| Resize a result column | Focus its resize handle, then ← / →; Home to fit |
+| Navigate a menu | ↑ / ↓, Home / End, Enter; Escape to close |
 | Shortcut list | ? |
 
 ### AI providers
@@ -327,6 +335,11 @@ relay and everything else to the app. Optional server-side AI keys go in `.env.s
 (for example `OPENROUTER_API_KEY=…`); they are read at runtime and never sent to browsers.
 To use the AI CLIs signed in on the host instead of keys, set up the local AI bridge
 ([`local-ai/README.md`](local-ai/README.md)); compose mounts its socket folder into the app.
+
+## Architecture
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for runtime boundaries, state ownership,
+loading, persistence, and validation, and [docs/DESIGN.md](docs/DESIGN.md) for UI conventions.
 
 ## Tech stack
 

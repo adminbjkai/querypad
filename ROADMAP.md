@@ -36,7 +36,8 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 
 ## Built today
 
-Two CLI commands ship: `querypad inspect` (Layers 1–2) and `querypad ask` (Layer 4).
+Three CLI commands ship: `querypad inspect` (Layers 1–3), `querypad ask` (Layer 4),
+and `querypad explain` (stored relationship evidence).
 
 ```bash
 querypad inspect ./data
@@ -173,10 +174,18 @@ SQL appear in the sidebar, are snapshotted for persistence, and get the same pro
 discovery as loaded files. The inferred graph is published back into DuckDB as
 `querypad.relationships` / `querypad.keys`, so "how do my tables connect?" is a query.
 
-The AI assistant is a per-tab conversation. Each turn carries the workspace context (schemas
+The SQL-generation assistant is a per-tab conversation. Each turn carries the workspace context (schemas
 with profile hints, joins by verdict, recent runs, editor SQL) plus earlier turns, and every
 answer is compiled against the real tables before it is shown, with one automatic repair.
-Spaces keep separate saved workspaces in the browser, with a sample-data template for fresh starts.
+Spaces keep separate saved workspaces through the server store, with IndexedDB fallback
+when the API is absent and a sample-data template for fresh starts. A separate answer-only
+Assistant uses localStorage conversations per space.
+
+The Overview surface exposes a searchable, sortable live data catalog, source row counts,
+profile coverage, relationship verdict counts, recent queries, and semantic entities. It
+uses `buildSemanticModel` from the same engine-agnostic core as the CLI; rejected
+relationships are excluded. Dataset previews, profiles, relationship review, and query
+creation route directly into the existing workbench.
 
 ## Claude Code integration
 
@@ -196,6 +205,8 @@ typed tools for agent workflows — a natural follow-on once Layers 3–4 land.
 - **Use DuckDB.** Do not build a database or a query engine.
 - **Understanding before UI.** Relationship inference and semantic modeling are the
   bottleneck; a dashboard built before solving them is just another BI tool.
-- **Local-first.** Computation and storage stay on the user's machine; AI is BYOK.
+- **Local-first.** Query computation stays in the browser or CLI. Browser workspaces save
+  to the self-hosted server when available, with IndexedDB fallback; AI can use BYOK or
+  providers configured on that server.
 - **Agent-native.** Artifacts are structured, typed, and token-efficient so agents
   can consume them directly.

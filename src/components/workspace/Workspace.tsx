@@ -11,6 +11,7 @@ import { useAiStore } from "@/stores/ai-store";
 import { useUiStore } from "@/stores/ui-store";
 import { importAndReport } from "@/lib/import";
 import { runActive } from "@/lib/workspace-actions";
+import { readPreference, writePreference } from "@/lib/preferences";
 import Header from "./Header";
 import StatusBar from "./StatusBar";
 import EmptyState from "./EmptyState";
@@ -22,6 +23,7 @@ import { Icon } from "@/components/ui/icons";
 import { btn } from "@/components/ui/primitives";
 
 const PipelineView = dynamic(() => import("@/components/pipeline/PipelineView"), { ssr: false });
+const WorkspaceOverview = dynamic(() => import("./WorkspaceOverview"), { ssr: false });
 const CommandPalette = dynamic(() => import("./CommandPalette"), { ssr: false });
 const AddFilesDialog = dynamic(() => import("@/components/dropzone/AddFilesDialog"), { ssr: false });
 const CollaborateDialog = dynamic(() => import("@/components/collaboration/CollaborateDialog"), { ssr: false });
@@ -47,6 +49,7 @@ export default function Workspace() {
   if (hydrated) everHydrated.current = true;
   const tables = useWorkspaceStore((s) => s.tables);
   const viewMode = useWorkspaceStore((s) => s.viewMode);
+  const workspacePage = useUiStore((s) => s.workspacePage);
 
   const dialog = useUiStore((s) => s.dialog);
   const setDialog = useUiStore((s) => s.setDialog);
@@ -58,7 +61,7 @@ export default function Workspace() {
   const [dbError, setDbError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem(WELCOME_KEY) === "1"
+    () => typeof window !== "undefined" && readPreference(WELCOME_KEY) === "1"
   );
   const initStarted = useRef(false);
   const roomJoinAttempted = useRef(false);
@@ -212,7 +215,7 @@ export default function Workspace() {
           <button
             onClick={() => {
               setWelcomeDismissed(true);
-              localStorage.setItem(WELCOME_KEY, "1");
+              writePreference(WELCOME_KEY, "1");
             }}
             className={btn.icon}
             aria-label="Dismiss"
@@ -223,14 +226,18 @@ export default function Workspace() {
       )}
 
       <div className="flex min-h-0 flex-1">
-        {tables.length === 0 ? (
+        {workspacePage === "overview" && tables.length > 0 ? (
+          <main id="workspace-content" className="min-w-0 flex-1 overflow-y-auto" tabIndex={-1}>
+            <WorkspaceOverview />
+          </main>
+        ) : tables.length === 0 ? (
           <div className="flex min-w-0 flex-1 flex-col">
             <EmptyState />
           </div>
         ) : (
           <>
             <Sidebar />
-            <main className="flex min-w-0 flex-1 flex-col">
+            <main id="workspace-content" className="flex min-w-0 flex-1 flex-col" tabIndex={-1}>
               {viewMode === "sql" ? <SqlWorkbench /> : <PipelineView />}
             </main>
           </>

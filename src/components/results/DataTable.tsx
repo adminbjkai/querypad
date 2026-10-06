@@ -132,6 +132,8 @@ export default function DataTable({
   const [overrides, setOverrides] = useState<Record<string, number>>({});
   const [sel, setSel] = useState<Sel | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const deferredFilter = useDeferredValue(filter);
+  const filterUpdating = deferredFilter !== filter;
 
   const kinds = useMemo(
     () => result.columns.map((_, i) => classifyType(result.columnTypes[i] ?? "")),
@@ -146,7 +148,7 @@ export default function DataTable({
 
   const rows = useMemo(() => {
     let out = result.rows;
-    const needle = filter.trim().toLowerCase();
+    const needle = deferredFilter.trim().toLowerCase();
     if (needle) {
       out = out.filter((row) =>
         result.columns.some((c) => formatValue(row[c]).toLowerCase().includes(needle))
@@ -163,7 +165,7 @@ export default function DataTable({
       });
     }
     return out;
-  }, [result, filter, sort]);
+  }, [result, deferredFilter, sort]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
@@ -382,11 +384,12 @@ export default function DataTable({
     <div className="flex h-full flex-col bg-surface">
       <div
         ref={parentRef}
-        className="group/grid min-h-0 flex-1 select-none overflow-auto bg-surface outline-none"
+        className="group/grid min-h-0 flex-1 select-none overflow-auto bg-surface outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
         role="grid"
         aria-rowcount={rows.length}
         aria-colcount={result.columns.length}
         aria-multiselectable="true"
+        aria-busy={filterUpdating}
         tabIndex={0}
         onKeyDown={onKeyDown}
       >
@@ -457,9 +460,30 @@ export default function DataTable({
                   </div>
                   {showStats && onInspect && <ColumnMiniChart result={result} column={col} index={i} onOpen={() => onInspect(col)} />}
                   <span
-                    aria-hidden="true"
-                    title="Drag to resize, double-click to fit"
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={`Resize ${col} column`}
+                    aria-valuemin={MIN_COL}
+                    aria-valuemax={MAX_COL}
+                    aria-valuenow={widths[i]}
+                    tabIndex={0}
+                    title="Drag to resize, use arrow keys to adjust, double-click to fit"
                     onPointerDown={(e) => startResize(e, col, widths[i])}
+                    onKeyDown={(e) => {
+                      if (e.key === "Home") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        autoFit(col);
+                      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const delta = e.key === "ArrowRight" ? 16 : -16;
+                        setOverrides((o) => ({
+                          ...o,
+                          [col]: Math.min(MAX_COL, Math.max(MIN_COL, (o[col] ?? widths[i]) + delta)),
+                        }));
+                      }
+                    }}
                     onClick={(e) => e.stopPropagation()}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
@@ -552,7 +576,7 @@ export default function DataTable({
           </div>
           {rows.length === 0 && (
             <p className="px-4 py-6 text-[13px] text-muted">
-              {filter ? `No rows contain “${filter}”.` : "The query returned no rows."}
+              {deferredFilter ? `No rows contain “${deferredFilter}”.` : "The query returned no rows."}
             </p>
           )}
         </div>
@@ -597,6 +621,7 @@ export default function DataTable({
           <p className="min-w-0 flex-1 truncate text-muted">
             <span className="text-ink">{rows.length.toLocaleString()}</span> {rows.length === 1 ? "row" : "rows"}
             {rows.length !== result.rows.length && <span className="text-faint"> of {result.rows.length.toLocaleString()}</span>}
+            {filterUpdating && <span className="ml-2 text-faint">Updating filter…</span>}
             {" · "}
             <span className="text-ink">{result.columns.length}</span> {result.columns.length === 1 ? "column" : "columns"}
           </p>
