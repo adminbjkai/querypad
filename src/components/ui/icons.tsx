@@ -40,6 +40,10 @@ const PATHS = {
   file: "M14 3H6v18h12V7l-4-4zM14 3v4h4",
   eraser: "M8 20h12M5 15l9-9 5 5-8 8H8l-3-3z",
   keyboard: "M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8",
+  bookmark: "M7 4h10v16l-5-3.5L7 20V4z",
+  folder: "M4 6h6l2 2h8v10H4z",
+  insert: "M4 6h16M4 12h7M4 18h16M15 9l3 3-3 3",
+  edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
 } as const;
 
 export type IconName = keyof typeof PATHS;

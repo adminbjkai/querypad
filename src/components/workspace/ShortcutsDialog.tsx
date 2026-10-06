@@ -6,6 +6,7 @@ const SHORTCUTS: [string, string[]][] = [
   ["Run query (or the selected part)", [MOD, "Enter"]],
   ["Ask AI to write SQL", [MOD, "K"]],
   ["Command palette", [MOD, "P"]],
+  ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
   ["Toggle sidebar", [MOD, "B"]],
   ["Rename a tab", ["Double-click"]],
   ["Copy a cell", ["Click cell"]],

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type Theme = "light" | "dark";
-export type SidebarPanel = "tables" | "joins" | "history";
+export type SidebarPanel = "tables" | "joins" | "history" | "snippets";
 export type Dialog = "addFiles" | "collaborate" | "plugins" | "shortcuts" | null;
 
 export interface Toast {

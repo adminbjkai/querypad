@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
-import { runActive, previewTable, shareWorkspace, copyAgentContext } from "@/lib/workspace-actions";
+import { runActive, previewTable, shareWorkspace, copyAgentContext, insertSnippet, openSnippet } from "@/lib/workspace-actions";
+import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { MOD } from "@/components/ui/primitives";
 
 interface Command {
   id: string;
-  group: "Actions" | "Spaces" | "Tables" | "Tabs" | "History";
+  group: "Actions" | "Spaces" | "Snippets" | "Tables" | "Tabs" | "History";
   label: string;
   detail?: string;
   icon: IconName;
@@ -35,6 +36,7 @@ export default function CommandPalette() {
   const spaces = useWorkspaceStore((s) => s.spaces);
   const spaceId = useWorkspaceStore((s) => s.spaceId);
   const views = useWorkspaceStore((s) => s.views);
+  const snippets = useSnippetStore((s) => s.snippets);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,6 +54,8 @@ export default function CommandPalette() {
       { id: "add", group: "Actions", label: "Add data files", detail: "import upload url", icon: "upload", run: () => ui().setDialog("addFiles") },
       { id: "joins", group: "Actions", label: "Show relationships", detail: "joins keys discover", icon: "join", run: () => ui().showPanel("joins") },
       { id: "history", group: "Actions", label: "Show query history", icon: "history", run: () => ui().showPanel("history") },
+      { id: "snippet:save", group: "Actions", label: "Save query as snippet", detail: "bookmark library selection", icon: "bookmark", hint: `${MOD} ⇧ S`, run: () => void saveCurrentAsSnippet() },
+      { id: "snippets", group: "Actions", label: "Show snippet library", detail: "saved sql", icon: "bookmark", run: () => ui().showPanel("snippets") },
       { id: "mode", group: "Actions", label: ws().viewMode === "sql" ? "Switch to pipeline mode" : "Switch to SQL mode", icon: "flow", run: () => ws().setViewMode(ws().viewMode === "sql" ? "pipeline" : "sql") },
       { id: "share", group: "Actions", label: "Copy share link", detail: "url", icon: "link", run: () => void shareWorkspace() },
       { id: "context", group: "Actions", label: "Copy context for an agent", detail: "claude codex", icon: "copy", run: () => void copyAgentContext() },
@@ -75,6 +79,24 @@ export default function CommandPalette() {
           run: () => void ws().switchSpace(sp.id),
         })),
     ];
+    const snippetCommands: Command[] = snippets.flatMap((sn) => [
+      {
+        id: `snippet:insert:${sn.id}`,
+        group: "Snippets" as const,
+        label: `Insert snippet ${sn.name}`,
+        detail: `${sn.folder ?? ""} ${sn.description ?? ""} ${sn.sql.slice(0, 120)}`,
+        icon: "insert" as const,
+        run: () => insertSnippet(sn.sql),
+      },
+      {
+        id: `snippet:run:${sn.id}`,
+        group: "Snippets" as const,
+        label: `Run snippet ${sn.name}`,
+        detail: `${sn.folder ?? ""} new tab`,
+        icon: "play" as const,
+        run: () => openSnippet(sn.sql, sn.name, true),
+      },
+    ]);
     const viewCommands: Command[] = views.map((v) => ({
       id: `preview-view:${v.name}`,
       group: "Tables",
@@ -120,8 +142,8 @@ export default function CommandPalette() {
       icon: "history",
       run: () => ws().addTab(h.sql),
     }));
-    return [...actions, ...spaceCommands, ...tableCommands, ...viewCommands, ...tabCommands, ...historyCommands];
-  }, [tables, views, tabs, history, spaces, spaceId]);
+    return [...actions, ...spaceCommands, ...snippetCommands, ...tableCommands, ...viewCommands, ...tabCommands, ...historyCommands];
+  }, [tables, views, tabs, history, spaces, spaceId, snippets]);
 
   const visible = useMemo(() => {
     if (!query.trim()) return commands.filter((c) => c.group !== "History").slice(0, 40);

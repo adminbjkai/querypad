@@ -1,14 +1,14 @@
-import { isSafeId, patchIndex, readIndex, readSpaceRevs, type IndexPatch } from "@/lib/server-store/fs-store";
+import { isSafeId, patchIndex, readIndex, readSnippets, readSpaceRevs, type IndexPatch } from "@/lib/server-store/fs-store";
 import { crossSiteError, json, namespaceOf } from "@/lib/server-store/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** The space list plus each space's rev — polled by open clients to pick up remote changes. */
+/** The space list, each space's rev and the snippet library's rev — polled by open clients to pick up remote changes. */
 export async function GET(req: Request) {
   const ns = namespaceOf(req);
-  const [index, revs] = await Promise.all([readIndex(ns), readSpaceRevs(ns)]);
-  return json({ index: { rev: index.rev, activeId: index.activeId, spaces: index.spaces }, revs });
+  const [index, revs, snippets] = await Promise.all([readIndex(ns), readSpaceRevs(ns), readSnippets(ns)]);
+  return json({ index: { rev: index.rev, activeId: index.activeId, spaces: index.spaces }, revs, snippetsRev: snippets.rev });
 }
 
 /** Apply one device's changes to the space list: { activeId?, upsert?: SpaceMeta[], remove?: id[] }. */

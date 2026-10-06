@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { runActive } from "@/lib/workspace-actions";
@@ -97,6 +98,15 @@ export default function TabBar() {
 
       <div className="flex shrink-0 items-center gap-1.5 px-2">
         {roomId && <PeerCursors />}
+        <button
+          onClick={() => void saveCurrentAsSnippet()}
+          disabled={!active?.query.trim()}
+          className={btn.icon}
+          title={`Save as snippet (${MOD}+Shift+S)`}
+          aria-label="Save as snippet"
+        >
+          <Icon name="bookmark" size={15} />
+        </button>
         <button
           onClick={() => {
             const ui = useUiStore.getState();

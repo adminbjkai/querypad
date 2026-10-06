@@ -2,6 +2,7 @@ import { get, set, delMany, keys } from "idb-keyval";
 import type { Pipeline } from "@/types/pipeline";
 import type { AiTurn } from "@/types";
 import type { Relationship, RelationshipVerdict } from "@/types/discovery";
+import type { Snippet } from "@/types/snippet";
 
 /**
  * Persistence layout (IndexedDB via idb-keyval). A browser holds several *spaces*:
@@ -180,4 +181,15 @@ async function migrateLegacy(): Promise<SpaceIndex> {
   await delMany([...legacyFileKeys, LEGACY_STATE_KEY]);
   localStorage.removeItem(LEGACY_HISTORY_KEY);
   return index;
+}
+
+// Snippet library (browser-only fallback): one record holding every snippet.
+const SNIPPETS_KEY = "querypad-snippets";
+
+export async function loadSnippets(): Promise<Snippet[]> {
+  return (await get<Snippet[]>(SNIPPETS_KEY)) ?? [];
+}
+
+export async function saveSnippets(snippets: Snippet[]): Promise<void> {
+  await set(SNIPPETS_KEY, snippets);
 }

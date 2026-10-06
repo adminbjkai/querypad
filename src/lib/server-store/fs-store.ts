@@ -212,3 +212,44 @@ export function deleteSpaceFile(ns: string, id: string, name: string): Promise<W
 export function deleteSpace(ns: string, id: string): Promise<void> {
   return withLock(ns, () => rm(spaceDir(ns, id), { recursive: true, force: true }));
 }
+
+// --- Snippet library ------------------------------------------------------------------
+//   <root>/<ns>/snippets.json → { rev, snippets, deleted }
+// Devices send per-snippet upserts/removals; for the same snippet the newer `updatedAt` wins.
+
+export interface StoredSnippet {
+  id: string;
+  updatedAt: number;
+  [key: string]: unknown;
+}
+
+export interface StoredSnippets {
+  rev: number;
+  snippets: StoredSnippet[];
+  deleted?: string[];
+}
+
+const snippetsFile = (ns: string) => path.join(nsDir(ns), "snippets.json");
+
+export async function readSnippets(ns: string): Promise<StoredSnippets> {
+  return (await readJson<StoredSnippets>(snippetsFile(ns))) ?? { rev: 0, snippets: [] };
+}
+
+export function patchSnippets(
+  ns: string,
+  patch: { upsert?: StoredSnippet[]; remove?: string[] }
+): Promise<WriteResult> {
+  return withLock(ns, async () => {
+    const current = await readSnippets(ns);
+    const deleted = new Set([...(current.deleted ?? []), ...(patch.remove ?? [])]);
+    const byId = new Map(current.snippets.filter((sn) => !deleted.has(sn.id)).map((sn) => [sn.id, sn]));
+    for (const snippet of patch.upsert ?? []) {
+      if (deleted.has(snippet.id)) continue;
+      const existing = byId.get(snippet.id);
+      if (!existing || snippet.updatedAt >= existing.updatedAt) byId.set(snippet.id, snippet);
+    }
+    const rev = current.rev + 1;
+    await writeJson(snippetsFile(ns), { rev, snippets: [...byId.values()], deleted: [...deleted] });
+    return { rev, prevRev: current.rev };
+  });
+}

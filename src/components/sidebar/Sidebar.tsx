@@ -8,6 +8,7 @@ import TableSchema from "./TableSchema";
 import ProfileDrawer from "./ProfileDrawer";
 import RelationshipsPanel from "./RelationshipsPanel";
 import HistoryPanel from "./HistoryPanel";
+import SnippetsPanel from "./SnippetsPanel";
 import { Icon } from "@/components/ui/icons";
 import { btn } from "@/components/ui/primitives";
 
@@ -15,6 +16,7 @@ const PANELS: { id: SidebarPanel; label: string }[] = [
   { id: "tables", label: "Tables" },
   { id: "joins", label: "Joins" },
   { id: "history", label: "History" },
+  { id: "snippets", label: "Snippets" },
 ];
 
 export default function Sidebar() {
@@ -111,6 +113,7 @@ export default function Sidebar() {
           )}
           {panel === "joins" && <RelationshipsPanel />}
           {panel === "history" && <HistoryPanel />}
+          {panel === "snippets" && <SnippetsPanel />}
         </aside>
         {visibleProfile && <ProfileDrawer tableName={visibleProfile} onClose={() => setProfileTable(null)} />}
       </div>

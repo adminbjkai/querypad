@@ -1084,6 +1084,9 @@ async function pullRemoteChanges(): Promise<void> {
   try {
     const spaceId = useWorkspaceStore.getState().spaceId!;
     const changes = await checkRemote(spaceId);
+    if (changes?.snippetsChanged) {
+      void import("@/stores/snippet-store").then((m) => m.useSnippetStore.getState().refresh());
+    }
     if (!changes || !ready() || useWorkspaceStore.getState().spaceId !== spaceId) return;
 
     if (changes.spaces) {

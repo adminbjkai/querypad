@@ -233,6 +233,95 @@ test.describe("Saved on the server", () => {
   });
 });
 
+test.describe("Snippet library", () => {
+  async function setEditor(page: Page, sql: string) {
+    await page.locator(".monaco-editor").first().click();
+    await page.keyboard.press(`${MOD}+a`);
+    await page.keyboard.press("Delete");
+    await page.keyboard.insertText(sql);
+  }
+
+  test("save, insert, run, edit, search and delete snippets — shared across devices", async ({ browser }) => {
+    test.setTimeout(120_000);
+    const ctxA = await browser.newContext();
+    const ns = await isolate(ctxA);
+    const a = await ctxA.newPage();
+    await openWithSamples(a);
+
+    // Save the editor's SQL with the shortcut.
+    await setEditor(a, "SELECT dept_name, budget FROM departments ORDER BY budget DESC");
+    await a.keyboard.press(`${MOD}+Shift+S`);
+    const dialog = a.getByRole("dialog", { name: "Save snippet" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("Snippet SQL")).toHaveValue(/ORDER BY budget DESC/);
+    await dialog.getByLabel("Snippet name").fill("Biggest budgets");
+    await dialog.getByLabel("Snippet folder").fill("Reports");
+    await dialog.getByLabel("Snippet description").fill("Departments by budget");
+    await dialog.getByRole("button", { name: "Save snippet" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(a.getByRole("tab", { name: "Snippets" })).toHaveAttribute("aria-selected", "true");
+    await expect(a.getByRole("region", { name: "Folder Reports" })).toBeVisible();
+    await expect(a.getByRole("button", { name: "Snippet Biggest budgets" })).toBeVisible();
+
+    // Clicking inserts at the cursor; "Run" opens it in a named tab and runs it.
+    await a.getByRole("button", { name: "New tab" }).click();
+    await a.getByRole("button", { name: "Snippet Biggest budgets" }).click();
+    await expect(a.locator(".monaco-editor")).toContainText("ORDER BY budget DESC");
+    await a.getByRole("button", { name: "Snippet Biggest budgets" }).hover();
+    await a.getByRole("button", { name: "Run Biggest budgets" }).click();
+    await expect(a.getByRole("tab", { name: /Biggest budgets/ })).toBeVisible();
+    await expect(a.getByRole("columnheader", { name: /budget/ })).toBeVisible({ timeout: 15_000 });
+
+    // A second device sees it without reloading.
+    const ctxB = await browser.newContext();
+    await isolate(ctxB, ns);
+    const b = await ctxB.newPage();
+    await openWithSamples(b);
+    await b.getByRole("tab", { name: "Snippets" }).click();
+    await expect(b.getByRole("button", { name: "Snippet Biggest budgets" })).toBeVisible({ timeout: 15_000 });
+
+    // Edit on A (rename); B picks it up live.
+    await a.getByRole("button", { name: "Snippet Biggest budgets" }).hover();
+    await a.getByRole("button", { name: "More for Biggest budgets" }).click();
+    await a.getByRole("menuitem", { name: "Edit" }).click();
+    const edit = a.getByRole("dialog", { name: "Edit snippet" });
+    await edit.getByLabel("Snippet name").fill("Top budgets");
+    await edit.getByRole("button", { name: "Save changes" }).click();
+    await expect(a.getByRole("button", { name: "Snippet Top budgets" })).toBeVisible();
+    await expect(b.getByRole("button", { name: "Snippet Top budgets" })).toBeVisible({ timeout: 15_000 });
+
+    // Search, then the command palette.
+    await a.getByRole("button", { name: "Save query" }).click();
+    const second = a.getByRole("dialog", { name: "Save snippet" });
+    await second.getByLabel("Snippet name").fill("Headcount");
+    await second.getByRole("button", { name: "Save snippet" }).click();
+    await a.getByLabel("Search snippets").fill("reports");
+    await expect(a.getByRole("button", { name: "Snippet Headcount" })).toHaveCount(0);
+    await expect(a.getByRole("button", { name: "Snippet Top budgets" })).toBeVisible();
+    await a.getByLabel("Search snippets").fill("");
+    await a.keyboard.press(`${MOD}+p`);
+    await a.getByLabel("Search commands").fill("insert snippet top");
+    await expect(a.getByRole("option", { name: /Insert snippet Top budgets/ })).toBeVisible();
+    await a.keyboard.press("Escape");
+
+    // Delete on B; A's library follows, and it stays gone after reload.
+    await b.getByRole("button", { name: "Snippet Top budgets" }).hover();
+    await b.getByRole("button", { name: "More for Top budgets" }).click();
+    await b.getByRole("menuitem", { name: "Delete" }).click();
+    await b.getByRole("button", { name: "Confirm delete Top budgets" }).click();
+    await expect(b.getByRole("button", { name: "Snippet Top budgets" })).toHaveCount(0);
+    await expect(a.getByRole("button", { name: "Snippet Top budgets" })).toHaveCount(0, { timeout: 15_000 });
+    await a.reload();
+    await expect(a.getByRole("button", { name: /^Space: / })).toBeVisible({ timeout: 30_000 });
+    await a.getByRole("tab", { name: "Snippets" }).click();
+    await expect(a.getByRole("button", { name: "Snippet Headcount" })).toBeVisible({ timeout: 15_000 });
+    await expect(a.getByRole("button", { name: "Snippet Top budgets" })).toHaveCount(0);
+
+    await ctxA.close();
+    await ctxB.close();
+  });
+});
+
 test.describe("AI assistant conversation", () => {
   test("remembers earlier turns, sees the run log, and repairs SQL that doesn't compile", async ({ page }) => {
     const bodies: { input: string; history?: { role: string; content: string }[] }[] = [];

@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { getDB } from "@/lib/duckdb/instance";
 import { SAMPLE_TABLE_NAMES } from "@/lib/constants";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { useUiStore } from "@/stores/ui-store";
 import { importAndReport } from "@/lib/import";
 import { runActive } from "@/lib/workspace-actions";
@@ -23,6 +24,7 @@ const AddFilesDialog = dynamic(() => import("@/components/dropzone/AddFilesDialo
 const CollaborateDialog = dynamic(() => import("@/components/collaboration/CollaborateDialog"), { ssr: false });
 const PluginManager = dynamic(() => import("@/components/plugins/PluginManager"), { ssr: false });
 const ShortcutsDialog = dynamic(() => import("./ShortcutsDialog"), { ssr: false });
+const SnippetDialog = dynamic(() => import("@/components/editor/SnippetDialog"), { ssr: false });
 
 const WELCOME_KEY = "querypad:welcome-dismissed";
 
@@ -44,6 +46,7 @@ export default function Workspace() {
   const dialog = useUiStore((s) => s.dialog);
   const setDialog = useUiStore((s) => s.setDialog);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
+  const snippetDraft = useSnippetStore((s) => s.draft);
 
   const isSharedPage = usePathname() === "/shared";
   const [dbError, setDbError] = useState<string | null>(null);
@@ -69,6 +72,11 @@ export default function Workspace() {
     initStarted.current = true;
     void init();
   }, [dbReady, isSharedPage, init]);
+
+  // The snippet library is shared by every space; load it once.
+  useEffect(() => {
+    if (hydrated) void useSnippetStore.getState().init();
+  }, [hydrated]);
 
   // Invite links (?room=<id>) join the room once the workspace is ready.
   useEffect(() => {
@@ -142,6 +150,9 @@ export default function Workspace() {
         e.preventDefault();
         if (ui.aiOpen) ui.closeAi();
         else ui.openAi();
+      } else if (mod && e.shiftKey && key === "s") {
+        e.preventDefault();
+        void saveCurrentAsSnippet();
       } else if (mod && key === "b") {
         e.preventDefault();
         ui.setSidebarOpen(!ui.sidebarOpen);
@@ -215,6 +226,7 @@ export default function Workspace() {
       {dialog === "collaborate" && <CollaborateDialog onClose={() => setDialog(null)} />}
       {dialog === "plugins" && <PluginManager onClose={() => setDialog(null)} />}
       {dialog === "shortcuts" && <ShortcutsDialog onClose={() => setDialog(null)} />}
+      {snippetDraft && <SnippetDialog key={snippetDraft.id ?? "new"} draft={snippetDraft} />}
       <Toaster />
     </div>
   );

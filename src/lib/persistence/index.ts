@@ -1,5 +1,6 @@
 import * as browser from "./browser";
 import type { FileEntry, LoadedSpace, PersistedState, SpaceIndex, SpaceMeta } from "./browser";
+import type { Snippet } from "@/types/snippet";
 
 export type {
   FileEntry,
@@ -24,6 +25,7 @@ export { newSpaceId } from "./browser";
 interface RemoteStatus {
   index: SpaceIndex & { rev: number };
   revs: Record<string, number>;
+  snippetsRev: number;
 }
 
 interface RemoteSpace {
@@ -41,6 +43,8 @@ const ownSpaceRevs = new Map<string, Set<number>>();
 const fileVersions = new Map<string, Map<string, string>>();
 let inFlight = 0;
 let pendingIndexRev = 0;
+let snippetsRev = 0;
+const ownSnippetRevs = new Set<number>();
 /** The space list as this client last sent or adopted it; saves send only the difference. */
 let syncedSpaces = new Map<string, string>();
 
@@ -206,6 +210,8 @@ export interface RemoteChanges {
   spaces: SpaceMeta[] | null;
   /** Call once the new space list has been applied. */
   ack: () => void;
+  /** True when another device changed the snippet library. */
+  snippetsChanged: boolean;
   /** True when the given space was written by another device since we last looked. */
   spaceChanged: boolean;
 }
@@ -222,7 +228,7 @@ export async function checkRemote(spaceId: string | null): Promise<RemoteChanges
     indexRev = Math.max(indexRev, pendingIndexRev);
     if (spaces) rememberSpaces(spaces);
   };
-  return { spaces, spaceChanged, ack };
+  return { spaces, spaceChanged, ack, snippetsChanged: status.snippetsRev > snippetsRev };
 }
 
 /**
@@ -238,4 +244,33 @@ export async function pullSpaceState(
   const after = Object.entries(remote.files);
   const filesChanged = after.length !== before.size || after.some(([name, v]) => before.get(name) !== v);
   return { state: remote.state, filesChanged };
+}
+
+// --- Snippet library ---------------------------------------------------------------
+
+/** Every saved snippet (server library, or this browser's when there's no server). */
+export async function loadSnippets(): Promise<Snippet[]> {
+  if (!(await serverStorage())) return browser.loadSnippets();
+  const { rev, snippets } = await request<{ rev: number; snippets: Snippet[] }>("/api/store/snippets");
+  snippetsRev = Math.max(snippetsRev, rev);
+  if (rev > 0) return snippets;
+  // First time on this server: bring this browser's snippets along.
+  const local = await browser.loadSnippets();
+  if (local.length > 0) await saveSnippetChanges(local, [], local);
+  return local;
+}
+
+/**
+ * Record snippet edits. `upsert`/`remove` go to the server as a merge (so devices never
+ * overwrite each other's unrelated edits); `all` is the full list for browser-only storage.
+ */
+export async function saveSnippetChanges(upsert: Snippet[], remove: string[], all: Snippet[]): Promise<void> {
+  if (!(await serverStorage())) return browser.saveSnippets(all);
+  const { rev } = await request<{ rev: number }>("/api/store/snippets", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ upsert, remove }),
+  });
+  ownSnippetRevs.add(rev);
+  snippetsRev = advance(snippetsRev, ownSnippetRevs);
 }

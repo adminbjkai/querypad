@@ -3,7 +3,7 @@ import { toast } from "@/stores/ui-store";
 import { buildShareUrl } from "@/lib/sharing/encode";
 import { buildAgentContext } from "@/lib/agent/context";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
-import { getSelectedText } from "@/lib/editor-bridge";
+import { getSelectedText, insertAtCursor } from "@/lib/editor-bridge";
 import { copyText } from "@/lib/export/clipboard";
 import { formatBytes } from "@/lib/utils";
 
@@ -23,6 +23,20 @@ export function runActive(): void {
 export function previewTable(name: string): void {
   ws().setViewMode("sql");
   if (ws().addTab(`SELECT *\nFROM ${quoteIdent(name)}\nLIMIT 100`)) void ws().runQuery();
+}
+
+/** Insert snippet SQL at the editor cursor (or open it in a new tab if there's no editor). */
+export function insertSnippet(sql: string): void {
+  if (ws().viewMode !== "sql") ws().setViewMode("sql");
+  if (!insertAtCursor(sql)) ws().addTab(sql);
+}
+
+/** Open snippet SQL in a new tab, optionally running it straight away. */
+export function openSnippet(sql: string, title: string, run = false): void {
+  ws().setViewMode("sql");
+  if (!ws().addTab(sql)) return;
+  ws().renameTab(ws().activeTabId, title);
+  if (run) void ws().runQuery();
 }
 
 export async function shareWorkspace(): Promise<void> {

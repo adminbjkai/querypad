@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { registerEditor } from "@/lib/editor-bridge";
@@ -80,6 +81,12 @@ export default function QueryEditor() {
       },
     });
     editor.addAction({
+      id: "querypad.snippet",
+      label: "Save as snippet (selection or query)",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS],
+      run: () => void saveCurrentAsSnippet(),
+    });
+    editor.addAction({
       id: "querypad.palette",
       label: "QueryPad command palette",
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyP],
@@ -120,6 +127,19 @@ export default function QueryEditor() {
                 range,
               });
             }
+          }
+          // Saved snippets complete by name and insert their SQL.
+          for (const snippet of useSnippetStore.getState().snippets) {
+            suggestions.push({
+              label: snippet.name,
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: snippet.sql,
+              detail: `snippet${snippet.folder ? ` · ${snippet.folder}` : ""}`,
+              documentation: snippet.description ? `${snippet.description}\n\n${snippet.sql}` : snippet.sql,
+              filterText: snippet.name,
+              sortText: `~${snippet.name}`,
+              range,
+            });
           }
           return { suggestions };
         },

@@ -7,6 +7,20 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.10.0 — A snippet library for the SQL you reuse
+
+- New **Snippets** sidebar tab: a library of saved SQL, grouped into folders, searchable by
+  name, folder, description or SQL. Click a snippet to insert it at the cursor, or run it in
+  its own tab; each one can be opened, copied, edited or deleted
+- Save the editor selection (or the whole query) with Ctrl/⌘+Shift+S, the bookmark button
+  next to "Ask AI", or the command palette; the dialog suggests a name and lets you pick a
+  folder and add a description
+- Snippets are shared by every space and every device, saved on the server and synced live
+  (edits merge per snippet; the newest edit wins and deleted snippets stay deleted)
+- Snippet names show up in editor autocomplete and in the command palette ("Insert snippet…",
+  "Run snippet…")
+- Export the library to JSON and import it again (imports add copies, never overwrite)
+
 ## v0.9.0 — Your workspace on every device
 
 - Spaces (tables, views, tabs, AI conversations, history, pipelines, join verdicts) are now

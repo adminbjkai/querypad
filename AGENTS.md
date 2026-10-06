@@ -34,6 +34,9 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   devices' edits (never over pending local saves). The `querypad_ns` cookie selects a storage
   namespace — e2e tests use it (`e2e/fixtures.ts`) to stay isolated. Store writes always target
   the space that was active when the change happened; switching flushes the debounced save first.
+- **Snippets** (`src/stores/snippet-store.ts`): one library shared by all spaces, stored in
+  `snippets.json` via `PATCH /api/store/snippets` (per-snippet upsert by `updatedAt`, tombstoned
+  removals) or the `querypad-snippets` IndexedDB key; refreshed when the poll reports a new rev.
 - **Catalog sync**: after any non-read-only statement, `syncCatalog` reconciles the store with
   `duckdb_tables()`/`duckdb_views()` (main schema only); new/changed tables are snapshotted to
   Parquet file entries. The `querypad` schema (relationships/keys) is internal and never listed.

@@ -176,10 +176,13 @@ falls back to keeping everything in the browser.
   `SELECT * FROM querypad.keys` lists every key column and what it references
 - **Spaces, on every device** — keep several saved workspaces on the server: save the current one as a new
   space, start a fresh space from the sample template or empty, switch, rename, delete
+- **Snippet library** — save SQL you reuse (Ctrl/⌘+Shift+S) into folders; search it, insert at
+  the cursor, run it in a tab, or autocomplete it by name. Shared by every space and device;
+  export/import as JSON
 - **Results you can work with** — sort by any column, filter rows, click a cell to copy,
   one-click charts, export to CSV / JSON / Markdown / HTML / Excel / Parquet / clipboard
-- **Command palette** — Ctrl/⌘+P to run anything, open a space, jump to a tab, preview or
-  profile a table, or reopen a past query
+- **Command palette** — Ctrl/⌘+P to run anything, open a space, insert a snippet, jump to a
+  tab, preview or profile a table, or reopen a past query
 - **History** — each space keeps its last 100 runs with row counts, timings and failures
 - **Pipelines** — chain named SQL steps that build on each other, shown as a dependency graph
 - **Live collaboration** — start a room, send the invite link, and edit the same tabs with
