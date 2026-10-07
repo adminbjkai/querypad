@@ -293,7 +293,7 @@ test.describe("Snippet library", () => {
     await expect(b.getByRole("button", { name: "Snippet Top budgets" })).toBeVisible({ timeout: 15_000 });
 
     // Search, then the command palette.
-    await a.getByRole("button", { name: "Save query" }).click();
+    await a.getByRole("complementary", { name: "Snippets panel" }).getByRole("button", { name: "Save as snippet" }).click();
     const second = a.getByRole("dialog", { name: "Save snippet" });
     await second.getByLabel("Snippet name").fill("Headcount");
     await second.getByRole("button", { name: "Save snippet" }).click();

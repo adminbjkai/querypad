@@ -8,12 +8,13 @@ import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { Kbd, MOD, SectionLabel } from "@/components/ui/primitives";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
+import { startFolder, startNotebook } from "./NavRail";
 import { insertAtCursor } from "@/lib/editor-bridge";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
 
 interface Command {
   id: string;
-  group: "Actions" | "Spaces" | "Snippets" | "Tables" | "Columns" | "Tabs" | "History";
+  group: "Actions" | "Spaces" | "Library" | "Snippets" | "Tables" | "Columns" | "Tabs" | "History";
   label: string;
   detail?: string;
   icon: IconName;
@@ -40,6 +41,9 @@ export default function CommandPalette() {
   const spaceId = useWorkspaceStore((s) => s.spaceId);
   const views = useWorkspaceStore((s) => s.views);
   const snippets = useSnippetStore((s) => s.snippets);
+  const notebooks = useWorkspaceStore((s) => s.notebooks);
+  const folders = useWorkspaceStore((s) => s.folders);
+  const savedQueries = useWorkspaceStore((s) => s.savedQueries);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +58,14 @@ export default function CommandPalette() {
     const ui = useUiStore.getState;
     const actions: Command[] = [
       { id: "run", group: "Actions", label: "Run query", detail: "execute selection", icon: "play", hint: `${MOD} ↵`, run: runActive },
-      { id: "home", group: "Actions", label: "Go to Home", detail: "overview datasets relationships ask", icon: "home", run: () => ui().setWorkspacePage("home") },
+      { id: "home", group: "Actions", label: "Go to Home", detail: "overview datasets relationships ask", icon: "home", hint: "G H", run: () => ui().setWorkspacePage("home") },
+      { id: "go:sql", group: "Actions", label: "Go to SQL", detail: "editor workbench queries", icon: "code", hint: "G S", run: () => { ws().setViewMode("sql"); ui().setWorkspacePage("workbench"); } },
+      { id: "go:tables", group: "Actions", label: "Go to Tables", detail: "catalog datasets views", icon: "table", hint: "G T", run: () => ui().setWorkspacePage("tables") },
+      { id: "go:agent", group: "Actions", label: "Go to Agent", detail: "tasks multi-step", icon: "agent", hint: "G A", run: () => ui().setWorkspacePage("agent") },
+      { id: "go:notebooks", group: "Actions", label: "Go to Notebooks", detail: "cells markdown sql", icon: "notebook", hint: "G N", run: () => ui().openNotebook(null) },
+      { id: "go:folders", group: "Actions", label: "Go to Folders", detail: "library saved queries", icon: "folder", hint: "G F", run: () => ui().openFolder(null) },
+      { id: "new:notebook", group: "Actions", label: "New notebook", detail: "create cells", icon: "notebook", run: () => startNotebook() },
+      { id: "new:folder", group: "Actions", label: "New folder", detail: "create library", icon: "folderPlus", run: startFolder },
       { id: "ai", group: "Actions", label: "Ask AI to write SQL", icon: "sparkle", hint: `${MOD} K`, run: () => ui().openAi() },
       { id: "assistant", group: "Actions", label: "Open the Assistant chat", detail: "ask questions explain help", icon: "sparkle", hint: `${MOD} I`, run: () => ui().setAssistantOpen(true) },
       { id: "new-tab", group: "Actions", label: "New query tab", icon: "plus", run: () => { ui().setWorkspacePage("workbench"); ws().addTab(); } },
@@ -67,7 +78,7 @@ export default function CommandPalette() {
       { id: "share", group: "Actions", label: "Copy share link", detail: "url", icon: "link", run: () => void shareWorkspace() },
       { id: "context", group: "Actions", label: "Copy context for an agent", detail: "claude codex", icon: "copy", run: () => void copyAgentContext() },
       { id: "theme", group: "Actions", label: ui().theme === "dark" ? "Use light theme" : "Use dark theme", detail: "appearance", icon: ui().theme === "dark" ? "sun" : "moon", run: () => ui().toggleTheme() },
-      { id: "sidebar", group: "Actions", label: "Show or hide the side panel", detail: "sidebar explorer", icon: "sidebar", hint: `${MOD} B`, run: () => ui().toggleSidePanel() },
+      { id: "sidebar", group: "Actions", label: "Show or hide the Tables panel", detail: "sidebar explorer side panel", icon: "sidebar", hint: `${MOD} B`, run: () => ui().toggleSidePanel() },
       { id: "nav", group: "Actions", label: ui().navCollapsed ? "Expand the navigation" : "Collapse the navigation", detail: "sidebar menu icons", icon: "sidebar", run: () => ui().setNavCollapsed(!ui().navCollapsed) },
       { id: "collab", group: "Actions", label: "Collaborate in a room", detail: "share live", icon: "users", run: () => ui().setDialog("collaborate") },
       { id: "plugins", group: "Actions", label: "Manage plugins", icon: "puzzle", run: () => ui().setDialog("plugins") },
@@ -86,6 +97,36 @@ export default function CommandPalette() {
           icon: "table" as const,
           run: () => void ws().switchSpace(sp.id),
         })),
+    ];
+    const libraryCommands: Command[] = [
+      ...notebooks.map((n) => ({
+        id: `notebook:${n.id}`,
+        group: "Library" as const,
+        label: `Open notebook ${n.name}`,
+        detail: `${n.cells.length} cells ${folders.find((f) => f.id === n.folderId)?.name ?? ""}`,
+        icon: "notebook" as const,
+        run: () => ui().openNotebook(n.id),
+      })),
+      ...folders.map((f) => ({
+        id: `folder:${f.id}`,
+        group: "Library" as const,
+        label: `Open folder ${f.name}`,
+        detail: "library queries notebooks",
+        icon: "folder" as const,
+        run: () => ui().openFolder(f.id),
+      })),
+      ...savedQueries.map((q) => ({
+        id: `saved:${q.id}`,
+        group: "Library" as const,
+        label: `Open saved query ${q.name}`,
+        detail: `${folders.find((f) => f.id === q.folderId)?.name ?? ""} ${q.sql.slice(0, 120)}`,
+        icon: "code" as const,
+        run: () => {
+          ws().setViewMode("sql");
+          ws().openSavedQuery(q.id);
+          ui().setWorkspacePage("workbench");
+        },
+      })),
     ];
     const snippetCommands: Command[] = snippets.flatMap((sn) => [
       {
@@ -185,8 +226,8 @@ export default function CommandPalette() {
       icon: "history",
       run: () => { ui().setWorkspacePage("workbench"); ws().addTab(h.sql); },
     }));
-    return [...actions, ...spaceCommands, ...snippetCommands, ...tableCommands, ...columnCommands, ...viewCommands, ...tabCommands, ...historyCommands];
-  }, [tables, views, tabs, history, spaces, spaceId, snippets]);
+    return [...actions, ...spaceCommands, ...libraryCommands, ...snippetCommands, ...tableCommands, ...columnCommands, ...viewCommands, ...tabCommands, ...historyCommands];
+  }, [tables, views, tabs, history, spaces, spaceId, snippets, notebooks, folders, savedQueries]);
 
   const visible = useMemo(() => {
     // Columns and history only show up once you search, so the list starts short.
@@ -237,7 +278,7 @@ export default function CommandPalette() {
                 close();
               }
             }}
-            placeholder="Search tables, columns, snippets, history, or type a command"
+            placeholder="Search tables, columns, notebooks, snippets, history, or type a command"
             className="h-11 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-faint"
             aria-label="Search commands"
             role="combobox"

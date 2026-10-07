@@ -41,6 +41,7 @@ const PATHS = {
   eraser: "M8 20h12M5 15l9-9 5 5-8 8H8l-3-3z",
   keyboard: "M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8",
   bookmark: "M7 4h10v16l-5-3.5L7 20V4z",
+  save: "M4 6h6l2 2h8v10H4zM9 13.5l2 2 4-4",
   folder: "M4 6h6l2 2h8v10H4z",
   insert: "M4 6h16M4 12h7M4 18h16M15 9l3 3-3 3",
   edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
@@ -60,6 +61,10 @@ const PATHS = {
   columns: "M4 5h16v14H4zM10 5v14M16 5v14",
   rows: "M4 5h16v14H4zM4 10h16M4 15h16",
   database: "M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
+  notebook: "M5 4h13a1 1 0 011 1v14a1 1 0 01-1 1H5zM8.5 4v16M12 9h4M12 13h4",
+  agent: "M4 20l8.5-8.5M14 4v2M18 8h-2M17.5 4.5l-1.4 1.4M12.5 4.5l1.4 1.4M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z",
+  folderPlus: "M4 6h6l2 2h8v10H4zM12 10.5v5M9.5 13h5",
+  approve: "M12 21a9 9 0 100-18 9 9 0 000 18zM8.5 12.5l2.5 2.5 4.5-5",
 } as const;
 
 export type IconName = keyof typeof PATHS;

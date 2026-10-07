@@ -3,8 +3,8 @@
 import { Fragment, type ReactNode } from "react";
 
 /**
- * A small Markdown renderer for assistant replies: headings, paragraphs, lists, pipe
- * tables, fenced code, and inline code/bold/italic/links. Fenced blocks are handed to
+ * A small Markdown renderer for assistant replies and notebook text cells: headings, paragraphs,
+ * lists, pipe tables, horizontal rules, fenced code, and inline code/bold/italic/links. Fenced blocks are handed to
  * `renderCode` so the panel can turn SQL and action blocks into interactive cards.
  */
 interface Props {
@@ -15,9 +15,12 @@ interface Props {
 type Block =
   | { kind: "code"; lang: string; code: string }
   | { kind: "heading"; level: number; text: string }
+  | { kind: "rule" }
   | { kind: "list"; ordered: boolean; items: string[] }
   | { kind: "table"; header: string[]; rows: string[][] }
   | { kind: "para"; text: string };
+
+const RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
 
 const splitRow = (line: string) =>
   line
@@ -47,7 +50,12 @@ function parse(text: string): Block[] {
     }
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
     if (heading) {
-      blocks.push({ kind: "heading", level: heading[1].length, text: heading[2] });
+      blocks.push({ kind: "heading", level: heading[1].length, text: heading[2].replace(/\s+#+\s*$/, "") });
+      i++;
+      continue;
+    }
+    if (RULE.test(line)) {
+      blocks.push({ kind: "rule" });
       i++;
       continue;
     }
@@ -73,7 +81,14 @@ function parse(text: string): Block[] {
       continue;
     }
     const para: string[] = [];
-    while (i < lines.length && lines[i].trim() && !/^\s*```/.test(lines[i]) && !/^#{1,4}\s/.test(lines[i]) && !bullet.test(lines[i])) {
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !/^\s*```/.test(lines[i]) &&
+      !/^#{1,4}\s/.test(lines[i]) &&
+      !bullet.test(lines[i]) &&
+      !RULE.test(lines[i])
+    ) {
       para.push(lines[i++]);
     }
     blocks.push({ kind: "para", text: para.join(" ") });
@@ -114,6 +129,8 @@ function inline(text: string): ReactNode[] {
   return out;
 }
 
+const HEADING_SIZE = { 1: "text-[16px]", 2: "text-[15px]", 3: "text-[14px]", 4: "text-[13px]" } as const;
+
 export default function Markdown({ text, renderCode }: Props) {
   let codeIndex = 0;
   return (
@@ -122,12 +139,19 @@ export default function Markdown({ text, renderCode }: Props) {
         switch (block.kind) {
           case "code":
             return <Fragment key={i}>{renderCode(block.lang, block.code, codeIndex++)}</Fragment>;
-          case "heading":
+          case "heading": {
+            // DESIGN.md heading sizes: h1 16, h2 15, h3 14 (h4 13), weight 600.
+            const level = Math.min(block.level, 4) as 1 | 2 | 3 | 4;
+            const Heading = `h${level}` as const;
+            const size = HEADING_SIZE[level];
             return (
-              <p key={i} className={`font-semibold text-ink ${block.level <= 2 ? "text-[14px]" : "text-[13px]"}`}>
+              <Heading key={i} className={`${size} font-semibold leading-5 text-ink ${i > 0 ? "pt-1" : ""}`}>
                 {inline(block.text)}
-              </p>
+              </Heading>
             );
+          }
+          case "rule":
+            return <hr key={i} className="border-line" />;
           case "list": {
             const List = block.ordered ? "ol" : "ul";
             return (

@@ -60,7 +60,7 @@ export default function ColumnMiniChart({
   result: QueryResult;
   column: string;
   index: number;
-  onOpen: () => void;
+  onOpen: (anchor: HTMLElement) => void;
 }) {
   const [stats, setStats] = useState<ColumnStats | undefined>(() => peekColumnStats(result, column));
   useEffect(() => {
@@ -78,10 +78,10 @@ export default function ColumnMiniChart({
     <button
       tabIndex={-1}
       aria-label={`Show stats for ${column}`}
-      title={stats ? `${describe(stats)}. Click to open in the inspector.` : "Computing…"}
+      title={stats ? `${describe(stats)}. Click for the column card.` : "Computing…"}
       onClick={(e) => {
         e.stopPropagation();
-        onOpen();
+        onOpen(e.currentTarget);
       }}
       onMouseDown={(e) => e.stopPropagation()}
       style={{ height: DIST_HEIGHT }}

@@ -3,6 +3,7 @@ import type { Pipeline } from "@/types/pipeline";
 import type { AiTurn } from "@/types";
 import type { Relationship, RelationshipVerdict } from "@/types/discovery";
 import type { Snippet } from "@/types/snippet";
+import type { Folder, Notebook, SavedQuery } from "@/types/library";
 
 /**
  * Persistence layout (IndexedDB via idb-keyval). A browser holds several *spaces*:
@@ -39,6 +40,7 @@ export interface PersistedTab {
   query: string;
   createdAt: number;
   aiThread?: AiTurn[];
+  savedQueryId?: string | null;
 }
 
 export interface FileEntry {
@@ -68,6 +70,10 @@ export interface PersistedState {
   pluginUrls?: string[];
   relationshipVerdicts?: Record<string, RelationshipVerdict>;
   relationshipOverrides?: Relationship[];
+  /** Query library (absent in spaces saved before it existed → empty). */
+  folders?: Folder[];
+  savedQueries?: SavedQuery[];
+  notebooks?: Notebook[];
 }
 
 export interface LoadedSpace extends PersistedState {

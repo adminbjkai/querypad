@@ -80,8 +80,8 @@ export default function SnippetsPanel() {
         <button
           onClick={() => void saveCurrentAsSnippet()}
           className={btn.icon}
-          title={`Save the query or selection (${MOD}+Shift+S)`}
-          aria-label="Save query"
+          title={`Save the current query as a snippet (${MOD}+Shift+S)`}
+          aria-label="Save as snippet"
         >
           <Icon name="plus" size={16} />
         </button>

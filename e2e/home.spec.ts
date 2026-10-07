@@ -45,9 +45,9 @@ test.describe("Home", () => {
     await expect(semanticModel.getByRole("heading", { name: "Department" })).toBeVisible();
     await expect(semanticModel.getByText("Belongs to Department")).toBeVisible({ timeout: 20_000 });
 
-    // Inspect jumps to the workbench with the column profile open.
+    // Inspect opens the dataset's page (under Tables in the navigation).
     await page.getByRole("button", { name: "Inspect dataset employees" }).click();
-    await expect(page.getByRole("button", { name: "Tables", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Tables", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("complementary", { name: /employees/ })).toBeVisible();
   });
 

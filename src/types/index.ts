@@ -89,5 +89,9 @@ export interface EditorTab {
   lastRunSql?: string;
   /** Conversation with the AI assistant in this tab. */
   aiThread?: AiTurn[];
+  /** The library query this tab is bound to (saved with the tab); null/absent when unsaved. */
+  savedQueryId?: string | null;
   createdAt: number;
 }
+
+export type { Folder, SavedQuery, Notebook, NotebookCell, NotebookCellKind } from "./library";

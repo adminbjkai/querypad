@@ -3,8 +3,14 @@ import { readPreference, writePreference } from "@/lib/preferences";
 
 export type Theme = "light" | "dark";
 export type SidebarPanel = "tables" | "joins" | "history" | "snippets";
-/** Home is the AI-first start page; the workbench holds SQL tabs and pipelines; `table` is one dataset's page. */
-export type WorkspacePage = "home" | "workbench" | "table";
+/**
+ * Home is the AI-first start page; the workbench holds SQL tabs and pipelines; `table` is one
+ * dataset's page; `tables` is the catalog; `agent`, `notebooks` (list or one notebook) and
+ * `folders` (list or one folder) are the remaining rail pages.
+ */
+export type WorkspacePage = "home" | "workbench" | "table" | "tables" | "agent" | "notebooks" | "folders";
+/** Pages that keep the side panel (Tables, Joins …) available next to them. */
+export const PANEL_PAGES: ReadonlySet<WorkspacePage> = new Set<WorkspacePage>(["workbench", "notebooks"]);
 export type TablePageTab = "overview" | "preview" | "profile";
 export type Dialog = "addFiles" | "collaborate" | "plugins" | "shortcuts" | "clearSpace" | null;
 
@@ -23,6 +29,12 @@ interface UiState {
   tablePageTab: TablePageTab;
   openTablePage: (name: string, tab?: TablePageTab) => void;
   setTablePageTab: (tab: TablePageTab) => void;
+  /** The notebook open on the `notebooks` page (null = the list); `openNotebook` shows the page. */
+  notebookId: string | null;
+  openNotebook: (id: string | null) => void;
+  /** The folder open on the `folders` page (null = the top level); `openFolder` shows the page. */
+  folderId: string | null;
+  openFolder: (id: string | null) => void;
   /** Spaces whose "sample data" banner was dismissed (remembered). */
   dismissedSampleHints: string[];
   dismissSampleHint: (spaceId: string) => void;
@@ -39,7 +51,7 @@ interface UiState {
   showPanel: (panel: SidebarPanel) => void;
   /** Open a panel, or close it when it is already the open one. */
   togglePanel: (panel: SidebarPanel) => void;
-  /** Show or hide the side panel (from Home, this opens the workbench with it shown). */
+  /** Show or hide the side panel (from a page without one, this opens the workbench with it shown). */
   toggleSidePanel: () => void;
 
   profileTable: string | null;
@@ -126,6 +138,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   tablePageTab: "overview",
   openTablePage: (name, tab = "overview") => set({ workspacePage: "table", tablePage: name, tablePageTab: tab, profileTable: null }),
   setTablePageTab: (tablePageTab) => set({ tablePageTab }),
+  notebookId: null,
+  openNotebook: (notebookId) => set({ workspacePage: "notebooks", notebookId, profileTable: null }),
+  folderId: null,
+  openFolder: (folderId) => set({ workspacePage: "folders", folderId, profileTable: null }),
   dismissedSampleHints: initialDismissedSampleHints(),
   dismissSampleHint: (spaceId) => {
     const dismissedSampleHints = [...new Set([...get().dismissedSampleHints, spaceId])].slice(-50);
@@ -152,7 +168,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   // The quick profile view belongs to the Tables panel; showing another panel closes it.
   showPanel: (sidebarPanel) => set((s) => ({ sidebarPanel, sidebarOpen: true, profileTable: sidebarPanel === "tables" ? s.profileTable : null })),
   toggleSidePanel: () =>
-    set((s) => (s.workspacePage !== "workbench" ? { workspacePage: "workbench", sidebarOpen: true } : { sidebarOpen: !s.sidebarOpen })),
+    set((s) => (PANEL_PAGES.has(s.workspacePage) ? { sidebarOpen: !s.sidebarOpen } : { workspacePage: "workbench", sidebarOpen: true })),
   togglePanel: (panel) =>
     set((s) =>
       s.sidebarOpen && s.sidebarPanel === panel

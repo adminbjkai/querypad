@@ -2,6 +2,9 @@ import type { ProfileColumnKind } from "../../types";
 
 export type SortDir = "asc" | "desc";
 
+/** The grid's current sort, or null for the query's own order. */
+export type SortState = { column: string; dir: SortDir } | null;
+
 const isNull = (v: unknown) => v === null || v === undefined;
 
 /** Numeric sort key for numbers, bigints and ISO date/time strings; null when the value has none. */

@@ -1,109 +1,50 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useSnippetStore } from "@/stores/snippet-store";
-import { openSnippet, openTablePage, previewTable } from "@/lib/workspace-actions";
+import { useUiStore } from "@/stores/ui-store";
+import { openSavedQueryInWorkbench, openSnippet } from "@/lib/workspace-actions";
 import { Icon } from "@/components/ui/icons";
-import { SectionLabel, Select, Tabs, btn, input } from "@/components/ui/primitives";
+import { Tabs } from "@/components/ui/primitives";
+import DatasetList from "./DatasetList";
 import { relativeTime } from "./format";
 
-const TABS = ["Datasets", "Queries", "Snippets", "Spaces"] as const;
+const TABS = ["Datasets", "Queries", "Folders", "Notebooks", "Snippets", "Spaces"] as const;
 type Tab = (typeof TABS)[number];
 
 const rowBtn =
   "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent";
 
-const SORTS = [
-  { value: "name", label: "Name A–Z" },
-  { value: "rows", label: "Most rows" },
-  { value: "columns", label: "Most columns" },
-] as const;
-type Sort = (typeof SORTS)[number]["value"];
-
 function Empty({ children }: { children: string }) {
   return <p className="px-5 py-8 text-center text-[13px] text-muted">{children}</p>;
 }
 
-function Datasets() {
-  const tables = useWorkspaceStore((s) => s.tables);
-  const views = useWorkspaceStore((s) => s.views);
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<Sort>("name");
-  const catalog = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return [...tables.map((t) => ({ ...t, kind: "Table" })), ...views.map((t) => ({ ...t, kind: "View" }))]
-      .filter((t) => !q || t.name.toLowerCase().includes(q) || t.columns.some((c) => c.name.toLowerCase().includes(q)))
-      .sort((a, b) => (sort === "rows" ? b.rowCount - a.rowCount : sort === "columns" ? b.columns.length - a.columns.length : 0) || a.name.localeCompare(b.name));
-  }, [tables, views, search, sort]);
-
-  return (
-    <section aria-label="Data catalog">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
-        <label className="relative min-w-40 flex-1">
-          <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
-          <input className={`${input} pl-9`} aria-label="Search data catalog" placeholder="Search datasets or columns…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </label>
-        <Select value={sort} onChange={setSort} options={[...SORTS]} ariaLabel="Sort data catalog" size="sm" />
-        <span className="px-1 text-[12px] tabular-nums text-muted">{catalog.length} datasets</span>
-      </div>
-      <div className="max-h-[420px] overflow-auto">
-        <table className="w-full table-fixed text-left text-[13px]">
-          <colgroup>
-            <col />
-            <col className="w-24" />
-            <col className="w-24 max-sm:hidden" />
-            <col className="w-20" />
-          </colgroup>
-          <thead className="sticky top-0 z-10 bg-surface">
-            <tr className="h-8">
-              <th scope="col" className="px-4 font-medium"><SectionLabel as="div">Dataset</SectionLabel></th>
-              <th scope="col" className="px-3 font-medium"><SectionLabel as="div" className="justify-end">Rows</SectionLabel></th>
-              <th scope="col" className="hidden px-3 font-medium sm:table-cell"><SectionLabel as="div" className="justify-end">Columns</SectionLabel></th>
-              <th scope="col" className="px-3 font-medium"><span className="sr-only">Explore</span></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line border-t border-line">
-            {catalog.map((t) => (
-              <tr key={`${t.kind}:${t.name}`} className="h-12 hover:bg-sunken">
-                <td className="px-4 py-1">
-                  <button onClick={() => openTablePage(t.name)} title="Open the table page" className="flex max-w-full items-center gap-2.5 rounded text-left font-medium hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent"><Icon name={t.kind === "View" ? "file" : "table"} size={14} /></span>
-                    <span className="min-w-0">
-                      <span className="block truncate leading-5" title={t.name}>{t.name}</span>
-                      <span className="block text-[11px] font-normal leading-4 text-muted">{t.kind}</span>
-                    </span>
-                  </button>
-                </td>
-                <td className="px-3 py-1 text-right tabular-nums text-muted">{t.rowCount.toLocaleString()}</td>
-                <td className="hidden px-3 py-1 text-right tabular-nums text-muted sm:table-cell">{t.columns.length}</td>
-                <td className="px-3 py-1">
-                  <div className="flex justify-end gap-1">
-                    <button className={btn.icon} aria-label={`Preview dataset ${t.name}`} title="Preview rows" onClick={() => previewTable(t.name)}><Icon name="play" size={14} /></button>
-                    <button className={btn.icon} aria-label={`Inspect dataset ${t.name}`} title="Columns, details and profile" onClick={() => openTablePage(t.name)}><Icon name="profile" size={16} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {catalog.length === 0 && (
-          <div className="p-8 text-center text-[13px] text-muted">
-            <p>No datasets match “{search}”.</p>
-            <button className={`${btn.ghost} mt-2`} onClick={() => setSearch("")}>Clear search</button>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
 function Queries() {
   const history = useWorkspaceStore((s) => s.history);
-  if (history.length === 0) return <Empty>Queries you run will appear here.</Empty>;
+  const savedQueries = useWorkspaceStore((s) => s.savedQueries);
+  const folders = useWorkspaceStore((s) => s.folders);
+  if (history.length === 0 && savedQueries.length === 0) return <Empty>Queries you save or run will appear here.</Empty>;
+  const saved = [...savedQueries].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8);
   return (
     <ul className="divide-y divide-line">
-      {history.slice(0, 8).map((h) => (
+      {saved.map((q) => {
+        const folder = q.folderId ? folders.find((f) => f.id === q.folderId)?.name : undefined;
+        return (
+          <li key={q.id}>
+            <button className={rowBtn} onClick={() => openSavedQueryInWorkbench(q.id)} title="Open the saved query" aria-label={`Saved query ${q.name}`}>
+              <Icon name="bookmark" size={14} className="fill-current text-accent" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] text-ink">{q.name}</span>
+                <span className="block truncate font-mono text-[11px] text-muted">{q.sql.replace(/\s+/g, " ") || "Empty query"}</span>
+              </span>
+              {folder && <span className="hidden shrink-0 truncate text-[11px] text-faint sm:inline">{folder}</span>}
+              <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-faint">{relativeTime(q.updatedAt)}</span>
+            </button>
+          </li>
+        );
+      })}
+      {history.slice(0, Math.max(3, 8 - saved.length)).map((h) => (
         <li key={h.id}>
           <button className={rowBtn} onClick={() => openSnippet(h.sql, "From history")} title="Open SQL in a new tab">
             <Icon name={h.error ? "alert" : "check"} size={14} className={h.error ? "text-danger" : "text-ok"} />
@@ -142,6 +83,59 @@ function Snippets() {
   );
 }
 
+function Folders() {
+  const folders = useWorkspaceStore((s) => s.folders);
+  const savedQueries = useWorkspaceStore((s) => s.savedQueries);
+  const notebooks = useWorkspaceStore((s) => s.notebooks);
+  if (folders.length === 0) return <Empty>Folders you create for saved queries and notebooks will appear here.</Empty>;
+  const sorted = [...folders].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8);
+  return (
+    <ul className="divide-y divide-line">
+      {sorted.map((f) => {
+        const queries = savedQueries.filter((q) => q.folderId === f.id).length;
+        const nbs = notebooks.filter((n) => n.folderId === f.id).length;
+        return (
+          <li key={f.id}>
+            <button className={rowBtn} onClick={() => useUiStore.getState().openFolder(f.id)} title="Open the folder" aria-label={`Folder ${f.name}`}>
+              <Icon name="folder" size={14} className="text-accent" />
+              <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{f.name}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-faint">
+                {queries} {queries === 1 ? "query" : "queries"} · {nbs} {nbs === 1 ? "notebook" : "notebooks"}
+              </span>
+              <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-faint">{relativeTime(f.updatedAt)}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Notebooks() {
+  const notebooks = useWorkspaceStore((s) => s.notebooks);
+  const folders = useWorkspaceStore((s) => s.folders);
+  if (notebooks.length === 0) return <Empty>Notebooks will appear here.</Empty>;
+  const sorted = [...notebooks].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8);
+  return (
+    <ul className="divide-y divide-line">
+      {sorted.map((n) => {
+        const folder = n.folderId ? folders.find((f) => f.id === n.folderId)?.name : undefined;
+        return (
+          <li key={n.id}>
+            <button className={rowBtn} onClick={() => useUiStore.getState().openNotebook(n.id)} title="Open the notebook" aria-label={`Notebook ${n.name}`}>
+              <Icon name="notebook" size={14} className="text-muted" />
+              <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{n.name}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-faint">{n.cells.length} {n.cells.length === 1 ? "cell" : "cells"}</span>
+              {folder && <span className="hidden shrink-0 truncate text-[11px] text-faint sm:inline">{folder}</span>}
+              <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-faint">{relativeTime(n.updatedAt)}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function Spaces() {
   const spaces = useWorkspaceStore((s) => s.spaces);
   const spaceId = useWorkspaceStore((s) => s.spaceId);
@@ -173,7 +167,19 @@ export default function RecentTabs() {
       <div className="overflow-hidden rounded-xl border border-line bg-surface">
         <Tabs value={tab} onChange={(v) => setTab(v as Tab)} ariaLabel="Recent" className="px-3" tabs={TABS.map((t) => ({ value: t, label: t }))} />
         <div role="tabpanel" aria-label={tab}>
-          {tab === "Datasets" ? <Datasets /> : tab === "Queries" ? <Queries /> : tab === "Snippets" ? <Snippets /> : <Spaces />}
+          {tab === "Datasets" ? (
+            <DatasetList />
+          ) : tab === "Queries" ? (
+            <Queries />
+          ) : tab === "Folders" ? (
+            <Folders />
+          ) : tab === "Notebooks" ? (
+            <Notebooks />
+          ) : tab === "Snippets" ? (
+            <Snippets />
+          ) : (
+            <Spaces />
+          )}
         </div>
       </div>
     </section>

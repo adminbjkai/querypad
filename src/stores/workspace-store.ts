@@ -7,6 +7,8 @@ import type {
 } from "@/types/discovery";
 import type { Pipeline, PipelineStep, PipelineExecutionResult } from "@/types/pipeline";
 import type { LoadedPlugin } from "@/types/plugin";
+import type { Folder, SavedQuery, Notebook, NotebookCell } from "@/types/library";
+import { newCell } from "@/lib/notebook/cells";
 import {
   loadSpaceIndex,
   saveSpaceIndex,
@@ -44,6 +46,8 @@ export interface HistoryEntry {
   rowCount: number | null;
   ms: number;
   error: string | null;
+  /** Who ran it: absent = the user (editor/tab), "agent" = an Agent plan step. */
+  source?: "agent";
 }
 
 interface ImportSummary {
@@ -122,6 +126,9 @@ function emptySpaceData() {
     pipelineResults: {} as Record<string, PipelineExecutionResult>,
     viewMode: "sql" as "sql" | "pipeline",
     plugins: [] as LoadedPlugin[],
+    folders: [] as Folder[],
+    savedQueries: [] as SavedQuery[],
+    notebooks: [] as Notebook[],
   };
 }
 
@@ -158,7 +165,8 @@ interface WorkspaceState {
   addTable: (table: TableInfo, fileName: string, data: Uint8Array) => void;
   removeTable: (name: string) => Promise<void>;
   dropView: (name: string) => Promise<void>;
-  importFiles: (files: Iterable<File>) => Promise<ImportSummary>;
+  /** `options.names` maps a file's `File.name` to the table name to use instead of the derived one. */
+  importFiles: (files: Iterable<File>, options?: { names?: Record<string, string> }) => Promise<ImportSummary>;
   loadSampleData: () => Promise<void>;
   loadTableProfile: (name: string) => Promise<TableProfile | null>;
   /**
@@ -214,6 +222,35 @@ interface WorkspaceState {
   plugins: LoadedPlugin[];
   loadPlugin: (url: string) => Promise<void>;
   unloadPlugin: (id: string) => void;
+
+  // Query library: folders, saved queries and notebooks. Saved with the space; live rooms
+  // share tabs only (src/lib/collaboration/sync.ts), never the library.
+  folders: Folder[];
+  savedQueries: SavedQuery[];
+  notebooks: Notebook[];
+  createFolder: (name: string) => Folder;
+  renameFolder: (id: string, name: string) => void;
+  /** Queries and notebooks inside move to the top level; nothing is deleted with the folder. */
+  deleteFolder: (id: string) => void;
+  /**
+   * Save a tab's SQL to the library: updates the query the tab is bound to (name/folder
+   * only when given), or creates one and binds the tab to it. The tab takes the name as title.
+   */
+  saveQuery: (tabId: string, name: string, folderId?: string | null) => SavedQuery;
+  /** Returns the id of the tab bound to the query (made active) or of a new tab seeded with it. */
+  openSavedQuery: (id: string) => string;
+  /** Also renames the bound tab. */
+  renameSavedQuery: (id: string, name: string) => void;
+  moveSavedQuery: (id: string, folderId: string | null) => void;
+  /** Bound tabs keep their text but are unbound. */
+  deleteSavedQuery: (id: string) => void;
+  /** Starts with one empty SQL cell. */
+  createNotebook: (name: string, folderId?: string | null) => Notebook;
+  renameNotebook: (id: string, name: string) => void;
+  moveNotebook: (id: string, folderId: string | null) => void;
+  deleteNotebook: (id: string) => void;
+  /** Replace the whole cell list (use src/lib/notebook/cells.ts to derive it). */
+  updateNotebookCells: (id: string, cells: NotebookCell[]) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -355,7 +392,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
-  importFiles: async (files) => {
+  importFiles: async (files, options) => {
     const summary: ImportSummary = { added: [], problems: [] };
     const { loadFileAsTable } = await import("@/lib/duckdb/files");
     const hadOnlySamples =
@@ -371,7 +408,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (size) summary.problems.push({ tone: size.type, message: size.message });
       if (size?.type === "error") continue;
       try {
-        const { table, data } = await loadFileAsTable(file);
+        const { table, data } = await loadFileAsTable(file, options?.names?.[file.name] || undefined);
         get().addTable(table, file.name, data);
         summary.added.push(table.name);
       } catch (err) {
@@ -764,6 +801,140 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   unloadPlugin: (id) =>
     set((state) => ({ plugins: state.plugins.filter((p) => p.manifest.id !== id) })),
+
+  // Query library
+  folders: [],
+  savedQueries: [],
+  notebooks: [],
+
+  createFolder: (name) => {
+    const now = Date.now();
+    const folder: Folder = { id: crypto.randomUUID(), name, createdAt: now, updatedAt: now };
+    set((state) => ({ folders: [...state.folders, folder] }));
+    return folder;
+  },
+
+  renameFolder: (id, name) =>
+    set((state) => ({
+      folders: state.folders.map((f) => (f.id === id && f.name !== name ? { ...f, name, updatedAt: Date.now() } : f)),
+    })),
+
+  deleteFolder: (id) =>
+    set((state) => {
+      const now = Date.now();
+      return {
+        folders: state.folders.filter((f) => f.id !== id),
+        savedQueries: state.savedQueries.map((q) =>
+          q.folderId === id ? { ...q, folderId: null, updatedAt: now } : q
+        ),
+        notebooks: state.notebooks.map((n) => (n.folderId === id ? { ...n, folderId: null, updatedAt: now } : n)),
+      };
+    }),
+
+  saveQuery: (tabId, name, folderId) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.id === tabId);
+    if (!tab) throw new Error(`No tab ${tabId}`);
+    const now = Date.now();
+    const bound = tab.savedQueryId ? state.savedQueries.find((q) => q.id === tab.savedQueryId) : undefined;
+    let saved: SavedQuery;
+    if (bound) {
+      const nextFolder = folderId === undefined ? bound.folderId : folderId;
+      const changed = bound.sql !== tab.query || bound.name !== name || bound.folderId !== nextFolder;
+      saved = changed ? { ...bound, sql: tab.query, name, folderId: nextFolder, updatedAt: now } : bound;
+      set((s) => ({
+        savedQueries: changed ? s.savedQueries.map((q) => (q.id === saved.id ? saved : q)) : s.savedQueries,
+        tabs: s.tabs.map((t) => (t.id === tabId && t.title !== name ? { ...t, title: name } : t)),
+      }));
+    } else {
+      saved = {
+        id: crypto.randomUUID(),
+        name,
+        sql: tab.query,
+        folderId: folderId ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      set((s) => ({
+        savedQueries: [...s.savedQueries, saved],
+        tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, title: name, savedQueryId: saved.id } : t)),
+      }));
+    }
+    return saved;
+  },
+
+  openSavedQuery: (id) => {
+    const state = get();
+    const saved = state.savedQueries.find((q) => q.id === id);
+    if (!saved) throw new Error(`No saved query ${id}`);
+    const bound = state.tabs.find((t) => t.savedQueryId === id);
+    if (bound) {
+      set({ activeTabId: bound.id });
+      return bound.id;
+    }
+    const tab: EditorTab = { ...createTab(1, saved.sql), title: saved.name, savedQueryId: id };
+    if (state.tabs.length >= MAX_TABS) {
+      // Same limit as addTab; nothing opens, so the active tab is the best answer we have.
+      toast(`You have ${MAX_TABS} tabs open. Close one to open another.`, "warning");
+      return state.activeTabId;
+    }
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }));
+    return tab.id;
+  },
+
+  renameSavedQuery: (id, name) =>
+    set((state) => ({
+      savedQueries: state.savedQueries.map((q) =>
+        q.id === id && q.name !== name ? { ...q, name, updatedAt: Date.now() } : q
+      ),
+      tabs: state.tabs.map((t) => (t.savedQueryId === id && t.title !== name ? { ...t, title: name } : t)),
+    })),
+
+  moveSavedQuery: (id, folderId) =>
+    set((state) => ({
+      savedQueries: state.savedQueries.map((q) =>
+        q.id === id && q.folderId !== folderId ? { ...q, folderId, updatedAt: Date.now() } : q
+      ),
+    })),
+
+  deleteSavedQuery: (id) =>
+    set((state) => ({
+      savedQueries: state.savedQueries.filter((q) => q.id !== id),
+      tabs: state.tabs.map((t) => (t.savedQueryId === id ? { ...t, savedQueryId: null } : t)),
+    })),
+
+  createNotebook: (name, folderId = null) => {
+    const now = Date.now();
+    const notebook: Notebook = {
+      id: crypto.randomUUID(),
+      name,
+      folderId,
+      cells: [newCell("sql")],
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((state) => ({ notebooks: [...state.notebooks, notebook] }));
+    return notebook;
+  },
+
+  renameNotebook: (id, name) =>
+    set((state) => ({
+      notebooks: state.notebooks.map((n) => (n.id === id && n.name !== name ? { ...n, name, updatedAt: Date.now() } : n)),
+    })),
+
+  moveNotebook: (id, folderId) =>
+    set((state) => ({
+      notebooks: state.notebooks.map((n) =>
+        n.id === id && n.folderId !== folderId ? { ...n, folderId, updatedAt: Date.now() } : n
+      ),
+    })),
+
+  deleteNotebook: (id) => set((state) => ({ notebooks: state.notebooks.filter((n) => n.id !== id) })),
+
+  updateNotebookCells: (id, cells) =>
+    set((state) => ({
+      notebooks: state.notebooks.map((n) => (n.id === id ? { ...n, cells, updatedAt: Date.now() } : n)),
+    })),
 }));
 
 // --- Helpers -------------------------------------------------------------------------
@@ -902,6 +1073,7 @@ async function openSpace(spaceId: string): Promise<void> {
     title: pt.title,
     createdAt: pt.createdAt,
     aiThread: pt.aiThread ?? [],
+    savedQueryId: pt.savedQueryId ?? null,
   }));
 
   if (stale()) return;
@@ -926,6 +1098,10 @@ async function openSpace(spaceId: string): Promise<void> {
     viewMode: persisted.viewMode ?? "sql",
     relationshipVerdicts: persisted.relationshipVerdicts ?? {},
     relationshipOverrides: persisted.relationshipOverrides ?? [],
+    // Spaces saved before the library existed load with an empty one.
+    folders: persisted.folders ?? [],
+    savedQueries: persisted.savedQueries ?? [],
+    notebooks: persisted.notebooks ?? [],
   });
   markSaved(spaceId);
 }
@@ -970,12 +1146,20 @@ const TYPING_DEBOUNCE_MS = 1200;
 let localEdits = 0;
 let pendingSave: (() => Promise<void>) | null = null;
 
-function snapshotState(): PersistedState {
+/** The state record a save sends (exported for tests). */
+export function snapshotState(): PersistedState {
   const s = useWorkspaceStore.getState();
   return {
     files: [...s.fileEntries.map(({ name, fileName }) => ({ name, fileName })), ...s.unrestoredFiles],
     views: [...s.views.map(({ name, sql }) => ({ name, sql })), ...s.unrestoredViews],
-    tabs: s.tabs.map(({ id, title, query, createdAt, aiThread }) => ({ id, title, query, createdAt, aiThread })),
+    tabs: s.tabs.map(({ id, title, query, createdAt, aiThread, savedQueryId }) => ({
+      id,
+      title,
+      query,
+      createdAt,
+      aiThread,
+      savedQueryId: savedQueryId ?? null,
+    })),
     activeTabId: s.activeTabId,
     history: s.history,
     pipelines: s.pipelines,
@@ -984,6 +1168,9 @@ function snapshotState(): PersistedState {
     pluginUrls: s.plugins.filter((p) => p.url).map((p) => p.url),
     relationshipVerdicts: s.relationshipVerdicts,
     relationshipOverrides: s.relationshipOverrides,
+    folders: s.folders,
+    savedQueries: s.savedQueries,
+    notebooks: s.notebooks,
   };
 }
 
@@ -1069,7 +1256,10 @@ useWorkspaceStore.subscribe((state, prev) => {
     state.viewMode !== prev.viewMode ||
     state.plugins !== prev.plugins ||
     state.relationshipVerdicts !== prev.relationshipVerdicts ||
-    state.relationshipOverrides !== prev.relationshipOverrides;
+    state.relationshipOverrides !== prev.relationshipOverrides ||
+    state.folders !== prev.folders ||
+    state.savedQueries !== prev.savedQueries ||
+    state.notebooks !== prev.notebooks;
   if (otherChanged || state.tabs !== prev.tabs) {
     localEdits += 1;
     if (saveTimer) clearTimeout(saveTimer);
@@ -1113,7 +1303,7 @@ function applyRemoteState(remote: PersistedState): void {
   const tabs = (remote.tabs ?? []).map((pt) => {
     const local = localById.get(pt.id);
     const base = local ?? { ...createTab(1, pt.query), id: pt.id, createdAt: pt.createdAt };
-    return { ...base, title: pt.title, query: pt.query, aiThread: pt.aiThread ?? [] };
+    return { ...base, title: pt.title, query: pt.query, aiThread: pt.aiThread ?? [], savedQueryId: pt.savedQueryId ?? null };
   });
   const pipelines = remote.pipelines ?? [];
   applyingRemote = true;
@@ -1130,6 +1320,9 @@ function applyRemoteState(remote: PersistedState): void {
         : (pipelines[0]?.id ?? null),
       relationshipVerdicts: remote.relationshipVerdicts ?? {},
       relationshipOverrides: remote.relationshipOverrides ?? [],
+      folders: remote.folders ?? [],
+      savedQueries: remote.savedQueries ?? [],
+      notebooks: remote.notebooks ?? [],
     });
     if (s.spaceId) markSaved(s.spaceId);
   } finally {

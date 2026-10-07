@@ -4,7 +4,8 @@ import { fileExtension, sanitizeTableName } from "../utils";
 import type { TableInfo } from "@/types";
 
 
-export async function loadRemoteFileAsTable(url: string): Promise<{
+/** Fetch a public file and load it as a table named `name` (default: derived from the URL's file name). */
+export async function loadRemoteFileAsTable(url: string, name?: string): Promise<{
   table: TableInfo;
   fileName: string;
   data: Uint8Array;
@@ -35,7 +36,7 @@ export async function loadRemoteFileAsTable(url: string): Promise<{
   }
 
   const buffer = new Uint8Array(await response.arrayBuffer());
-  const tableName = sanitizeTableName(fileName);
+  const tableName = name || sanitizeTableName(fileName);
   const table = await loadBufferAsTable(tableName, fileName, new Uint8Array(buffer));
 
   return { table, fileName, data: buffer };

@@ -1,16 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore, type SidebarPanel } from "@/stores/ui-store";
 import type { TableInfo } from "@/types";
 import { relationshipKey } from "@/lib/discovery/relationships";
+import { readPreference, writePreference } from "@/lib/preferences";
+import { askAssistant } from "@/components/home/Composer";
 import TableSchema from "./TableSchema";
 import ProfileDrawer from "./ProfileDrawer";
 import RelationshipsPanel from "./RelationshipsPanel";
 import HistoryPanel from "./HistoryPanel";
 import SnippetsPanel from "./SnippetsPanel";
 import PanelHeader, { SearchBox } from "./PanelHeader";
+import { PinIcon, firstSeen } from "./TableHoverCard";
 import { Icon } from "@/components/ui/icons";
 import { SectionLabel, btn } from "@/components/ui/primitives";
 
@@ -21,9 +24,21 @@ function matchesFilter(table: TableInfo, q: string): boolean {
   return !q || table.name.toLowerCase().includes(q) || table.columns.some((c) => c.name.toLowerCase().includes(q));
 }
 
+/** Pinned table names, remembered per space in this browser. */
+const pinsKey = (spaceId: string | null) => `querypad-pins:${spaceId ?? "default"}`;
+function readPins(spaceId: string | null): string[] {
+  try {
+    const parsed: unknown = JSON.parse(readPreference(pinsKey(spaceId)) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function Sidebar() {
   const tables = useWorkspaceStore((s) => s.tables);
   const views = useWorkspaceStore((s) => s.views);
+  const spaceId = useWorkspaceStore((s) => s.spaceId);
   const discovery = useWorkspaceStore((s) => s.discovery);
   const verdicts = useWorkspaceStore((s) => s.relationshipVerdicts);
   const open = useUiStore((s) => s.sidebarOpen);
@@ -44,13 +59,54 @@ export default function Sidebar() {
     return marks;
   }, [discovery.relationships, verdicts]);
 
+  // Remember when each table first appeared, for the hover card's "Loaded" line.
+  useEffect(() => {
+    const now = Date.now();
+    for (const t of tables) {
+      const key = `${spaceId}:${t.name}`;
+      if (!firstSeen.has(key)) firstSeen.set(key, now);
+    }
+  }, [spaceId, tables]);
+
+  // Pins are per space: re-read them when the space changes (state adjusted during render, not in an effect).
+  const [pinState, setPinState] = useState(() => ({ spaceId, pins: readPins(spaceId) }));
+  if (pinState.spaceId !== spaceId) setPinState({ spaceId, pins: readPins(spaceId) });
+  const pins = pinState.pins;
+  const togglePin = useCallback(
+    (name: string) => {
+      setPinState((current) => {
+        const next = current.pins.includes(name) ? current.pins.filter((n) => n !== name) : [...current.pins, name];
+        writePreference(pinsKey(current.spaceId), JSON.stringify(next));
+        return { ...current, pins: next };
+      });
+    },
+    []
+  );
+
   const [filter, setFilter] = useState("");
   const q = filter.trim().toLowerCase();
   const visibleTables = useMemo(() => tables.filter((t) => matchesFilter(t, q)), [tables, q]);
   const visibleViews = useMemo(() => views.filter((t) => matchesFilter(t, q)), [views, q]);
+  const pinnedTables = useMemo(() => pins.map((name) => visibleTables.find((t) => t.name === name)).filter((t): t is TableInfo => !!t), [pins, visibleTables]);
+  const otherTables = useMemo(() => visibleTables.filter((t) => !pins.includes(t.name)), [pins, visibleTables]);
 
   const visibleProfile = profileTable && tables.some((t) => t.name === profileTable) ? profileTable : null;
   if (!open) return null;
+
+  const renderTable = (t: TableInfo) => (
+    <TableSchema
+      key={t.name}
+      table={t}
+      filter={q}
+      keyColumns={keyColumns}
+      profileActive={visibleProfile === t.name}
+      onOpenProfile={() => setProfileTable(visibleProfile === t.name ? null : t.name)}
+      pinned={pins.includes(t.name)}
+      onTogglePin={() => togglePin(t.name)}
+    />
+  );
+  /** "Tables 2 of 5" while searching; the plain count otherwise. */
+  const ofTotal = (shown: number, total: number) => (q && shown !== total ? <span className="normal-case tracking-normal">of {total}</span> : null);
 
   return (
     <>
@@ -81,18 +137,24 @@ export default function Sidebar() {
                 </PanelHeader>
                 <SearchBox value={filter} onChange={setFilter} placeholder="Search tables and columns" label="Search tables and columns" />
                 <div className="min-h-0 flex-1 overflow-y-auto pb-3">
-                  {visibleTables.length > 0 && <SectionLabel as="div" className="px-3 pb-1 pt-3" count={visibleTables.length}>Tables</SectionLabel>}
-                  {visibleTables.map((t) => (
-                    <TableSchema
-                      key={t.name}
-                      table={t}
-                      filter={q}
-                      keyColumns={keyColumns}
-                      profileActive={visibleProfile === t.name}
-                      onOpenProfile={() => setProfileTable(visibleProfile === t.name ? null : t.name)}
-                    />
-                  ))}
-                  {visibleViews.length > 0 && <SectionLabel as="div" className="px-3 pb-1 pt-3" count={visibleViews.length}>Views</SectionLabel>}
+                  {pinnedTables.length > 0 && (
+                    <SectionLabel as="div" className="px-3 pb-1 pt-3" count={pinnedTables.length}>
+                      <PinIcon size={11} className="mr-1 inline align-[-1px] text-accent" />
+                      Pinned
+                    </SectionLabel>
+                  )}
+                  {pinnedTables.map(renderTable)}
+                  {otherTables.length > 0 && (
+                    <SectionLabel as="div" className="px-3 pb-1 pt-3" count={otherTables.length}>
+                      Tables {ofTotal(otherTables.length, tables.length - pinnedTables.length)}
+                    </SectionLabel>
+                  )}
+                  {otherTables.map(renderTable)}
+                  {visibleViews.length > 0 && (
+                    <SectionLabel as="div" className="px-3 pb-1 pt-3" count={visibleViews.length}>
+                      Views {ofTotal(visibleViews.length, views.length)}
+                    </SectionLabel>
+                  )}
                   {visibleViews.map((v) => (
                     <TableSchema
                       key={`view:${v.name}`}
@@ -121,6 +183,19 @@ export default function Sidebar() {
                   )}
                   {q && visibleTables.length === 0 && visibleViews.length === 0 && (tables.length > 0 || views.length > 0) && (
                     <p className="px-3 py-4 text-[13px] text-muted">Nothing matches “{filter.trim()}”.</p>
+                  )}
+                  {q && (tables.length > 0 || views.length > 0) && (
+                    <div className="mt-2 border-t border-line px-1.5 pt-2">
+                      <button
+                        onClick={() => askAssistant(`Which of my tables and columns relate to "${filter.trim()}", and how are they connected?`)}
+                        className="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 text-left text-[12px] text-muted transition-colors hover:bg-sunken hover:text-ink"
+                      >
+                        <Icon name="sparkle" size={14} className="shrink-0 text-accent" />
+                        <span className="truncate">
+                          Ask the Assistant about <span className="font-mono text-ink">{filter.trim()}</span>
+                        </span>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

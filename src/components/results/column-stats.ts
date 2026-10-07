@@ -14,6 +14,8 @@ export interface ColumnStats {
   minNum: number | null;
   maxNum: number | null;
   mean: number | null;
+  /** Total of the numeric values (null for non-numeric columns). */
+  sum: number | null;
   top: { label: string; count: number }[];
   /** Equal-width bins over [minNum, maxNum]; only for numeric columns with data. */
   histogram: { from: number; to: number; count: number }[] | null;
@@ -58,6 +60,7 @@ function computeColumnStats(result: QueryResult, column: string): ColumnStats {
   const histogramIsDate = nums.length === 0 && times.length > 0;
   const points = histogramIsDate ? times : nums;
   let mean: number | null = null;
+  let sumNum: number | null = null;
   let minNum: number | null = null;
   let maxNum: number | null = null;
   let histogram: ColumnStats["histogram"] = null;
@@ -74,6 +77,7 @@ function computeColumnStats(result: QueryResult, column: string): ColumnStats {
     maxNum = hi;
     if (!histogramIsDate) {
       mean = sum / points.length;
+      sumNum = sum;
       min = formatValue(lo);
       max = formatValue(hi);
     }
@@ -89,7 +93,7 @@ function computeColumnStats(result: QueryResult, column: string): ColumnStats {
     .slice(0, 5)
     .map(([label, count]) => ({ label, count }));
 
-  return { kind, type, total, nulls, distinct: counts.size, min, max, minNum, maxNum, mean, top, histogram, histogramIsDate };
+  return { kind, type, total, nulls, distinct: counts.size, min, max, minNum, maxNum, mean, sum: sumNum, top, histogram, histogramIsDate };
 }
 
 /** 1234 → "1.2K", 1_500_000 → "1.5M"; small numbers keep up to two decimals. */

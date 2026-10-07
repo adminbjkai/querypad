@@ -7,9 +7,14 @@ import { useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { runActive } from "@/lib/workspace-actions";
 import { formatSql } from "./format-sql";
+import SaveQueryButton from "./SaveQueryButton";
 import PeerCursors from "@/components/collaboration/PeerCursors";
+import ConfirmDialog from "@/components/library/ConfirmDialog";
+import MoveToFolderDialog from "@/components/library/MoveToFolderDialog";
+import { openSaveQueryDialog } from "@/components/library/SaveQueryDialog";
 import { Icon } from "@/components/ui/icons";
-import { MOD, Spinner, btn, kbdOnAccent } from "@/components/ui/primitives";
+import { MOD, Menu, Spinner, btn, kbdOnAccent } from "@/components/ui/primitives";
+import type { SavedQuery } from "@/types";
 
 /**
  * Query tabs plus the editor tools. The tab list scrolls sideways (hidden scrollbar, wheel
@@ -23,12 +28,17 @@ export default function TabBar() {
   const removeTab = useWorkspaceStore((s) => s.removeTab);
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
   const renameTab = useWorkspaceStore((s) => s.renameTab);
+  const savedQueries = useWorkspaceStore((s) => s.savedQueries);
   const active = tabs.find((t) => t.id === activeTabId);
+  const savedFor = (tab: { savedQueryId?: string | null }): SavedQuery | undefined =>
+    tab.savedQueryId ? savedQueries.find((q) => q.id === tab.savedQueryId) : undefined;
   const aiOpen = useUiStore((s) => s.aiOpen);
   const roomId = useCollaborationStore((s) => s.roomId);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [moving, setMoving] = useState<SavedQuery | null>(null);
+  const [unsaving, setUnsaving] = useState<SavedQuery | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Keep the active tab visible when it changes (new tab, keyboard navigation, restore).
@@ -36,9 +46,19 @@ export default function TabBar() {
     document.getElementById(`query-tab-${activeTabId}`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeTabId, tabs.length]);
 
+  // Renaming a saved tab renames the library entry too, so the tab and the folder agree.
   const commit = () => {
-    if (editingId && editValue.trim()) renameTab(editingId, editValue.trim());
+    const name = editValue.trim();
+    if (editingId && name) {
+      renameTab(editingId, name);
+      const saved = savedFor(tabs.find((t) => t.id === editingId) ?? {});
+      if (saved) useWorkspaceStore.getState().renameSavedQuery(saved.id, name);
+    }
     setEditingId(null);
+  };
+  const startRename = (tab: { id: string; title: string; savedQueryId?: string | null }) => {
+    setEditingId(tab.id);
+    setEditValue(savedFor(tab)?.name ?? tab.title);
   };
 
   return (
@@ -55,6 +75,9 @@ export default function TabBar() {
       >
         {tabs.map((tab) => {
           const selected = tab.id === activeTabId;
+          const saved = savedFor(tab);
+          const title = saved?.name ?? tab.title;
+          const dirty = !!saved && saved.sql !== tab.query;
           return (
             <div
               key={tab.id}
@@ -78,10 +101,7 @@ export default function TabBar() {
                 }
               }}
               id={`query-tab-${tab.id}`}
-              onDoubleClick={() => {
-                setEditingId(tab.id);
-                setEditValue(tab.title);
-              }}
+              onDoubleClick={() => startRename(tab)}
               onAuxClick={(e) => e.button === 1 && tabs.length > 1 && removeTab(tab.id)}
               className={`group relative flex min-w-[88px] max-w-[180px] shrink cursor-pointer select-none items-center gap-1.5 border-r border-line px-3 text-[13px] ${
                 selected ? "bg-surface text-ink" : "text-muted hover:bg-sunken hover:text-ink"
@@ -95,6 +115,9 @@ export default function TabBar() {
               ) : tab.result ? (
                 <span className="size-1.5 rounded-full bg-ok" title="Has results" />
               ) : null}
+              {saved && (
+                <Icon name="bookmark" size={12} className="shrink-0 fill-current text-accent" aria-label="Saved query" />
+              )}
               {editingId === tab.id ? (
                 <input
                   value={editValue}
@@ -110,7 +133,38 @@ export default function TabBar() {
                   aria-label="Tab name"
                 />
               ) : (
-                <span className="min-w-0 flex-1 truncate">{tab.title}</span>
+                <span className="min-w-0 flex-1 truncate" title={dirty ? `${title} — unsaved changes` : title}>
+                  {title}
+                </span>
+              )}
+              {dirty && <span className="size-1.5 shrink-0 rounded-full bg-warn" title="Unsaved changes" aria-label="Unsaved changes" />}
+              {selected && (
+                <Menu
+                  label={`Tab ${title}`}
+                  trigger={({ toggle }) => (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggle();
+                      }}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                      className="shrink-0 rounded p-0.5 text-faint hover:bg-sunken hover:text-ink"
+                      aria-label={`Options for ${title}`}
+                      title="Tab options"
+                    >
+                      <Icon name="more" size={14} />
+                    </button>
+                  )}
+                  items={[
+                    { label: "Rename…", icon: "edit", onSelect: () => startRename(tab) },
+                    ...(saved
+                      ? [
+                          { label: "Move to folder…", icon: "folder" as const, onSelect: () => setMoving(saved) },
+                          { label: "Remove from saved", icon: "trash" as const, danger: true, onSelect: () => setUnsaving(saved) },
+                        ]
+                      : [{ label: "Save query…", icon: "bookmark" as const, hint: `${MOD}+S`, onSelect: () => openSaveQueryDialog(tab.id) }]),
+                  ]}
+                />
               )}
               {tabs.length > 1 && (
                 <button
@@ -119,7 +173,7 @@ export default function TabBar() {
                     removeTab(tab.id);
                   }}
                   className={`shrink-0 rounded p-0.5 text-faint hover:bg-sunken hover:text-ink focus-visible:opacity-100 ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}
-                  aria-label={`Close ${tab.title}`}
+                  aria-label={`Close ${title}`}
                 >
                   <Icon name="x" size={14} />
                 </button>
@@ -132,9 +186,10 @@ export default function TabBar() {
         </button>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-l border-line bg-chrome px-2">
+      <div className="flex shrink-0 items-center gap-2 border-l border-line bg-chrome px-2" role="toolbar" aria-label="Editor tools">
         {roomId && <PeerCursors />}
         <div className="flex items-center">
+          <SaveQueryButton />
           <button
             onClick={() => void formatSql()}
             disabled={!active?.query.trim()}
@@ -182,6 +237,19 @@ export default function TabBar() {
           </span>
         </button>
       </div>
+      {moving && (
+        <MoveToFolderDialog
+          name={moving.name}
+          current={moving.folderId}
+          onMove={(folderId) => useWorkspaceStore.getState().moveSavedQuery(moving.id, folderId)}
+          onClose={() => setMoving(null)}
+        />
+      )}
+      {unsaving && (
+        <ConfirmDialog title="Remove from saved?" action="Remove" onConfirm={() => useWorkspaceStore.getState().deleteSavedQuery(unsaving.id)} onClose={() => setUnsaving(null)}>
+          <span className="font-medium text-ink">{unsaving.name}</span> leaves the folder library on every device. This tab keeps its SQL.
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

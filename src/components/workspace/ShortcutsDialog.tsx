@@ -6,7 +6,7 @@ const KEYBOARD: [string, string[]][] = [
   ["Run query (or the selected part)", [MOD, "Enter"]],
   ["Ask AI to write SQL", [MOD, "K"]],
   ["Open the Assistant chat", [MOD, "I"]],
-  ["Show or hide the side panel", [MOD, "B"]],
+  ["Show or hide the Tables panel (SQL, Notebooks)", [MOD, "B"]],
   ["Command palette", [MOD, "P"]],
   ["Format SQL", ["Shift", "Alt", "F"]],
   ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
@@ -14,6 +14,17 @@ const KEYBOARD: [string, string[]][] = [
   ["Resize focused editor divider", ["↑", "↓"]],
   ["Resize focused column handle", ["←", "→"]],
   ["This list", ["?"]],
+];
+
+/** "G then a letter" jumps to a page of the navigation. */
+const NAVIGATION: [string, string[]][] = [
+  ["Go to Home", ["G", "H"]],
+  ["Go to Agent", ["G", "A"]],
+  ["Go to SQL", ["G", "S"]],
+  ["Go to Notebooks", ["G", "N"]],
+  ["Go to Pipelines", ["G", "P"]],
+  ["Go to Tables", ["G", "T"]],
+  ["Go to Folders", ["G", "F"]],
 ];
 
 const MOUSE: [string, string][] = [
@@ -40,6 +51,8 @@ export default function ShortcutsDialog({ onClose }: { onClose: () => void }) {
     <Dialog title="Keyboard shortcuts" onClose={onClose} width="max-w-sm">
       <SectionLabel>Keyboard</SectionLabel>
       <Rows rows={KEYBOARD} />
+      <SectionLabel className="mt-4">Navigation</SectionLabel>
+      <Rows rows={NAVIGATION} />
       <SectionLabel className="mt-4">Mouse</SectionLabel>
       <Rows rows={MOUSE} />
     </Dialog>

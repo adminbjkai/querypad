@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useWorkspaceStore, type HistoryEntry } from "@/stores/workspace-store";
 import { Icon } from "@/components/ui/icons";
 import PanelHeader, { SearchBox } from "./PanelHeader";
-import { HoverTray, Segmented, btn } from "@/components/ui/primitives";
+import { Chip, HoverTray, Segmented, btn } from "@/components/ui/primitives";
 import { relativeTime } from "@/components/home/format";
 
 type Filter = "all" | "ok" | "failed";
@@ -86,6 +86,7 @@ export default function HistoryPanel() {
                       <span>{entry.rowCount?.toLocaleString()} rows</span>
                     )}
                     <span>{entry.ms} ms</span>
+                    {entry.source === "agent" && <Chip className="h-4! px-1!">Agent</Chip>}
                     <span className="ml-auto">{relativeTime(entry.at)}</span>
                   </span>
                 </button>

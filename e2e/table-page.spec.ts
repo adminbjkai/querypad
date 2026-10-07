@@ -78,13 +78,17 @@ test.describe("Table page", () => {
     await openHome(page);
     await page.getByRole("button", { name: "Inspect dataset departments" }).click();
     await expect(page.getByRole("heading", { name: "departments", level: 1 })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Tables", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Tables", exact: true })).toHaveAttribute("aria-current", "page");
 
-    // The "Tables" crumb goes back to the workbench's explorer.
+    // The "Tables" crumb goes back to the Tables page (the catalog).
     await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("button", { name: "All tables" }).click();
-    await expect(page.getByRole("complementary", { name: "Tables panel" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tables", level: 1 })).toBeVisible();
 
-    // Explorer rows open the page too.
+    // Explorer rows (the Tables panel beside SQL) open the page too.
+    await page.getByRole("button", { name: "SQL", exact: true }).click();
+    const panel = page.getByRole("complementary", { name: "Tables panel" });
+    if (!(await panel.isVisible())) await page.getByRole("button", { name: "Tables panel" }).click();
+    await expect(panel).toBeVisible();
     await page.getByRole("button", { name: "Open employees" }).click({ force: true });
     await expect(page.getByRole("heading", { name: "employees", level: 1 })).toBeVisible();
   });
@@ -122,7 +126,7 @@ test.describe("Table page", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     // The desktop load left the panel open; it now floats over the page.
     const panel = page.getByRole("complementary", { name: "Tables panel" });
-    if (!(await panel.isVisible())) await page.getByRole("button", { name: "Tables", exact: true }).click();
+    if (!(await panel.isVisible())) await page.getByRole("button", { name: "Tables panel" }).click();
     await expect(panel).toBeVisible();
     await page.screenshot({ path: "/tmp/lane-a-mobile.png" });
     await panel.getByRole("button", { name: "Close panel" }).click();

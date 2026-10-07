@@ -2,12 +2,15 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useWorkspaceStore, saveSharedAsSpace } from "@/stores/workspace-store";
-import { useUiStore } from "@/stores/ui-store";
+import { PANEL_PAGES, useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { shareWorkspace } from "@/lib/workspace-actions";
 import RoomBar from "@/components/collaboration/RoomBar";
 import { Icon } from "@/components/ui/icons";
 import { MOD, btn } from "@/components/ui/primitives";
+import { startFolder, startNotebook } from "./NavRail";
+
+const crumb = "truncate rounded font-medium text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
 /** The light bar above the work area: where you are, and the space-wide actions. */
 export default function PageHeader() {
@@ -15,38 +18,62 @@ export default function PageHeader() {
   const isSharedPage = usePathname() === "/shared";
   const page = useUiStore((s) => s.workspacePage);
   const tablePage = useUiStore((s) => s.tablePage);
+  const notebookId = useUiStore((s) => s.notebookId);
+  const notebookName = useWorkspaceStore((s) => (notebookId ? (s.notebooks.find((n) => n.id === notebookId)?.name ?? null) : null));
+  const folderId = useUiStore((s) => s.folderId);
+  const folderName = useWorkspaceStore((s) => (folderId ? (s.folders.find((f) => f.id === folderId)?.name ?? null) : null));
   const viewMode = useWorkspaceStore((s) => s.viewMode);
   const spaceName = useWorkspaceStore((s) => s.spaces.find((sp) => sp.id === s.spaceId)?.name);
   const hasTables = useWorkspaceStore((s) => s.tables.length > 0);
+  const hasData = useWorkspaceStore((s) => s.tables.length + s.views.length > 0);
   const persistEnabled = useWorkspaceStore((s) => s.persistEnabled);
   const roomId = useCollaborationStore((s) => s.roomId);
   const assistantOpen = useUiStore((s) => s.assistantOpen);
+  const tablesPanelOpen = useUiStore((s) => s.sidebarOpen && s.sidebarPanel === "tables");
   const setDialog = useUiStore((s) => s.setDialog);
   const toast = useUiStore((s) => s.toast);
 
-  const title = page === "home" ? "Home" : page === "table" ? (tablePage ?? "Table") : viewMode === "sql" ? "SQL" : "Pipelines";
   const space = isSharedPage ? "Shared link" : (spaceName ?? "Space");
-  const crumb = "truncate rounded font-medium text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
-  const openTablesPanel = () => {
-    const ui = useUiStore.getState();
-    ui.setWorkspacePage("workbench");
-    ui.showPanel("tables");
-  };
+  // Pages with a parent list show it as a crumb; the last crumb is the page itself.
+  const parent: { label: string; onClick: () => void; aria: string } | null =
+    page === "table"
+      ? { label: "Tables", aria: "All tables", onClick: () => useUiStore.getState().setWorkspacePage("tables") }
+      : page === "notebooks" && notebookId
+        ? { label: "Notebooks", aria: "All notebooks", onClick: () => useUiStore.getState().openNotebook(null) }
+        : page === "folders" && folderId
+          ? { label: "Folders", aria: "All folders", onClick: () => useUiStore.getState().openFolder(null) }
+          : null;
+  const title =
+    page === "home"
+      ? "Home"
+      : page === "table"
+        ? (tablePage ?? "Table")
+        : page === "tables"
+          ? "Tables"
+          : page === "agent"
+            ? "Agent"
+            : page === "notebooks"
+              ? (notebookId ? (notebookName ?? "Notebook") : "Notebooks")
+              : page === "folders"
+                ? (folderId ? (folderName ?? "Folder") : "Folders")
+                : viewMode === "sql"
+                  ? "SQL"
+                  : "Pipelines";
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-chrome px-3 sm:px-4">
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
-        {page === "table" ? (
+        {parent ? (
           <>
             <button onClick={() => useUiStore.getState().setWorkspacePage("home")} className={`${crumb} max-sm:hidden`} title={space}>{space}</button>
             <Icon name="chevronRight" size={14} className="text-faint max-sm:hidden" />
-            <button onClick={openTablesPanel} className={crumb} aria-label="All tables" title="Open the Tables panel">Tables</button>
+            <button onClick={parent.onClick} className={crumb} aria-label={parent.aria} title={`Open ${parent.label}`}>{parent.label}</button>
           </>
         ) : (
           <span className="truncate font-medium text-muted" title={space}>{space}</span>
         )}
         <Icon name="chevronRight" size={14} className="text-faint" />
-        <span className={`font-semibold text-ink ${page === "table" ? "min-w-0 truncate font-mono" : "shrink-0"}`} aria-current="page">{title}</span>
+        <span className={`font-semibold text-ink ${page === "table" ? "min-w-0 truncate font-mono" : "min-w-0 truncate"}`} aria-current="page">{title}</span>
       </nav>
 
       {isSharedPage && !persistEnabled && (
@@ -65,6 +92,36 @@ export default function PageHeader() {
       )}
 
       <div className="flex shrink-0 items-center gap-1.5">
+        {PANEL_PAGES.has(page) && (
+          <button
+            onClick={() => useUiStore.getState().togglePanel("tables")}
+            className={`${btn.secondary} ${tablesPanelOpen ? "bg-accent-soft text-accent hover:bg-accent-soft" : ""}`}
+            aria-pressed={tablesPanelOpen}
+            aria-label="Tables panel"
+            title={`Tables panel (${MOD}+B)`}
+          >
+            <Icon name="sidebar" size={16} />
+            <span className="max-lg:hidden">Tables</span>
+          </button>
+        )}
+        {page === "tables" && hasData && (
+          <button onClick={() => setDialog("addFiles")} className={btn.secondary} aria-label="Add data" title="Add data">
+            <Icon name="upload" size={16} />
+            <span className="max-sm:hidden">Add data</span>
+          </button>
+        )}
+        {page === "notebooks" && (
+          <button onClick={() => startNotebook(null)} className={btn.secondary} aria-label="New notebook" title="New notebook">
+            <Icon name="plus" size={16} />
+            <span className="max-sm:hidden">New notebook</span>
+          </button>
+        )}
+        {page === "folders" && (
+          <button onClick={startFolder} className={btn.secondary} aria-label="New folder" title="New folder">
+            <Icon name="folderPlus" size={16} />
+            <span className="max-sm:hidden">New folder</span>
+          </button>
+        )}
         {roomId ? (
           <RoomBar />
         ) : (

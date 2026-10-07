@@ -15,6 +15,9 @@ const state = (): PersistedState => ({
   pluginUrls: [],
   relationshipVerdicts: {},
   relationshipOverrides: [],
+  folders: [],
+  savedQueries: [],
+  notebooks: [{ id: "n1", name: "Notes", folderId: null, cells: [{ id: "c1", kind: "sql", source: "SELECT 1" }], createdAt: 1, updatedAt: 1 }],
 });
 
 test("snapshotKey is stable for equal states and changes with any persisted field", () => {
@@ -25,6 +28,12 @@ test("snapshotKey is stable for equal states and changes with any persisted fiel
   const verdict = state();
   verdict.relationshipVerdicts = { "a.b->c.d": "accepted" };
   assert.notEqual(snapshotKey(state()), snapshotKey(verdict));
+  const cell = state();
+  cell.notebooks![0].cells[0].source = "SELECT 2";
+  assert.notEqual(snapshotKey(state()), snapshotKey(cell), "a notebook cell edit is a new record");
+  const bound = state();
+  bound.tabs![0].savedQueryId = "q1";
+  assert.notEqual(snapshotKey(state()), snapshotKey(bound), "binding a tab to a saved query is a new record");
 });
 
 test("indexEntryStale only asks for a space-list save when the entry would differ", () => {

@@ -37,9 +37,13 @@ Hover/color 120ms; menus & panels 160ms `var(--ease-out)`; respect reduced motio
 
 ## States
 Hover = one fill step (`bg-sunken`). Selected = `bg-accent-soft` + `text-ink`, or a 2px accent bar.
-Navigation: the current item is a raised white card (`bg-surface`, hairline ring, accent icon and edge bar);
-pages carry `aria-current="page"`, panel toggles carry `aria-pressed`. Counts are a `bg-sunken` pill;
-collapsed, they become a 6px accent dot. A sorted grid column shows its header and arrow in `text-accent`.
+Navigation (Snowsight-like): Search + New ▾ (query, notebook, folder, pipeline, add data), then three groups —
+Workspace: Home · Agent · SQL · Notebooks · Pipelines (pages); Data: Tables (page) · Joins (panel, badge =
+joins still to review); Library: Folders (page) · Snippets · History (panels). The current item is a raised
+white card (`bg-surface`, hairline ring, accent icon and edge bar); pages carry `aria-current="page"`, panel
+toggles carry `aria-pressed`. The Tables side panel stays available beside SQL and Notebooks through the
+page header's "Tables panel" toggle and ⌘B. Collapsed items show "Label (G X)" tooltips for the `g`-chords
+(G H/A/S/N/P/T/F). Counts are a `bg-sunken` pill; collapsed, they become a 6px accent dot. A sorted grid column shows its header and arrow in `text-accent`.
 Focus = `:focus-visible` 2px accent outline, offset 2. Disabled = 45% opacity.
 
 ## Patterns
@@ -57,19 +61,46 @@ Focus = `:focus-visible` 2px accent outline, offset 2. Disabled = 45% opacity.
 - Home: greeting, one composer that hands the question to the Assistant, suggestion chips, live
   catalog counts, Recent tabs (datasets, queries, snippets, spaces) and the semantic model — never
   decorative or fabricated statistics.
+- Page header breadcrumbs: `Space › Tables`, `Space › Tables › name`, `Space › Notebooks › name`,
+  `Space › Folders › name`, `Space › Agent`; the parent crumb returns to its list. Page actions sit before the
+  space-wide ones (Collaborate, Share, Assistant): Tables → Add data; Notebooks → New notebook; Folders → New
+  folder; Agent → none. Tables page = title, count, Add data, then the `DatasetList` (search, sort, Preview /
+  Open / Profile per row) in a card, or an empty state with Add data.
 - Table page: breadcrumb `Space › Tables › name` (the space crumb hides under 640px), a mono 22px title
   with the object icon, kind and source file, header actions (Query, Ask Assistant, Copy name), then
   Overview | Preview | Profile tabs (`role=tablist`, arrow keys). Overview = a name-filtered column
   table sorted by #, name or type (`aria-sort`) plus a "Table details" rail (`aside`, 280px on large
   screens); Preview = the results grid over the first 100 rows, no SQL tab; Profile = Row count and
   Columns stat tiles then the column cards.
+- Explorer: pinned tables sit first under a "Pinned" label (pin glyph, remembered per space in local
+  storage); hovering a row for ~400 ms or focusing it opens a 272px summary card beside the panel
+  (`role="dialog"`, "name summary": shape, source, loaded time, keys, Open / Preview; Escape or leave
+  closes; never on touch); searching keeps every match expanded with an accent "n of m columns" chip,
+  `<mark>` on `bg-accent-soft`, "of total" after section counts, and a trailing "Ask the Assistant
+  about …" row. Add data stages each file with an editable, validated table name before "Load".
 - Sample-data banner: a 36px `bg-accent-soft` strip under the page header with an "Add data" action
   and a dismiss remembered per space — never a floating toast.
 - Results header stats (toggle in the `#` header; on by default up to 50 columns, remembered): a
   histogram (numbers, dates) or a stacked top-values bar with the null share as a trailing marker, then
   two mono lines — min/max, the top value with its share and "+N more" (both values for a two-valued
   column), or true/false shares for booleans; bins and the block carry hover titles; click opens the
-  column inspector.
+  column card.
+- Results toolbar: the "N rows · N columns · N ms" meta is a button (`aria-label="Query details"`) opening
+  a popover (rows, columns, a duration bar — "Total" only, DuckDB-Wasm reports no parse/execute split —
+  "Ran at" and the SQL with Copy); an active grid sort is an accent `Chip` ("dept_name ASC" with a 14px
+  × button, `aria-label="Clear sort"`); "Choose columns" (columns icon) opens a dialog with search,
+  Select all and a checkbox per column — Apply hides unchecked columns in the grid and the exports;
+  "✦ Next steps" opens a popover of up to three locally computed follow-ups (join a related table on
+  the discovered key with its overlap, group a text column and count, profile the source table).
+- Column card: a 300px popover anchored to the header stats block — name and type, the distribution
+  (histogram) or top values with share bars and a "Show rows" chip per value (applies the grid filter),
+  "NN% filled · NN% null", Distinct, Min/Max, Sum/Average for numbers, then "Keys & joins" rows in
+  `text-join` when the column maps to a loaded table column (unique, referenced by, value overlap);
+  "Open inspector" at the bottom opens the side pane (also in the column ⋮ menu as "Inspect column").
+- Column ⋮ menu order: Copy column name · Hide/Show column stats · Sort ascending · Sort descending ·
+  (Clear sort) · Select column · Copy column values · Inspect column.
+- Selection footer: a header click selects the column and sorts by it; the footer reads "Count N"
+  (plus Sum/Avg/Min/Max for numbers, Unique otherwise); a cell range reads "N cells" with the same stats.
 - Assistant: user turns in soft right-aligned bubbles, replies as full-width prose, lookups as
   compact collapsible rows; a rounded composer with the model picker and a round send button;
   "All chats" lists every conversation in the space.

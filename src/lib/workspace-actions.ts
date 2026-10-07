@@ -103,3 +103,28 @@ export async function copyAgentContext(): Promise<void> {
   );
   toast("Context copied — paste it into Claude Code, Codex, or any agent.", "success");
 }
+
+/**
+ * Save the active tab to the query library: a first save asks for a name and folder, later
+ * saves silently update the bound saved query with the tab's current SQL.
+ */
+export async function saveActiveQuery(): Promise<void> {
+  const tab = activeTab();
+  if (!tab) return;
+  const state = ws();
+  const saved = tab.savedQueryId ? state.savedQueries.find((q) => q.id === tab.savedQueryId) : undefined;
+  if (saved) {
+    state.saveQuery(tab.id, saved.name, saved.folderId);
+    toast("Saved.", "success");
+    return;
+  }
+  const { openSaveQueryDialog } = await import("@/components/library/SaveQueryDialog");
+  openSaveQueryDialog(tab.id);
+}
+
+/** Open a saved query in the workbench (reusing its tab when one is already bound to it). */
+export function openSavedQueryInWorkbench(id: string): void {
+  ws().setViewMode("sql");
+  ws().openSavedQuery(id);
+  useUiStore.getState().setWorkspacePage("workbench");
+}

@@ -187,6 +187,13 @@ falls back to keeping everything in the browser.
   actual values — and never changes your workspace. Drag its edge to resize it, or collapse
   it to a slim strip. Every space keeps its chats: start a new one any time and reopen older
   ones from "All chats"
+- **The Agent** — a page where a planning AI does multi-step work on your data: ask it to
+  build a demo schema, add a date dimension or clean up null-heavy columns and it answers
+  with a numbered plan of single SQL steps, each marked Read, Write or Danger. Reads run on
+  their own; writes wait for your "Run" (or set approvals to Auto); destructive steps always
+  ask again in a confirmation; Plan mode only plans. Every step shows its SQL, result grid or
+  error (with "Fix and retry"), tables it creates appear in the catalog like your own, and a
+  closing summary lists what changed with follow-up chips. Sessions are kept per space
 - **AI models without API keys** — on a self-hosted server, QueryPad can use the AI CLIs
   already signed in on that machine: Claude Sonnet 5.5, Codex GPT-6 Luna and Grok 4.7 (each
   with a low/medium effort toggle), plus Cursor's Grok 4.7 Medium Fast (256k) and Composer

@@ -142,6 +142,7 @@ test.describe("QueryPad", () => {
     await openWithSamples(page);
     await page.getByRole("button", { name: "Add data" }).click();
     await page.getByLabel("Choose data files").setInputFiles(["fixtures/data/users.csv", "fixtures/data/payments.csv"]);
+    await page.getByRole("dialog", { name: "Add data" }).getByRole("button", { name: "Load 2 files" }).click();
     await expect(page.getByRole("button", { name: "users", exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: "payments", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "employees", exact: true })).toHaveCount(0);
@@ -201,6 +202,7 @@ test.describe("QueryPad", () => {
     // Files added in the room reach everyone in it.
     await a.getByRole("button", { name: "Add data" }).click();
     await a.getByLabel("Choose data files").setInputFiles(["fixtures/data/users.csv"]);
+    await a.getByRole("dialog", { name: "Add data" }).getByRole("button", { name: "Load 1 file" }).click();
     await expect(b.getByRole("button", { name: "users", exact: true })).toBeVisible({ timeout: 15_000 });
 
     await a.locator(".monaco-editor").click();

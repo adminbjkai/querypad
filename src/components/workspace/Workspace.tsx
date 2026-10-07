@@ -8,7 +8,7 @@ import { SAMPLE_TABLE_NAMES } from "@/lib/constants";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { useAiStore } from "@/stores/ai-store";
-import { useUiStore } from "@/stores/ui-store";
+import { PANEL_PAGES, useUiStore } from "@/stores/ui-store";
 import { importAndReport } from "@/lib/import";
 import { runActive } from "@/lib/workspace-actions";
 import NavRail from "./NavRail";
@@ -24,6 +24,10 @@ import { btn } from "@/components/ui/primitives";
 const PipelineView = dynamic(() => import("@/components/pipeline/PipelineView"), { ssr: false });
 const Home = dynamic(() => import("./Home"), { ssr: false });
 const TablePage = dynamic(() => import("./TablePage"), { ssr: false });
+const TablesPage = dynamic(() => import("./TablesPage"), { ssr: false });
+const AgentPage = dynamic(() => import("./AgentPage"), { ssr: false });
+const NotebooksPage = dynamic(() => import("@/components/notebook/NotebooksPage"), { ssr: false });
+const FoldersPage = dynamic(() => import("@/components/library/FoldersPage"), { ssr: false });
 const CommandPalette = dynamic(() => import("./CommandPalette"), { ssr: false });
 const AddFilesDialog = dynamic(() => import("@/components/dropzone/AddFilesDialog"), { ssr: false });
 const CollaborateDialog = dynamic(() => import("@/components/collaboration/CollaborateDialog"), { ssr: false });
@@ -38,6 +42,29 @@ function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || !!el.closest(".monaco-editor"));
 }
+
+/** True while a modal dialog, the palette or a menu is open anywhere in the document. */
+function layerOpen(): boolean {
+  return !!document.querySelector('[role="dialog"][aria-modal="true"], [role="menu"]');
+}
+
+/** "G then letter" navigation chords (outside text fields): the pages of the rail. */
+const GO_KEYS: Record<string, () => void> = {
+  h: () => useUiStore.getState().setWorkspacePage("home"),
+  a: () => useUiStore.getState().setWorkspacePage("agent"),
+  s: () => {
+    useWorkspaceStore.getState().setViewMode("sql");
+    useUiStore.getState().setWorkspacePage("workbench");
+  },
+  n: () => useUiStore.getState().openNotebook(null),
+  p: () => {
+    useWorkspaceStore.getState().setViewMode("pipeline");
+    useUiStore.getState().setWorkspacePage("workbench");
+  },
+  t: () => useUiStore.getState().setWorkspacePage("tables"),
+  f: () => useUiStore.getState().openFolder(null),
+};
+const GO_CHORD_MS = 800;
 
 export default function Workspace() {
   const dbReady = useWorkspaceStore((s) => s.dbReady);
@@ -103,20 +130,26 @@ export default function Workspace() {
   }, [hydrated, isSharedPage]);
 
   // An empty space shows Home (where data is added); data arriving — added, or by switching away
-  // from an empty space — opens the workbench. A table page never outlives its space.
+  // from an empty space — opens the workbench. A table page never outlives its space, and an open
+  // notebook or folder (ids belong to one space) falls back to its list.
   const seenData = useRef<{ space: string | null; count: number } | null>(null);
   useEffect(() => {
     if (!hydrated) return;
     const prev = seenData.current;
     seenData.current = { space: spaceId, count: dataCount };
-    const setPage = useUiStore.getState().setWorkspacePage;
+    const ui = useUiStore.getState();
+    const setPage = ui.setWorkspacePage;
+    if (prev && prev.space !== spaceId) {
+      if (ui.workspacePage === "notebooks" && ui.notebookId) ui.openNotebook(null);
+      else if (ui.workspacePage === "folders" && ui.folderId) ui.openFolder(null);
+    }
     if (!prev) {
       if (dataCount === 0) setPage("home");
     } else if (prev.count === 0 && dataCount > 0) {
       setPage("workbench");
     } else if (dataCount === 0 && (prev.count > 0 || prev.space !== spaceId)) {
       setPage("home");
-    } else if (prev.space !== spaceId && useUiStore.getState().workspacePage === "table") {
+    } else if (prev.space !== spaceId && ui.workspacePage === "table") {
       setPage("workbench");
     }
   }, [hydrated, spaceId, dataCount]);
@@ -168,10 +201,22 @@ export default function Workspace() {
 
   // Global shortcuts. Editor-local ones (run, AI) are also bound inside Monaco.
   useEffect(() => {
+    let goArmedAt = 0;
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       const ui = useUiStore.getState();
       const key = e.key.toLowerCase();
+      // Chords only on the page itself: not while typing, and not under any open dialog or menu
+      // (local-state dialogs such as Add data or Save query are not in the ui store).
+      if (!mod && !e.altKey && !isTypingTarget(e.target) && ui.dialog === null && !ui.paletteOpen && !layerOpen()) {
+        if (goArmedAt && Date.now() - goArmedAt < GO_CHORD_MS && GO_KEYS[key]) {
+          goArmedAt = 0;
+          e.preventDefault();
+          GO_KEYS[key]();
+          return;
+        }
+        goArmedAt = key === "g" ? Date.now() : 0;
+      }
       if (mod && key === "p") {
         e.preventDefault();
         ui.setPaletteOpen(!ui.paletteOpen);
@@ -219,7 +264,7 @@ export default function Workspace() {
 
       <div className="flex min-h-0 flex-1">
         <NavRail />
-        {workspacePage === "workbench" && <Sidebar />}
+        {PANEL_PAGES.has(workspacePage) && <Sidebar />}
         <div className="relative flex min-w-0 flex-1 flex-col md:min-w-[320px]">
           <PageHeader />
           {onlySampleTables && !sampleHintDismissed && !isSharedPage && (
@@ -241,7 +286,23 @@ export default function Workspace() {
             </div>
           )}
           <main id="workspace-content" className="flex min-h-0 min-w-0 flex-1 flex-col" tabIndex={-1}>
-            {workspacePage === "home" ? <Home /> : workspacePage === "table" ? <TablePage /> : viewMode === "sql" ? <SqlWorkbench /> : <PipelineView />}
+            {workspacePage === "home" ? (
+              <Home />
+            ) : workspacePage === "table" ? (
+              <TablePage />
+            ) : workspacePage === "tables" ? (
+              <TablesPage />
+            ) : workspacePage === "agent" ? (
+              <AgentPage />
+            ) : workspacePage === "notebooks" ? (
+              <NotebooksPage />
+            ) : workspacePage === "folders" ? (
+              <FoldersPage />
+            ) : viewMode === "sql" ? (
+              <SqlWorkbench />
+            ) : (
+              <PipelineView />
+            )}
           </main>
         </div>
         {!isSharedPage && (assistantOpen ? <AssistantPanel /> : <AssistantRail />)}

@@ -6,14 +6,37 @@ import { usePathname } from "next/navigation";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { relationshipKey } from "@/lib/discovery/relationships";
 import { useSnippetStore } from "@/stores/snippet-store";
-import { useUiStore, type SidebarPanel } from "@/stores/ui-store";
+import { PANEL_PAGES, useUiStore, type SidebarPanel } from "@/stores/ui-store";
 import { copyAgentContext } from "@/lib/workspace-actions";
 import { Icon, type IconName } from "@/components/ui/icons";
-import { Kbd, Menu, MOD, SectionLabel, btn } from "@/components/ui/primitives";
+import { Kbd, Menu, MOD, SectionLabel, btn, type MenuEntry } from "@/components/ui/primitives";
 import { BrandMark } from "./BrandMark";
 import SpaceSwitcher from "./SpaceSwitcher";
 
 const REPO_URL = "https://github.com/adminbjkai/querypad";
+
+/** "Untitled notebook 2" when "Untitled notebook" is taken: a name the user can change on the page. */
+function nextName(base: string, taken: { name: string }[]): string {
+  const names = new Set(taken.map((t) => t.name));
+  if (!names.has(base)) return base;
+  let n = 2;
+  while (names.has(`${base} ${n}`)) n++;
+  return `${base} ${n}`;
+}
+
+/** Create a notebook in the open space (optionally inside a folder, optionally named) and open it. */
+export function startNotebook(folderId: string | null = null, name?: string): void {
+  const ws = useWorkspaceStore.getState();
+  const notebook = ws.createNotebook(name?.trim() || nextName("Untitled notebook", ws.notebooks), folderId);
+  useUiStore.getState().openNotebook(notebook.id);
+}
+
+/** Create a folder in the open space and open it on the Folders page. */
+export function startFolder(): void {
+  const ws = useWorkspaceStore.getState();
+  const folder = ws.createFolder(nextName("New folder", ws.folders));
+  useUiStore.getState().openFolder(folder.id);
+}
 
 /** Phones always get the icon-only rail so the work area keeps its width. */
 function useNarrow(): boolean {
@@ -55,7 +78,7 @@ function NavItem({
       aria-pressed={pressed}
       aria-current={current ? "page" : undefined}
       aria-label={label}
-      title={collapsed ? (hint ? `${label} (${hint})` : label) : hint}
+      title={hint ? `${label} (${hint})` : collapsed ? label : undefined}
       className={`qp-nav-item group relative flex h-8 w-full items-center gap-2.5 rounded-md text-[13px] transition-colors ${
         collapsed ? "justify-center" : "px-2.5"
       } ${
@@ -109,6 +132,8 @@ export default function NavRail() {
     s.discovery.status === "ready" ? s.discovery.relationships.filter((r) => !s.relationshipVerdicts[relationshipKey(r)]).length : 0
   );
   const snippetCount = useSnippetStore((s) => s.snippets.length);
+  const notebookCount = useWorkspaceStore((s) => s.notebooks.length);
+  const folderCount = useWorkspaceStore((s) => s.folders.length);
   const panelOpen = useUiStore((s) => s.sidebarOpen);
   const panel = useUiStore((s) => s.sidebarPanel);
   const theme = useUiStore((s) => s.theme);
@@ -130,7 +155,7 @@ export default function NavRail() {
   };
   const openPanel = (id: SidebarPanel) => {
     const ui = useUiStore.getState();
-    if (ui.workspacePage !== "workbench") {
+    if (!PANEL_PAGES.has(ui.workspacePage)) {
       ui.setWorkspacePage("workbench");
       ui.showPanel(id);
     } else {
@@ -145,12 +170,31 @@ export default function NavRail() {
     setViewMode("pipeline");
     setPage("workbench");
   };
+  const pageItem = (icon: IconName, label: string, onClick: () => void, current: boolean, hint?: string, badge?: number) => (
+    <NavItem
+      key={label}
+      icon={icon}
+      label={label}
+      collapsed={collapsed}
+      current={current}
+      onClick={onClick}
+      hint={hint}
+      badge={badge !== undefined && badge > 0 && !collapsed ? (badge > 99 ? "99+" : badge) : undefined}
+    />
+  );
   const panelItem = (id: SidebarPanel, icon: IconName, label: string, count?: number, hint?: string) => {
-    // A dataset's page lives under Tables, so that item stays lit there.
-    const active = (onWorkbench && panelOpen && panel === id) || (page === "table" && id === "tables");
+    const active = PANEL_PAGES.has(page) && panelOpen && panel === id;
     const badge = count !== undefined && count > 0 && (!collapsed || id === "joins") ? (count > 99 ? "99+" : count) : undefined;
     return <NavItem key={id} icon={icon} label={label} collapsed={collapsed} pressed={active} onClick={() => openPanel(id)} badge={badge} hint={hint} />;
   };
+  const startItems: MenuEntry[] = [
+    { label: "New query", icon: "code", onSelect: newQuery },
+    { label: "New notebook", icon: "notebook", onSelect: () => startNotebook() },
+    { label: "New folder", icon: "folderPlus", onSelect: startFolder },
+    { label: "New pipeline", icon: "flow", onSelect: newPipeline },
+    "divider",
+    { label: "Add data…", icon: "upload", onSelect: () => setDialog("addFiles") },
+  ];
 
   return (
     <nav
@@ -203,9 +247,16 @@ export default function NavRail() {
           )}
         </button>
         {collapsed ? (
-          <button onClick={newQuery} className={btn.icon} aria-label="New query" title="New query">
-            <Icon name="plus" size={16} />
-          </button>
+          <Menu
+            label="New"
+            align="left"
+            trigger={({ toggle, open }) => (
+              <button onClick={toggle} className={`${btn.icon} ${open ? "bg-sunken text-ink" : ""}`} aria-label="New" title="New query, notebook, folder…" aria-expanded={open} aria-haspopup="menu">
+                <Icon name="plus" size={16} />
+              </button>
+            )}
+            items={startItems}
+          />
         ) : (
           <div className="flex shrink-0">
             <button
@@ -233,41 +284,29 @@ export default function NavRail() {
                   <Icon name="chevronDown" size={14} />
                 </button>
               )}
-              items={[
-                { label: "New query", icon: "code", onSelect: newQuery },
-                { label: "New pipeline", icon: "flow", onSelect: newPipeline },
-                { label: "Add data…", icon: "upload", onSelect: () => setDialog("addFiles") },
-              ]}
+              items={startItems}
             />
           </div>
         )}
       </div>
 
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        <Section label="Work" collapsed={collapsed}>
-          <NavItem icon="home" label="Home" collapsed={collapsed} current={page === "home"} onClick={() => setPage("home")} />
-          <NavItem
-            icon="code"
-            label="SQL"
-            collapsed={collapsed}
-            current={onWorkbench && viewMode === "sql"}
-            onClick={goSql}
-          />
-          <NavItem
-            icon="flow"
-            label="Pipelines"
-            collapsed={collapsed}
-            current={onWorkbench && viewMode === "pipeline"}
-            onClick={goPipeline}
-          />
+        <Section label="Workspace" collapsed={collapsed}>
+          {pageItem("home", "Home", () => setPage("home"), page === "home", "G H")}
+          {pageItem("agent", "Agent", () => setPage("agent"), page === "agent", "G A")}
+          {pageItem("code", "SQL", goSql, onWorkbench && viewMode === "sql", "G S")}
+          {pageItem("notebook", "Notebooks", () => useUiStore.getState().openNotebook(null), page === "notebooks", "G N", notebookCount)}
+          {pageItem("flow", "Pipelines", goPipeline, onWorkbench && viewMode === "pipeline", "G P")}
         </Section>
         <Section label="Data" collapsed={collapsed}>
-          {panelItem("tables", "table", "Tables", tableCount, `${MOD}+B`)}
+          {/* A dataset's page lives under Tables, so that item stays lit there. */}
+          {pageItem("table", "Tables", () => setPage("tables"), page === "tables" || page === "table", "G T", tableCount)}
           {panelItem("joins", "join", "Joins", joinsToReview)}
         </Section>
         <Section label="Library" collapsed={collapsed}>
-          {panelItem("history", "history", "History")}
+          {pageItem("folder", "Folders", () => useUiStore.getState().openFolder(null), page === "folders", "G F", folderCount)}
           {panelItem("snippets", "bookmark", "Snippets", snippetCount)}
+          {panelItem("history", "history", "History")}
         </Section>
       </div>
 

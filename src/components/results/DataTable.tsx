@@ -11,7 +11,7 @@ import { Icon, type IconName } from "@/components/ui/icons";
 import { Kbd, KindGlyph, MOD } from "@/components/ui/primitives";
 import ColumnMiniChart, { DIST_HEIGHT } from "./ColumnMiniChart";
 import { computeRangeStats, formatNumber, rangeToTsv } from "./range-stats";
-import { sortRows, type SortDir } from "./sort";
+import { sortRows, type SortState } from "./sort";
 
 const ROW_HEIGHT = 28;
 const HEADER_HEIGHT = 32;
@@ -20,7 +20,6 @@ const NUM_COL = 56;
 const MIN_COL = 48;
 const MAX_COL = 640;
 
-type Sort = { column: string; dir: SortDir } | null;
 type Cell = { row: number; col: number };
 /** A rectangular selection; `mode` records how it was made (whole rows/columns copy differently). */
 type Sel = { anchor: Cell; focus: Cell; mode: "cell" | "row" | "col" | "all" };
@@ -113,7 +112,10 @@ export default memo(function DataTable({
   showStats = false,
   onToggleStats,
   onInspect,
+  onOpenCard,
   onSelectColumn,
+  sort: sortProp,
+  onSortChange,
 }: {
   result: QueryResult;
   filter?: string;
@@ -124,11 +126,22 @@ export default memo(function DataTable({
   /** Hosted in the row-number header; when absent the toggle is not rendered. */
   onToggleStats?: () => void;
   onInspect?: (column: string) => void;
+  /** Click on a header's stats block: opens the column card anchored to it (falls back to `onInspect`). */
+  onOpenCard?: (column: string, anchor: HTMLElement) => void;
   /** Called when a cell is selected, so the inspector can follow the selection. */
   onSelectColumn?: (column: string) => void;
+  /** Controlled sort (with `onSortChange`); when absent the grid keeps its own. */
+  sort?: SortState;
+  onSortChange?: (sort: SortState) => void;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
-  const [sort, setSort] = useState<Sort>(null);
+  const [localSort, setLocalSort] = useState<SortState>(null);
+  const sort = sortProp !== undefined ? sortProp : localSort;
+  const setSort = (next: SortState | ((prev: SortState) => SortState)) => {
+    const value = typeof next === "function" ? next(sort) : next;
+    if (onSortChange) onSortChange(value);
+    else setLocalSort(value);
+  };
   const [overrides, setOverrides] = useState<Record<string, number>>({});
   const [sel, setSel] = useState<Sel | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -353,11 +366,14 @@ export default memo(function DataTable({
   }
 
   const menuItems = (column: string) => [
+    { label: "Copy column name", icon: "copy" as const, onSelect: () => copyColumnName(column) },
+    ...(onToggleStats
+      ? [{ label: showStats ? "Hide column stats" : "Show column stats", icon: "profile" as const, onSelect: onToggleStats }]
+      : []),
     { label: "Sort ascending", icon: "sortAsc" as const, onSelect: () => setSort({ column, dir: "asc" }) },
     { label: "Sort descending", icon: "sortDesc" as const, onSelect: () => setSort({ column, dir: "desc" }) },
     ...(sort?.column === column ? [{ label: "Clear sort", icon: "x" as const, onSelect: () => setSort(null) }] : []),
     { label: "Select column", icon: "table" as const, onSelect: () => selectColumn(result.columns.indexOf(column), false) },
-    { label: "Copy column name", icon: "copy" as const, onSelect: () => copyColumnName(column) },
     { label: "Copy column values", icon: "copy" as const, onSelect: () => copyColumnValues(column) },
     ...(onInspect ? [{ label: "Inspect column", icon: "panelRight" as const, onSelect: () => onInspect(column) }] : []),
   ];
@@ -433,7 +449,12 @@ export default memo(function DataTable({
                   onClick={(e) => {
                     if (e.altKey && onInspect) onInspect(col);
                     else if (e.metaKey || e.ctrlKey) selectColumn(i, e.shiftKey);
-                    else cycleSort(col);
+                    else {
+                      // Snowsight-style: a click selects the column (the footer shows its count) and sorts by it.
+                      parentRef.current?.focus({ preventScroll: true });
+                      selectColumn(i, false);
+                      cycleSort(col);
+                    }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -471,7 +492,14 @@ export default memo(function DataTable({
                       <Icon name="chevronDown" size={14} />
                     </button>
                   </div>
-                  {showStats && onInspect && <ColumnMiniChart result={result} column={col} index={i} onOpen={() => onInspect(col)} />}
+                  {showStats && (onOpenCard || onInspect) && (
+                    <ColumnMiniChart
+                      result={result}
+                      column={col}
+                      index={i}
+                      onOpen={(anchor) => (onOpenCard ? onOpenCard(col, anchor) : onInspect?.(col))}
+                    />
+                  )}
                   <span
                     role="separator"
                     aria-orientation="vertical"
@@ -604,9 +632,14 @@ export default memo(function DataTable({
         >
           {st && range ? (
             <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-              <span className="whitespace-nowrap">
-                <span className="text-ink">{st.cells.toLocaleString()}</span> <span className="text-muted">{st.cells === 1 ? "cell" : "cells"}</span>
-              </span>
+              {range.mode === "col" ? (
+                // A selected column reads as a count of its rows, Snowsight-style.
+                stat("Count", (range.r2 - range.r1 + 1).toLocaleString())
+              ) : (
+                <span className="whitespace-nowrap">
+                  <span className="text-ink">{st.cells.toLocaleString()}</span> <span className="text-muted">{st.cells === 1 ? "cell" : "cells"}</span>
+                </span>
+              )}
               {st.numericCount > 0 ? (
                 <>
                   {sep}

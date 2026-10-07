@@ -7,7 +7,7 @@ runs DuckDB-Wasm; the CLI runs native DuckDB. Keep runtime-specific imports at t
 
 | Layer | Location | Responsibility |
 | --- | --- | --- |
-| Web shell | `src/components/workspace`, `src/components/home` | Navigation rail, page header, Home, table page, spaces, status, command palette |
+| Web shell | `src/components/workspace`, `src/components/home` | Navigation rail, page header, Home, Tables and table pages, Agent placeholder, spaces, status, command palette; `DatasetList` is shared by Home and the Tables page |
 | Analysis UI | `src/components/editor`, `results`, `sidebar`, `pipeline`, `assistant` | Interactive workflows over store state |
 | Shared UI | `src/components/ui`, `src/lib/hooks` | Semantic controls, dialogs, menus, focus lifecycle |
 | Workspace actions | `src/lib/workspace-actions.ts` | Cross-component run, preview, snippet, share, context actions |
@@ -33,18 +33,35 @@ existing profiles; it does not maintain a second catalog or launch its own profi
   statement named (`mutationTargets`) or whose signature moved. A write it cannot attribute
   (MERGE, EXECUTE, CALL …) makes `mutationTargets` return `null`, and every table is checked
   exactly.
-- `ui-store`: theme, current page (Home, workbench or a table page with its selected dataset and
-  tab), the open side panel, navigation collapse, dialogs, sizes, cursor, toasts and per-space
-  dismissal of the sample-data banner. The page is session UI state; it never changes a remote
-  device's saved space. An empty space shows Home; data arriving opens the workbench; switching
-  spaces leaves a table page. The Explorer's quick profile view closes whenever the page or the
-  side panel changes.
+- `ui-store`: theme, current page (`WorkspacePage`: Home, workbench, a table page with its selected
+  dataset and tab, Tables, Agent, Notebooks with `notebookId`, Folders with `folderId`; `openNotebook`
+  / `openFolder` set the page and the id, null meaning the list), the open side panel, navigation
+  collapse, dialogs, sizes, cursor, toasts and per-space dismissal of the sample-data banner. The
+  page is session UI state; it never changes a remote device's saved space. An empty space shows
+  Home; data arriving opens the workbench; switching spaces leaves a table page and drops an open
+  notebook or folder back to its list. The side panel renders only on `PANEL_PAGES` (workbench,
+  notebooks); `toggleSidePanel` (⌘B) opens the workbench with it from anywhere else. The Explorer's
+  quick profile view closes whenever the page or the side panel changes. Notebooks and folders are
+  created from the rail's New ▾ menu, the page header and the palette through `startNotebook` /
+  `startFolder` (`NavRail.tsx`), which name the record and open its page.
 - `ai-store`: current model, effort and available providers. The status bar subscribes
   directly, avoiding a second cached model label or periodic UI polling.
 - `assistant-store`: answer-only chats, streaming and tool execution. Each space keeps up to
   30 chats in localStorage (`querypad:assistant:v2:<space>`); answers always land in the chat
   they started in. It follows the open space itself, so Home can send before the panel opens.
   The SQL-writing assistant stores its thread with the query tab instead.
+- `agent-store`: the Agent page's planning, write-capable sessions (up to 30 per space in
+  `querypad:agent:v1:<space>`). The model answers with prose plus one JSON plan
+  (`src/lib/ai/agent-prompt.ts`, parsed and classified by `src/lib/agent/plan.ts`); the store
+  runs the steps in order through `src/lib/agent/run.ts` — `executeQuery`, then the workspace
+  store's `syncCatalog` with `mutationTargets`, and a History entry tagged `source: "agent"` —
+  so tables the agent creates appear everywhere the user's own SQL would. Reads run on their
+  own; writes wait for approval unless the session's approvals are "auto"; danger steps (DROP,
+  TRUNCATE, DELETE/UPDATE without WHERE, ALTER … DROP, CREATE OR REPLACE TABLE) always need the
+  per-step click plus a confirmation; plan-only sessions never run anything. A failed step can
+  be sent back for a revised plan, which resumes on its own once; after that the user decides.
+  When every step is done, a catalog diff (tables added/removed, row deltas, views) feeds the
+  closing summary and its follow-up suggestions. The Assistant panel is unchanged.
 - `snippet-store`: a shared cross-space snippet library, with timestamp merges and deletion
   tombstones.
 
