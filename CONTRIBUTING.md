@@ -28,20 +28,31 @@ src/
     api/complete/      # server-key AI proxy (same-origin JSON only)
     api/store/         # server file store: index, snippets/, spaces/[id]/, spaces/[id]/files/[name]/
   components/          # React components (web app)
-    ui/                # icons, primitives (btn, input, Dialog, Menu, KindGlyph, SectionLabel), Toaster
-    workspace/         # shell: Workspace, NavRail, PageHeader, Home, TablePage, StatusBar, SpaceSwitcher,
-                       # CommandPalette, ShortcutsDialog, ClearSpaceDialog, BrandMark, Splash
-    home/              # Home pieces: Composer, QuickActions, RecentTabs, Onboarding, SemanticModel, format.ts
-    assistant/         # answer-only Assistant: AssistantPanel, ChatList, Markdown
+    ui/                # icons, primitives (btn, input, Kbd, Chip, Segmented, Tabs, Select, Menu, Dialog,
+                       # DialogFooter, HoverTray, KindGlyph, SectionLabel), Toaster
+    workspace/         # shell: Workspace (g-chords), NavRail (groups, New ▾, startNotebook/startFolder),
+                       # PageHeader, Home, TablesPage, TablePage, AgentPage (re-export), StatusBar,
+                       # SpaceSwitcher, CommandPalette, ShortcutsDialog, ClearSpaceDialog, BrandMark, Splash
+    home/              # Home pieces: Composer, QuickActions, RecentTabs, DatasetList (shared with the Tables
+                       # page), Onboarding, SemanticModel, format.ts
+    agent/             # Agent page: AgentPage, Composer (approvals, Plan mode), PlanCard (steps, danger confirm,
+                       # Fix and retry), SummaryCard, SessionList, glyphs
+    notebook/          # NotebooksPage (list), NotebookView (cells, Run all), NotebookCell, CellEditor, CellResult,
+                       # MarkdownCell
+    library/           # FoldersPage, FolderDetail, FolderCard, LibraryRow, SaveQueryDialog, FolderPicker,
+                       # MoveToFolderDialog, NameDialog, ConfirmDialog, library-items.ts
+    assistant/         # answer-only Assistant: AssistantPanel, ChatList, Markdown (also notebook text cells)
     ai/                # ModelPicker (provider + effort)
-    editor/            # Monaco workbench: SqlWorkbench, QueryEditor, TabBar, AiAssistant (Ctrl/⌘+K), SnippetDialog
-    results/           # grid (DataTable, ColumnMiniChart, sort.ts, column-stats.ts), inspector, stats pane,
+    editor/            # Monaco workbench: SqlWorkbench, QueryEditor, TabBar, SaveQueryButton (Ctrl/⌘+S),
+                       # AiAssistant (Ctrl/⌘+K), SnippetDialog
+    results/           # grid (DataTable, ColumnMiniChart, sort.ts, column-stats.ts), ColumnCard, Popover,
+                       # ChooseColumnsDialog, QueryDetails, NextSteps, inspector, stats pane,
                        # ChartPanel/ChartSettings, DetailsView, ExportMenu, ResultsPanel
-    sidebar/           # side panel: Sidebar, PanelHeader, TableSchema, ProfileDrawer, RelationshipsPanel,
-                       # HistoryPanel, SnippetsPanel
+    sidebar/           # side panel: Sidebar (pins, search counts), PanelHeader, TableSchema, TableHoverCard,
+                       # ProfileDrawer, RelationshipsPanel, HistoryPanel, SnippetsPanel
     pipeline/          # PipelineView, PipelineStepCard, PipelineDag, PipelineResults
     collaboration/     # CollaborateDialog, RoomBar, PeerCursors
-    dropzone/          # AddFilesDialog (Files | From URL), DropTarget, UrlInput
+    dropzone/          # AddFilesDialog (Files | From URL, per-file table names), DropTarget, UrlInput, table-name.ts
     plugins/           # PluginManager, PluginVisualization
   cli/                 # querypad CLI: index.ts (dispatch), inspect.ts, ask.ts, explain.ts, artifacts.ts,
                        # render.ts, ai-env.ts
@@ -53,8 +64,13 @@ src/
                        # (AI compile check), browser-runner.ts, sql-utils.ts (shared)
     duckdb-node/       # Node DuckDB: connection.ts, load.ts, profile.ts (never imported by app code)
     ai/                # complete.ts (streaming), providers.ts, api-key.ts (BYOK), local-bridge.ts (server),
-                       # workspace-context.ts / assistant-context.ts / schema-context.ts (prompts), generate-sql.ts
-    agent/             # context.ts (buildAgentContext for "copy for an agent"), ask-context.ts (CLI ask prompt)
+                       # workspace-context.ts / assistant-context.ts / schema-context.ts (prompts), generate-sql.ts,
+                       # agent-prompt.ts (the Agent's plan, retry and summary prompts)
+    agent/             # plan.ts (parse/classify plan steps, catalog diff), run.ts (run a step through
+                       # executeQuery + syncCatalog), context.ts ("copy for an agent"), ask-context.ts (CLI ask)
+    notebook/          # cells.ts (pure cell-list helpers), run.ts (run one cell's SQL)
+    results/           # source-tables.ts (trace result columns to tables), next-steps.ts (local follow-ups)
+    editor/            # monaco-setup.ts (loader path, themes, one SQL completion registration)
     persistence/       # spaces: index.ts (server store first, IndexedDB fallback), browser.ts (IndexedDB),
                        # snapshot.ts (skip unchanged saves)
     server-store/      # fs-store.ts (QUERYPAD_DATA_DIR records with revs), http.ts (route helpers)
@@ -68,16 +84,21 @@ src/
     hooks/             # use-focus-trap.ts
     workspace-actions.ts  editor-bridge.ts  import.ts  monaco-global.ts (y-monaco shim)  monaco-theme.ts
     preferences.ts  constants.ts  utils.ts
-  stores/              # Zustand: workspace-store (spaces, tables, tabs, history, pipelines, saves and live sync),
-                       # ui-store (theme, page, panels, dialogs, toasts), ai-store (model, effort),
-                       # assistant-store (chats), snippet-store (shared library), collaboration-store
-  types/               # TypeScript type definitions (discovery.ts, pipeline.ts, plugin.ts, snippet.ts, …)
+  stores/              # Zustand: workspace-store (spaces, tables, tabs, history, pipelines, folders/saved
+                       # queries/notebooks, saves and live sync), ui-store (theme, page, panels, dialogs, toasts),
+                       # ai-store (model, effort), assistant-store (chats), agent-store (Agent sessions, plan
+                       # runs and approvals), snippet-store (shared library), collaboration-store
+  types/               # TypeScript type definitions (discovery.ts, pipeline.ts, plugin.ts, snippet.ts,
+                       # library.ts — Folder, SavedQuery, Notebook, NotebookCell, …)
 scripts/               # copy-duckdb-wasm, copy-editor-assets (postinstall), check-version,
                        # check-browser-bundle (after build), run-parallel (lint + typecheck)
 collab/server.mjs      # self-hosted collaboration relay (plain Node ESM)
 local-ai/              # host-side AI bridge (bridge.mjs, sandbox.mjs) for signed-in CLIs
-test/                  # Node test runner specs for discovery, AI layer, catalog, persistence, collaboration
-e2e/                   # Playwright specs for the web app
+test/                  # Node test runner specs for discovery, AI layer, catalog, persistence, collaboration,
+                       # the agent plan protocol, the library, result helpers
+e2e/                   # Playwright specs: app, workspace, home, nav, table-page, agent, notebooks, folders,
+                       # results-extras, explorer-extras, accessibility, editor-offline, polish (fixtures.ts
+                       # scopes the querypad_ns cookie to the configured baseURL)
 fixtures/data/         # sample related files for CLI inspection
 ```
 

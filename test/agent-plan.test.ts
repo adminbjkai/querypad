@@ -45,6 +45,14 @@ test("steps are classified: reads, writes and danger", () => {
   assert.equal(classifyStep("WITH x AS (SELECT 1) SELECT * FROM x"), "read");
   assert.equal(classifyStep("CREATE TABLE t (id INTEGER)"), "write");
   assert.equal(classifyStep("INSERT INTO t VALUES (1)"), "write");
+  // Several statements in one step never inherit the first keyword's classification.
+  assert.equal(classifyStep("SELECT 1; DROP TABLE orders"), "danger");
+  assert.equal(dangerReason("CREATE TABLE t AS SELECT 1; DELETE FROM orders"), "contains several statements");
+  assert.equal(classifyStep("SELECT 1;"), "read");
+  assert.equal(classifyStep("SELECT 'a;b' AS s"), "read");
+  // CTE-wrapped bulk writes are judged by the write, not by a WHERE inside the CTE.
+  assert.equal(classifyStep("WITH x AS (SELECT 1 WHERE true) DELETE FROM t"), "danger");
+  assert.equal(classifyStep("WITH x AS (SELECT 1) UPDATE t SET a = 1 WHERE a = 2"), "write");
   assert.equal(classifyStep("UPDATE t SET a = 1 WHERE id = 2"), "write");
   assert.equal(classifyStep("DELETE FROM t WHERE id = 2"), "write");
   assert.equal(classifyStep("DROP TABLE customers"), "danger");

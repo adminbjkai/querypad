@@ -7,6 +7,106 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.16.0 — An Agent that plans and writes, Notebooks, Folders, and one design system across the app
+
+- **Navigation**: the rail is now three Snowsight-style groups — Workspace (Home, Agent, SQL,
+  Notebooks, Pipelines), Data (Tables, Joins) and Library (Folders, Snippets, History) — with Search
+  and a New split control above them (the accent half starts a query; the chevron opens New query /
+  notebook / folder / pipeline / Add data…; collapsed, one `+` button). `g` then a letter jumps to a
+  page (`g h` Home, `g a` Agent, `g s` SQL, `g n` Notebooks, `g p` Pipelines, `g t` Tables, `g f`
+  Folders; never while typing or under a dialog); tooltips show the chord. Exactly one item is lit
+  (a table page lights Tables); the Tables panel stays available beside SQL and Notebooks through
+  the page header's "Tables panel" toggle and Ctrl/⌘+B. Page headers carry breadcrumbs
+  (`Space › Tables › name`, `Space › Notebooks › name`, `Space › Folders › name`, `Space › Agent`) and a
+  page action before Collaborate / Share / Assistant (Add data, New notebook, New folder)
+- **Agent page**: a planning, write-capable AI, separate from the answer-only Assistant. It answers
+  with a short sentence and a numbered plan of single SQL steps, each marked Read, Write or Danger.
+  Reads run on their own; writes wait for Run / Skip (or set approvals to Auto, or "Run all
+  remaining"); danger steps — DROP, TRUNCATE, DELETE/UPDATE without WHERE, ALTER … DROP, CREATE OR
+  REPLACE TABLE — always ask again in a confirmation; Plan mode only plans. Every step expands to its
+  SQL (Copy, Open in SQL), a result grid or its error with "Fix and retry", which sends the error
+  back for a revised plan that resumes once on its own. Steps run through the workbench's own path
+  (`executeQuery` + `syncCatalog`), so new tables appear in Tables, Home and the saved space, and in
+  History tagged "Agent". When a plan finishes, a catalog diff (tables added, row deltas, views)
+  feeds a summary card with table links, the keys chosen and follow-up chips. Ctrl/⌘+Enter runs the
+  waiting plan; the composer attaches tables as `@context` and has the model picker. Sessions are
+  kept per space (up to 30, in localStorage) with search and delete
+- **Notebooks**: documents of SQL and text (Markdown) cells saved with the space. Ctrl/⌘+Enter runs
+  a cell, Shift+Enter runs it and moves to the next (adding one at the end), Run all
+  (Ctrl/⌘+Shift+Enter) stops at the first failure and focuses that cell; the cell frame is focusable
+  so ↑/↓, Enter, A/B (add above/below) and Escape work without entering the editor; a cell menu
+  moves, converts (SQL ↔ text) and deletes. SQL cells use the workbench's Monaco with the same
+  completion and themes, sized to 3–20 lines; results are capped grids and live for the session
+  only. Typing is saved after a 300 ms pause, structural edits at once; inline rename; a searchable
+  list with rename and delete
+- **Folders and saved queries**: Ctrl/⌘+S (or the tab bar's Save control, or the tab's ⋯ menu) saves
+  the tab's SQL to the library — a name and folder the first time, silent updates after. Saved tabs
+  show an accent bookmark and a warn dot while they have unsaved changes; renaming a tab renames the
+  saved query; "Move to folder…" and "Remove from saved" sit in the tab menu. The Folders page shows
+  folder cards (query and notebook counts), an Unfiled section and rows with Open · Rename · Move ·
+  Delete; each folder has search and a New menu (query, notebook). Saved queries, folders and
+  notebooks appear in Home's Recent tabs and the command palette ("Open folder …", "Open notebook
+  …", "Go to Agent / Notebooks / Folders")
+- **Tables page**: Data › Tables lists every table and view (search, sort, Preview / Open / Profile
+  per row, Add data in the header) — the same `DatasetList` as Home's catalog
+- **Results**: the column ⋮ menu now reads Copy column name · Hide/Show column stats · Sort
+  ascending · Sort descending · (Clear sort) · Select column · Copy column values · Inspect column;
+  clicking a header selects the column and sorts by it, and the footer reads "Count N" (plus Sum /
+  Avg / Min / Max for numbers); the active sort shows as a chip in the toolbar with a × to clear it;
+  clicking a header's stats opens a column card popover — distribution or top values with a "Show
+  rows" filter per value, filled / null shares, Distinct, Min / Max, Sum / Average, and "Keys &
+  joins" rows (unique, referenced by, value overlap) when the column traces back to a loaded table —
+  with "Open inspector" at the bottom; the "N rows · N columns · N ms" meta opens a Query details
+  popover (rows, columns, duration, "Ran at", the SQL with Copy); "Choose columns" hides columns
+  from the grid and every export for that result; "✦ Next steps" offers up to three locally
+  computed follow-ups — join a related table on the discovered key (with its overlap), group a text
+  column and count, profile the source table
+- **Tables panel (explorer)**: hover a row for ~400 ms or focus it for a summary card beside the
+  panel (shape, source file, loaded time, keys, Open / Preview; never on touch); pin tables to a
+  "Pinned" group at the top (remembered per space); searching keeps every match expanded with an
+  accent "n of m columns" chip, highlighted matches, "of total" counts and a trailing "Ask the
+  Assistant about …" row; an empty-state card with Add data
+- **Add data**: files are staged with an editable, validated table name (identifier-safe, unique in
+  the batch; a note when it replaces an existing table) and loaded with one "Load N files" button
+  that reports each file's status; the URL tab gets the same table-name field
+- **Design system** (`docs/DESIGN.md`): shared primitives — `Chip` (tones), `Segmented`, `Tabs`,
+  `Select` (no native `<select>` remains: chart settings, the join editor, the catalog sort and the
+  snippet folder use it), `DialogFooter`, `HoverTray`, `btn.iconSm`, a single-chip `Kbd` combo —
+  and a `Menu` rendered through a portal that flips and clamps to the viewport instead of
+  stretching its container; dialogs have a sticky footer slot with an optional note; a `line-soft`
+  token for the quietest hairlines (grid rows and cells); dark `accent-soft` lifted to `#1f3252`;
+  Markdown headings render as real `h1`–`h4` (16 / 15 / 14 / 13px) with horizontal rules. Toasts
+  carry an icon per tone on a ringed card, the same message extends the existing toast instead of
+  stacking, and at most three show. Applied across the shell: nav rail items (one lit card, 11px
+  count pills, SectionLabel group labels), Home's catalog (styled sort, fixed column widths),
+  Recent tabs on `Tabs`, Tables panel rows with hover trays, the snippet dialog (real folder
+  `Select` with "New folder…", read-only SQL preview when saved from the editor), snippet and
+  space deletion in confirmation dialogs, History with a Segmented filter and a Run again tray,
+  the Joins panel's verdict pair and `Select` editors, results toolbar tabs, the table page on
+  `Tabs` with key / unique chips, the pipeline view with one canvas-wide empty state, and an
+  icon-size sweep (13 → 14, 15 → 16)
+- **Editor**: snippets saved from the editor default to "<first table> query" instead of the first
+  SQL line; the Monaco loader path and SQL completion registration moved to
+  `src/lib/editor/monaco-setup.ts`, shared by the workbench and notebook cells
+- **Explorer and panels**: the Tables panel header carries Add data only once data exists (the
+  empty state carries it otherwise), and the Joins count hides at zero
+- Fixed: a `Menu` opened inside a dialog no longer fights the focus trap on Tab (the trap defers
+  to the open menu, which closes and refocuses its trigger); menus near the bottom of a scroll
+  container or dialog no longer stretch it; Markdown headings keep trailing `#`s out of the text;
+  the same toast message no longer stacks duplicates; an Agent step holding several statements
+  (`SELECT 1; DROP TABLE t`) is classed as Danger instead of inheriting the first keyword, and a
+  CTE-wrapped DELETE/UPDATE is judged by the write itself; a notebook edit still inside its save
+  debounce is flushed before a space switch swaps the data out; "Choose columns" projects rows as
+  well as columns, so Excel and plugin exports match the grid
+- Cleanup: `src/components/workspace/AgentPage.tsx` is a one-line re-export of
+  `src/components/agent/AgentPage`; Home's dataset table lives in `home/DatasetList.tsx`; the chart
+  type radio grid and every native select are gone; `border-line/40` and `/60` hairlines use the
+  `line-soft` token; local uppercase labels in the model picker, profile drawer and nav rail use
+  `SectionLabel`; new unit tests for the agent plan protocol, the library, result source tables and
+  next steps, and new e2e specs (`nav`, `agent`, `notebooks`, `folders`, `results-extras`,
+  `explorer-extras`); README, ROADMAP, CONTRIBUTING, AGENTS and the architecture/design docs
+  describe the new surfaces
+
 ## v0.15.0 — A page per table, Snowsight-style column stats, and a much lighter build
 
 - **Table page**: every table and view now has its own page — breadcrumb `Space › Tables › name`,

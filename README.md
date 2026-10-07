@@ -163,11 +163,19 @@ falls back to keeping everything in the browser.
 - **Start from Home** — an AI-first start page: ask a question about your data in one box
   (it goes to the Assistant), pick a suggestion, use a quick action (Add data, New query,
   Inspect a dataset, Open Assistant), or pick up where you left off in the Recent tabs
-  (datasets with search and sorting, queries, snippets, spaces), with live catalog counts and
-  the semantic model below. A labeled navigation on the left (Home, SQL, Pipelines; Tables,
-  Joins; History, Snippets) collapses to icons and remembers it
+  (datasets with search and sorting, queries, folders, notebooks, snippets, spaces), with live
+  catalog counts and the semantic model below
+- **Snowsight-style navigation** — a labeled rail on the left in three groups: Workspace (Home,
+  Agent, SQL, Notebooks, Pipelines), Data (Tables, Joins) and Library (Folders, Snippets,
+  History), with Search and a New ▾ control (query, notebook, folder, pipeline, add data) above
+  them. Press `g` then a letter to jump: `g h` Home, `g a` Agent, `g s` SQL, `g n` Notebooks,
+  `g p` Pipelines, `g t` Tables, `g f` Folders. It collapses to icons (remembered) and shows the
+  chord in each tooltip; the Tables panel stays available beside SQL and Notebooks (Ctrl/⌘+B)
 - **Drop anything** — CSV, TSV, Parquet, JSON/NDJSON, Excel; several at once, then JOIN them.
-  The Add data dialog takes files or a URL and shows each file's status as it loads
+  The Add data dialog stages each file (or a URL) with an editable, validated table name, then
+  a "Load N files" button imports them and shows each file's status
+- **Tables page** — the Data › Tables page lists every table and view with search, sort and
+  Preview / Open / Profile actions, and an Add data action in the header
 - **A page per table** — open any table or view from Home, the Explorer or the command
   palette: breadcrumb (space › Tables › name), Query / Ask Assistant / Copy name, and Overview
   (filterable, sortable columns with keys and a details rail listing its joins), Preview (the
@@ -192,8 +200,19 @@ falls back to keeping everything in the browser.
   with a numbered plan of single SQL steps, each marked Read, Write or Danger. Reads run on
   their own; writes wait for your "Run" (or set approvals to Auto); destructive steps always
   ask again in a confirmation; Plan mode only plans. Every step shows its SQL, result grid or
-  error (with "Fix and retry"), tables it creates appear in the catalog like your own, and a
-  closing summary lists what changed with follow-up chips. Sessions are kept per space
+  error (with "Fix and retry", which asks for a revised plan), tables it creates appear in the
+  catalog like your own (and in History, tagged Agent), and a closing summary lists what changed
+  — tables added, row counts moved, keys chosen — with follow-up chips. Sessions are kept per
+  space, newest first, with search and delete. The Assistant stays answer-only
+- **Notebooks** — a document of SQL and text (Markdown) cells you run top to bottom: Ctrl/⌘+Enter
+  runs a cell, Shift+Enter runs it and moves on (adding a cell at the end), Run all
+  (Ctrl/⌘+Shift+Enter) stops at the first failure, cells move, convert and delete from a menu or
+  the A / B keys. Notebooks are saved with the space; results live only for the session
+- **Folders and saved queries** — Ctrl/⌘+S (or the Save control in the tab bar) saves the tab's
+  SQL to the library, naming it and picking a folder the first time and updating silently after
+  that; a bookmark marks saved tabs and a dot marks unsaved changes. The Folders page groups
+  saved queries and notebooks (rename, move, delete; a New menu inside each folder), Home's
+  Recent tabs list them, and the command palette opens them
 - **AI models without API keys** — on a self-hosted server, QueryPad can use the AI CLIs
   already signed in on that machine: Claude Sonnet 5.5, Codex GPT-6 Luna and Grok 4.7 (each
   with a low/medium effort toggle), plus Cursor's Grok 4.7 Medium Fast (256k) and Composer
@@ -217,20 +236,28 @@ falls back to keeping everything in the browser.
   (natural order, so `file2` comes before `file10`; the sorted column is highlighted), a
   filter box that expands from its icon, range selection with a Sum / Avg / Min / Max footer,
   sticky headers and row numbers, resizable columns, NULLs marked, keyboard cell navigation
-  with Ctrl/⌘+C, a per-column menu (sort, copy name or values, inspect), a column inspector
-  with distribution, nulls, distinct values and top values, a Details view with Rows,
-  Columns, Duration and Last run tiles plus the SQL, and an export menu (Copy / Download /
+  with Ctrl/⌘+C, a per-column menu (copy name, show or hide stats, sort, select, copy values,
+  inspect), a column card popover from the header stats (distribution or top values with
+  "Show rows" filters, filled/null shares, distinct, min/max, sum/average, and the column's
+  keys and joins), a column inspector pane, a sort chip in the toolbar you can clear, a Query
+  details popover (rows, columns, duration, time of the run, the SQL), Choose columns to hide
+  columns from the grid and exports, join-aware Next steps computed locally (join a related
+  table on the discovered key, group and count, profile the source table), a Details view with
+  Rows, Columns, Duration and Last run tiles plus the SQL, and an export menu (Copy / Download /
   Plugins) for CSV / JSON / Markdown / HTML / Excel / Parquet / clipboard
 - **Charts and column stats like Snowsight** — a chart builder (bar, line, area, scatter,
   pie, scorecard; date buckets, aggregations, group-by, stacking, PNG download) and a stats
   pane listing every column with its distribution
-- **Explorer, history and status bar** — a searchable explorer for tables, views and columns
-  that opens beside the navigation; history search with a succeeded/failed filter; a status bar with
+- **Explorer, history and status bar** — a searchable Tables panel for tables, views and columns
+  that opens beside SQL and Notebooks: hover or focus a row for a summary card (shape, source,
+  keys, Open / Preview), pin tables to the top (remembered per space), and while searching every
+  match stays expanded with "n of m columns" counts, highlights and an "Ask the Assistant about …"
+  row; history search with a succeeded/failed filter and a Run again action; a status bar with
   the engine and its DuckDB version, space, storage location, cursor line/column and selection
   size, the last result (click an error to jump to it) and the active AI model; Format SQL
   (Shift+Alt+F)
-- **Search everything** — Ctrl/⌘+P finds tables, columns, snippets, history, tabs and spaces,
-  and runs any command
+- **Search everything** — Ctrl/⌘+P finds tables, columns, notebooks, folders, saved queries,
+  snippets, history, tabs and spaces, and runs any command
 - **History** — each space keeps its last 100 runs with row counts, timings and failures
 - **Pipelines** — chain named SQL steps that build on each other, shown as a dependency graph
 - **Live collaboration** — start a room, send the invite link, and edit the same tabs with
@@ -240,22 +267,23 @@ falls back to keeping everything in the browser.
 - **Agent context** — copy schema, profiles, the current SQL and its results for Claude Code,
   Codex or any agent
 - **A considered design system** ([`docs/DESIGN.md`](docs/DESIGN.md)): a light, Snowsight-like
-  frame (labeled navigation, page header with breadcrumb), semantic surface colors, Inter +
-  JetBrains Mono, matching light and dark themes and skeleton loading
+  frame (labeled navigation, page header with breadcrumb), shared primitives (chips, segmented
+  controls, tabs, styled selects, menus, dialogs with sticky footers), semantic surface colors,
+  Inter + JetBrains Mono, matching light and dark themes and skeleton loading
 - **Light and dark themes**, keyboard-first (press `?` for shortcuts), works on phones
 
 <details>
 <summary><strong>More web app details</strong></summary>
 
-- **Persistence** — each space's tables, views, tabs, SQL-generation conversations, history, pipelines and
-  join verdicts are saved through `/api/store` to the server's data directory
+- **Persistence** — each space's tables, views, tabs, SQL-generation conversations, history, pipelines,
+  join verdicts, folders, saved queries and notebooks are saved through `/api/store` to the server's data directory
   (`QUERYPAD_DATA_DIR`, a Docker volume in the compose setup; `.querypad-data/` in dev).
   Open clients poll every 3 s while in use (every 15 s after 60 s without activity, at once on
   focus) and apply edits from other devices; table, view and plugin changes reopen the space.
   Saves are debounced and skipped when nothing changed; hiding or reloading the page flushes a
   pending save first. Spaces already kept in a browser's IndexedDB are uploaded the
   first time that browser meets an empty server, and older layouts are migrated into a space
-  called "My workspace". Assistant chats stay in localStorage per space (up to 30). Without the API the app keeps using IndexedDB. The server store has
+  called "My workspace". Assistant chats and Agent sessions stay in localStorage per space (up to 30 each). Live rooms share tabs and files, not the library. Without the API the app keeps using IndexedDB. The server store has
   no accounts of its own — protect the site (e.g. basic auth) if it's reachable publicly. The first visit creates a "Playground"
   space with two sample tables.
 - **Remote files** — load Parquet/CSV/JSON from any URL that allows cross-origin requests
@@ -275,19 +303,22 @@ falls back to keeping everything in the browser.
 
 | Action | Keys |
 |--------|------|
-| Run query (or the selection) | Ctrl/⌘ + Enter |
+| Run query (or the selected part) | Ctrl/⌘ + Enter |
 | Ask AI to write SQL | Ctrl/⌘ + K |
+| Open the Assistant chat | Ctrl/⌘ + I |
+| Show or hide the Tables panel (SQL, Notebooks) | Ctrl/⌘ + B |
 | Command palette | Ctrl/⌘ + P |
-| Assistant chat | Ctrl/⌘ + I |
-| Save query or selection as a snippet | Ctrl/⌘ + Shift + S |
 | Format SQL | Shift + Alt + F |
-| Show or hide the side panel | Ctrl/⌘ + B |
-| Rename a tab | Double-click it |
+| Save query to a folder | Ctrl/⌘ + S |
+| Save query or selection as a snippet | Ctrl/⌘ + Shift + S |
 | Copy selected cells | Ctrl/⌘ + C |
+| Resize focused editor divider | ↑ / ↓ |
+| Resize focused column handle | ← / → |
+| Go to Home / Agent / SQL / Notebooks / Pipelines / Tables / Folders | G then H / A / S / N / P / T / F |
+| Notebook: run cell · run and move on · run all | Ctrl/⌘ + Enter · Shift + Enter · Ctrl/⌘ + Shift + Enter |
+| Rename a tab | Double-click it |
 | Sort a column | Click its header |
-| Resize editor/results split | Focus separator, then ↑ / ↓; Home / End |
-| Resize a result column | Focus its resize handle, then ← / →; Home to fit |
-| Navigate a menu | ↑ / ↓, Home / End, Enter; Escape to close |
+| Inspect a column | Click its header stats |
 | Shortcut list | ? |
 
 ### AI providers

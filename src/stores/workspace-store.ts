@@ -1212,8 +1212,19 @@ async function persistEverything(spaceId: string): Promise<void> {
   await saveStateNow(spaceId, true);
 }
 
+/**
+ * Views that keep their own short-lived drafts (notebook cells debounce typing) register a
+ * flush here; it runs before the space's data is swapped out, so no edit is lost.
+ */
+const draftFlushers = new Set<() => void>();
+export function onBeforeSpaceData(flush: () => void): () => void {
+  draftFlushers.add(flush);
+  return () => draftFlushers.delete(flush);
+}
+
 /** Run a debounced state save immediately (before switching spaces). */
 async function flushPendingSave(): Promise<void> {
+  for (const flush of draftFlushers) flush();
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   const run = pendingSave;

@@ -111,11 +111,17 @@ function code(sql: string): string {
  * a confirmation, whatever the approval setting.
  */
 export function dangerReason(sql: string): string | null {
-  const text = leading(code(sql)).trim();
+  const stripped = code(sql).replace(/;\s*$/, "");
+  // The plan is model output: a step is gated as ONE statement, so several statements in one
+  // step (`SELECT 1; DROP TABLE t`) can never ride on the first keyword's classification.
+  if (stripped.includes(";")) return "contains several statements";
+  const text = leading(stripped).trim();
   if (/^drop\b/i.test(text)) return "drops an object";
   if (/^truncate\b/i.test(text)) return "empties a table";
-  if (/^delete\b/i.test(text) && !/\bwhere\b/i.test(text)) return "deletes every row";
-  if (/^update\b/i.test(text) && !/\bwhere\b/i.test(text)) return "rewrites every row";
+  // A CTE-wrapped write is judged by the write itself, not by a WHERE inside the CTE.
+  const write = /^with\b/i.test(text) ? text.replace(/^[\s\S]*?(?=\b(?:delete\s+from|update)\b)/i, "") : text;
+  if (/^delete\b/i.test(write) && !/\bwhere\b/i.test(write)) return "deletes every row";
+  if (/^update\b/i.test(write) && !/\bwhere\b/i.test(write)) return "rewrites every row";
   if (/^alter\s+table\b[\s\S]*\bdrop\b/i.test(text)) return "drops a column or constraint";
   if (/^create\s+or\s+replace\s+table\b/i.test(text)) return "replaces an existing table";
   return null;

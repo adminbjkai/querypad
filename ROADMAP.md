@@ -32,6 +32,9 @@ Layer 4  AI Analyst          →  question → semantic model → SQL → execut
 | `querypad explain` | Justify each relationship from stored `RelationshipSignals` + caveats | ✅ Built |
 | UI — AI Verification | Sidebar Relationships panel: accept/reject/edit inferred joins | ✅ Built |
 | UI — Workspace | Spaces, SQL-created tables/views in the catalog, AI conversations with compile check, `querypad.keys` | ✅ Built |
+| UI — Agent | Planning, write-capable Agent page: plan cards, per-step approvals, danger confirms, catalog diff summaries | ✅ Built |
+| UI — Notebooks | SQL and Markdown cells, Run all, persisted per space | ✅ Built |
+| UI — Folders | Saved queries (⌘S) and notebooks organized in folders, per space | ✅ Built |
 | MCP server | Expose `inspect`/`ask`/`explain` as typed agent tools | 🚧 Next |
 
 ## Built today
@@ -71,7 +74,10 @@ Architecture (engine-agnostic core, two DuckDB bindings):
 
 ```text
 src/lib/discovery/     profile.ts · signals.ts · relationships.ts · semantic-model.ts · explain.ts · sql-safety.ts
-src/lib/ai/            complete.ts (one streaming layer: six API providers + five signed-in local CLIs) · generate-sql.ts · providers.ts · local-bridge.ts
+src/lib/ai/            complete.ts (one streaming layer: six API providers + five signed-in local CLIs) · generate-sql.ts · providers.ts · local-bridge.ts · agent-prompt.ts
+src/lib/agent/         plan.ts (plan protocol, step classification, catalog diff) · run.ts (steps through executeQuery + syncCatalog)
+src/lib/notebook/      cells.ts (pure cell-list helpers) · run.ts (one cell's SQL)
+src/lib/results/       source-tables.ts · next-steps.ts (local, join-aware follow-ups)
 src/lib/duckdb-node/   connection.ts · load.ts · profile.ts (thin wrapper)   (native @duckdb/node-api)
 src/lib/duckdb/        sql-utils.ts (shared) · browser-runner.ts · profile.ts (thin wrapper)   (DuckDB-Wasm)
 src/cli/               index.ts (dispatch) · inspect.ts · ask.ts · explain.ts · artifacts.ts
@@ -193,6 +199,18 @@ same engine-agnostic core as the CLI (rejected relationships excluded). Each dat
 its own table page (breadcrumb `Space › Tables › name`) with Overview, Preview and Profile
 tabs and a details rail listing its relationships; it opens from Home, the Explorer or the
 command palette, and its Query / Ask Assistant actions route into the existing workbench.
+
+## UI — Agent, Notebooks, Folders (built)
+
+The **Agent** page is the write-capable counterpart to the answer-only Assistant: the model
+answers a request with prose plus one JSON plan of single SQL steps (`src/lib/ai/agent-prompt.ts`);
+`src/lib/agent/plan.ts` parses it and classifies each step as read, write or danger, and the store
+runs steps in order through the workbench's own path (`executeQuery`, then `syncCatalog`) behind
+an approval gate — reads run, writes wait for a click unless approvals are Auto, danger steps
+always confirm, and Plan mode only plans. A failed step can be sent back for a revised plan, and a
+catalog diff (tables added, row deltas, views) feeds the closing summary with follow-ups. Sessions
+are kept per space. **Notebooks** mix SQL and Markdown cells into a document run top to bottom;
+**Folders** hold saved queries (bound to tabs, ⌘S) and notebooks. Both are saved with the space.
 
 ## Claude Code integration
 

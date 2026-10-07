@@ -7,10 +7,12 @@ runs DuckDB-Wasm; the CLI runs native DuckDB. Keep runtime-specific imports at t
 
 | Layer | Location | Responsibility |
 | --- | --- | --- |
-| Web shell | `src/components/workspace`, `src/components/home` | Navigation rail, page header, Home, Tables and table pages, Agent placeholder, spaces, status, command palette; `DatasetList` is shared by Home and the Tables page |
-| Analysis UI | `src/components/editor`, `results`, `sidebar`, `pipeline`, `assistant` | Interactive workflows over store state |
-| Shared UI | `src/components/ui`, `src/lib/hooks` | Semantic controls, dialogs, menus, focus lifecycle |
-| Workspace actions | `src/lib/workspace-actions.ts` | Cross-component run, preview, snippet, share, context actions |
+| Web shell | `src/components/workspace`, `src/components/home` | Navigation rail (groups, New ▾, `g`-chords in `Workspace.tsx`), page header, Home, Tables and table pages, spaces, status, command palette; `DatasetList` is shared by Home and the Tables page |
+| Analysis UI | `src/components/editor`, `results`, `sidebar`, `pipeline`, `assistant` | Interactive workflows over store state; `src/lib/results` holds the pure result helpers (source tables, next steps) |
+| Agent | `src/components/agent`, `src/lib/agent/{plan,run}.ts`, `src/lib/ai/agent-prompt.ts` | The planning, write-capable Agent page: plan protocol, step classification, execution behind the approval gate |
+| Notebooks and library | `src/components/notebook`, `src/components/library`, `src/lib/notebook`, `src/types/library.ts` | SQL/Markdown cells and their pure list helpers; folders, saved queries, the Save query dialog |
+| Shared UI | `src/components/ui`, `src/lib/hooks`, `src/lib/editor/monaco-setup.ts` | Semantic controls, dialogs, menus, focus lifecycle; one Monaco loader/completion setup for every editor host |
+| Workspace actions | `src/lib/workspace-actions.ts` | Cross-component run, preview, snippet, save-query, share, context actions |
 | Browser engine | `src/lib/duckdb` | Wasm lifecycle, query execution, catalog reconciliation |
 | Understanding core | `src/lib/discovery` | Profiles, relationship signals, explanations, semantic models |
 | Native engine and CLI | `src/lib/duckdb-node`, `src/cli` | Local folder loading and command execution; never imported by app code |
@@ -27,7 +29,12 @@ existing profiles; it does not maintain a second catalog or launch its own profi
 ## State ownership
 
 - `workspace-store`: spaces, tables/views, profiles, relationship verdicts, SQL tabs,
-  results, query history, pipelines and plugins. DuckDB's main catalog is authoritative:
+  results, query history, pipelines, plugins and the query library (`folders`, `savedQueries`,
+  `notebooks`). A tab bound to a saved query carries `savedQueryId`; `saveQuery` updates the
+  bound record or creates one (⌘S asks for a name and folder only the first time), `openSavedQuery`
+  reuses the bound tab, and deleting a folder moves its items to the top level. Library records are
+  saved with the space; live rooms share tabs and files only (`src/lib/collaboration/sync.ts`),
+  never the library. DuckDB's main catalog is authoritative:
   after a write, `syncCatalog` reads the catalog plus one column/row-estimate signature per
   relation (`readCatalogSignatures`) and only describes and re-snapshots tables that the
   statement named (`mutationTargets`) or whose signature moved. A write it cannot attribute
@@ -57,11 +64,27 @@ existing profiles; it does not maintain a second catalog or launch its own profi
   store's `syncCatalog` with `mutationTargets`, and a History entry tagged `source: "agent"` —
   so tables the agent creates appear everywhere the user's own SQL would. Reads run on their
   own; writes wait for approval unless the session's approvals are "auto"; danger steps (DROP,
-  TRUNCATE, DELETE/UPDATE without WHERE, ALTER … DROP, CREATE OR REPLACE TABLE) always need the
+  TRUNCATE, DELETE/UPDATE without WHERE — judged by the write itself when a CTE wraps it —
+  ALTER … DROP, CREATE OR REPLACE TABLE, or a step holding several statements) always need the
   per-step click plus a confirmation; plan-only sessions never run anything. A failed step can
   be sent back for a revised plan, which resumes on its own once; after that the user decides.
   When every step is done, a catalog diff (tables added/removed, row deltas, views) feeds the
-  closing summary and its follow-up suggestions. The Assistant panel is unchanged.
+  closing summary and its follow-up suggestions. The Assistant panel is unchanged and stays
+  answer-only; the Agent is the only AI surface that writes, and only through that gate.
+- Notebook cells: `NotebookView` keeps a local copy of the open notebook's cells and writes it
+  to the store (`updateNotebookCells`) after a 300 ms typing pause; structural edits (add, move,
+  convert, delete) are written at once, and running a cell, leaving the notebook or the space's
+  data being swapped out (`onBeforeSpaceData` in the workspace store, run by `flushPendingSave`)
+  flushes whatever is pending. A store change the view did not push (another device) replaces the local
+  copy unless an edit is still pending. Cell results live in a module-level map for the session
+  only — they survive leaving and reopening the notebook, never a reload. `runCellSql` mirrors
+  `runQuery`: `executeQuery`, then `syncCatalog` for anything that is not read-only.
+- Results view state: `ResultsPanel` keeps one view record per tab (view, filter, chart, inspected
+  column, grid sort, hidden columns, open column card). The sort is controlled from the panel so
+  the toolbar can show and clear it; `hidden` (from "Choose columns") produces a `visibleResult`
+  (columns, types and projected rows) that the grid, the inspector and the export menu all use,
+  while the tab's stored result stays complete. Next steps are computed locally (`src/lib/results/next-steps.ts`) from the SQL's source
+  tables and the discovered relationships — no model call.
 - `snippet-store`: a shared cross-space snippet library, with timestamp merges and deletion
   tombstones.
 
@@ -81,7 +104,9 @@ mtime).
 
 State saves are debounced 400 ms (1200 ms while typing in the editor) and compared against
 the last written snapshot (`src/lib/persistence/snapshot.ts`): an unchanged record is not
-sent, and the space index is only patched when the table count changed or the entry's
+sent. Spaces saved before the library existed load with empty `folders`, `savedQueries` and
+`notebooks`. Agent sessions (`querypad:agent:v1:<space>`) and Assistant chats stay in
+localStorage, up to 30 each per space; and the space index is only patched when the table count changed or the entry's
 `updatedAt` lags by 60 s or more. Hiding the page (`visibilitychange`, `pagehide`) flushes a
 pending save; bodies under 60 KB go out with `keepalive` so a reload inside the debounce
 does not lose the last edit. Opening a space fetches its file bytes in parallel and loads each
@@ -94,8 +119,11 @@ signal proves that a particular write has completed. UI preferences use best-eff
 storage access so blocked localStorage does not prevent the shell from rendering.
 
 AI-generated SQL is checked against the live schema. Assistant automatic query execution
-uses the read-only gate. Local AI CLIs run in the host's bubblewrap sandbox with tools
-disabled; only the server-side bridge module can reach them. Keep this boundary intact.
+uses the read-only gate. The Agent's steps are classified by `src/lib/agent/plan.ts` before
+anything runs; writes wait for approval and danger steps for a confirmation, and every run goes
+through `executeQuery` + `syncCatalog` like the user's own SQL. Local AI CLIs run in the host's
+bubblewrap sandbox with tools disabled; only the server-side bridge module can reach them. Keep
+these boundaries intact.
 
 ## Loading and rendering
 
@@ -115,10 +143,16 @@ to `public/monaco/<version>/vs`. y-monaco's import of Monaco's ESM build is alia
 `next.config.ts` (turbopack `resolveAlias`) to `src/lib/monaco-global.ts`, which re-exports
 `Range`/`Selection` from the editor instance already loaded, so no second copy is bundled.
 `output: "standalone"` with `outputFileTracingExcludes` keeps `sharp`, `public`, sources,
-tests, fixtures and runtime data out of the server bundle.
+tests, fixtures and runtime data out of the server bundle. `src/lib/editor/monaco-setup.ts`
+points the loader at that path and registers the SQL completion provider once per Monaco
+instance (a marker on the `monaco` object), so the workbench editor and every notebook cell share
+one registration.
 
 Use semantic CSS tokens for both themes; the frame (navigation, page header) uses the same
-surface tokens as everything else. Dialogs share focus containment and restoration; menus provide arrow-key
+surface tokens as everything else. Controls come from `src/components/ui/primitives.tsx`
+(`btn`, `input`, `Kbd`, `Chip`, `Segmented`, `Tabs`, `Select`, `Menu`, `Dialog`, `DialogFooter`,
+`HoverTray`, `SectionLabel`, `KindGlyph`) — see `docs/DESIGN.md`. Dialogs share focus containment
+and restoration; menus are portaled, positioned from their trigger and provide arrow-key
 navigation. Resize handles expose keyboard controls and current values.
 
 ## Verification
@@ -128,10 +162,13 @@ navigation. Resize handles expose keyboard controls and current values.
   (`scripts/check-browser-bundle.mjs`), which fails if the built browser chunks contain
   `@duckdb/node-api`, `duckdb-node`, `node:fs` or ws server code.
 - `npm test`: browser workflows on a dedicated app (3217) and relay (1999), with namespace
-  isolation. Stop a separately running Next development server before testing because Next
-  uses a shared development lock. `PLAYWRIGHT_CHROMIUM_PATH` optionally selects an installed
-  Chromium executable.
-- `npm run test:cli`: shared discovery, SQL safety, native CLI and related unit tests.
+  isolation: `e2e/fixtures.ts` sets the `querypad_ns` cookie scoped to the configured `baseURL`,
+  so a test never runs in a server's real `default` namespace. Never point the suite at a
+  deployed host without that cookie in place. Stop a separately running Next development server
+  before testing because Next uses a shared development lock. `PLAYWRIGHT_CHROMIUM_PATH`
+  optionally selects an installed Chromium executable.
+- `npm run test:cli`: shared discovery, SQL safety, native CLI, agent plan protocol, library,
+  results helpers and related unit tests.
 
 Generated browser assets, `.querypad/` inspection artifacts, screenshots, videos, test
 reports and `.querypad-data` are runtime/development output, not source changes.

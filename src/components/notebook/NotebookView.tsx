@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { onBeforeSpaceData, useWorkspaceStore } from "@/stores/workspace-store";
 import { toast } from "@/stores/ui-store";
 import type { Notebook, NotebookCell as Cell, NotebookCellKind } from "@/types/library";
 import { addCellAfter, moveCell, newCell, removeCell, updateCell } from "@/lib/notebook/cells";
@@ -67,8 +67,14 @@ export default function NotebookView({ notebook }: { notebook: Notebook }) {
     },
     [flush]
   );
-  // Leaving the notebook writes whatever is still pending.
-  useEffect(() => flush, [flush]);
+  // Leaving the notebook, or the space's data being swapped out, writes whatever is still pending.
+  useEffect(() => {
+    const off = onBeforeSpaceData(flush);
+    return () => {
+      off();
+      flush();
+    };
+  }, [flush]);
 
   const [runs, setRuns] = useState<Runs>(() => sessionRuns.get(notebook.id) ?? {});
   const setRun = useCallback(

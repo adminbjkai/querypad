@@ -9,6 +9,7 @@ const KEYBOARD: [string, string[]][] = [
   ["Show or hide the Tables panel (SQL, Notebooks)", [MOD, "B"]],
   ["Command palette", [MOD, "P"]],
   ["Format SQL", ["Shift", "Alt", "F"]],
+  ["Save the query to the library", [MOD, "S"]],
   ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
   ["Copy selected cells", [MOD, "C"]],
   ["Resize focused editor divider", ["↑", "↓"]],
@@ -25,6 +26,15 @@ const NAVIGATION: [string, string[]][] = [
   ["Go to Pipelines", ["G", "P"]],
   ["Go to Tables", ["G", "T"]],
   ["Go to Folders", ["G", "F"]],
+];
+
+/** Inside a notebook (a cell is focused). */
+const NOTEBOOK: [string, string[]][] = [
+  ["Run the cell", [MOD, "Enter"]],
+  ["Run the cell and move to the next", ["Shift", "Enter"]],
+  ["Run every cell", [MOD, "Shift", "Enter"]],
+  ["Add a cell above / below", ["A", "B"]],
+  ["Leave the editor, focus the cell", ["Esc"]],
 ];
 
 const MOUSE: [string, string][] = [
@@ -53,6 +63,8 @@ export default function ShortcutsDialog({ onClose }: { onClose: () => void }) {
       <Rows rows={KEYBOARD} />
       <SectionLabel className="mt-4">Navigation</SectionLabel>
       <Rows rows={NAVIGATION} />
+      <SectionLabel className="mt-4">Notebooks</SectionLabel>
+      <Rows rows={NOTEBOOK} />
       <SectionLabel className="mt-4">Mouse</SectionLabel>
       <Rows rows={MOUSE} />
     </Dialog>

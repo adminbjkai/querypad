@@ -48,6 +48,16 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   rebuilt from the stores on every message; `sql-run` blocks auto-run only when
   `autoRunRejection` allows (one plain query over loaded tables — no writes, settings, files
   or URLs). It never changes the workspace. Each space keeps several chats in localStorage.
+- **Agent** (`src/stores/agent-store.ts`, `src/lib/agent/{plan,run}.ts`, `src/lib/ai/agent-prompt.ts`): the
+  only AI surface that writes. The model answers with a plan; every step is classified
+  (read / write / danger) and runs only through `runStep` — `executeQuery`, then `syncCatalog`
+  with the statement's targets — behind the approval gate (reads run, writes wait unless
+  approvals are Auto, danger steps always confirm, Plan mode never runs). Keep writes on that path
+  so agent-made tables are persisted like the user's own; the Assistant stays answer-only.
+- **Library** (`folders`, `savedQueries`, `notebooks` in the workspace store, types in
+  `src/types/library.ts`): saved in the space's state record with everything else, so it syncs
+  across devices through `/api/store`; it is never shared through collaboration rooms (rooms sync
+  tabs and files only). Notebook cell results are session-only.
 - **Catalog sync**: after any non-read-only statement, `syncCatalog` reconciles the store with
   `duckdb_tables()`/`duckdb_views()` (main schema only); new/changed tables are snapshotted to
   Parquet file entries. `mutationTargets` (`src/lib/duckdb/catalog-sql.ts`) names the tables a
@@ -78,7 +88,9 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
 - Run `npm run check` after code/config changes (version check → lint and typecheck in parallel
   via `scripts/run-parallel.mjs` → `next build` → browser-bundle guard).
 - Run `npm test` when UI behavior or e2e-covered flows change (it starts its own dev
-  server on port 3217 and a relay on 1999 — it never reuses another server).
+  server on port 3217 and a relay on 1999 — it never reuses another server). `e2e/fixtures.ts`
+  scopes the `querypad_ns` cookie to the configured `baseURL`; never run the e2e suite against a
+  deployed host without that isolation, or the tests write into its real `default` namespace.
 - Run `npm run test:cli` when discovery/CLI logic changes.
 - Do not commit demo video artifacts or `.querypad/` inspection output; use the videos
   as release/README upload assets.

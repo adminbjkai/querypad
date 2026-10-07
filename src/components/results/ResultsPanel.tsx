@@ -119,12 +119,19 @@ export default function ResultsPanel() {
   const [detailsAnchor, setDetailsAnchor] = useState<HTMLElement | null>(null);
   const [chooserOpen, setChooserOpen] = useState(false);
 
-  // The grid, inspector and exports see only the chosen columns; rows keep every key, so nothing is copied.
+  // The grid, inspector and exports see only the chosen columns. Rows are projected too (only
+  // while columns are hidden), so exporters that read row keys (Excel, plugins) match the grid.
   const hidden = current.hidden;
   const visibleResult = useMemo(() => {
     if (!result || hidden.length === 0) return result;
     const keep = result.columns.map((c, i) => [c, i] as const).filter(([c]) => !hidden.includes(c));
-    return { ...result, columns: keep.map(([c]) => c), columnTypes: keep.map(([, i]) => result.columnTypes[i]) };
+    const columns = keep.map(([c]) => c);
+    return {
+      ...result,
+      columns,
+      columnTypes: keep.map(([, i]) => result.columnTypes[i]),
+      rows: result.rows.map((row) => Object.fromEntries(columns.map((c) => [c, row[c]]))),
+    };
   }, [result, hidden]);
   const inspectedColumn =
     visibleResult && inspectorOpen
