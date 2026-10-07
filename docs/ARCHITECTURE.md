@@ -127,6 +127,19 @@ these boundaries intact.
 
 ## Loading and rendering
 
+There is no splash on the normal path: the real shell (navigation, page header, status bar and
+the current page) renders as soon as the workspace chunk arrives, and readiness shows locally.
+Everything starts in parallel: `src/app/page.tsx` calls `getDB()` as soon as its chunk runs, and
+`init` fetches the space index and file bytes without waiting for the engine. (A `<link rel=preload>` for the wasm module was tried and dropped:
+Chromium aborted the worker's own streaming compile of the same URL.) `openSpace` awaits `getDB()` only when it loads a file, plugin or view into
+DuckDB, so bytes download while the engine instantiates; file order, the generation guard and
+per-file error handling are unchanged. Until the engine is up and the space is open, the status bar
+reads "Starting engine…" (then "DuckDB vX ready"), the results grid and Home stats show
+skeleton rows of their final size, and Run and Agent send are disabled with the title "Engine
+starting…" (`runActive` is a no-op too); the editor accepts typing immediately, though restoring the
+saved tabs replaces text typed before the space has opened. `Splash` remains only for a fatal engine
+error and for the `/shared` link loader.
+
 The browser workspace is dynamically loaded without server rendering. Optional Home, table
 page, pipeline, chart, assistant, and dialog surfaces load on demand; `/shared` imports the
 engine, store and share decoder after its shell renders. Results virtualize rows; filtering is

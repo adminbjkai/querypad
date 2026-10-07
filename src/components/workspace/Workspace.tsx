@@ -67,12 +67,9 @@ const GO_KEYS: Record<string, () => void> = {
 const GO_CHORD_MS = 800;
 
 export default function Workspace() {
-  const dbReady = useWorkspaceStore((s) => s.dbReady);
   const setDbReady = useWorkspaceStore((s) => s.setDbReady);
   const hydrated = useWorkspaceStore((s) => s._hydrated);
   const init = useWorkspaceStore((s) => s.init);
-  const everHydrated = useRef(false);
-  if (hydrated) everHydrated.current = true;
   const tables = useWorkspaceStore((s) => s.tables);
   const dataCount = useWorkspaceStore((s) => s.tables.length + s.views.length);
   const spaceId = useWorkspaceStore((s) => s.spaceId);
@@ -101,12 +98,13 @@ export default function Workspace() {
       .catch((err) => setDbError(err instanceof Error ? err.message : String(err)));
   }, [setDbReady]);
 
-  // Open the active saved space (the shared page loads its own data instead).
+  // Open the active saved space (the shared page loads its own data instead). This does not wait for
+  // the engine: the space index and file bytes download while DuckDB starts.
   useEffect(() => {
-    if (!dbReady || isSharedPage || initStarted.current) return;
+    if (isSharedPage || initStarted.current) return;
     initStarted.current = true;
     void init();
-  }, [dbReady, isSharedPage, init]);
+  }, [isSharedPage, init]);
 
   // Load the shared snippet library and the AI model choice once.
   useEffect(() => {
@@ -256,8 +254,6 @@ export default function Workspace() {
       />
     );
   }
-  if (!dbReady) return <Splash message="Starting DuckDB" />;
-  if (!hydrated) return <Splash message={everHydrated.current ? "Opening space" : "Restoring your workspace"} />;
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">

@@ -32,30 +32,63 @@ test.describe("Explorer extras", () => {
     await expect(card).toBeVisible();
   });
 
-  test("pinned tables sit in a Pinned group and survive a reload", async ({ page }) => {
+  test("pinned tables sort first with a pin glyph and survive a reload", async ({ page }) => {
     await openWithSamples(page);
-    await page.getByRole("button", { name: "Pin employees" }).click({ force: true });
     const explorer = page.getByRole("complementary", { name: "Tables panel" });
-    await expect(explorer.getByText("Pinned", { exact: true })).toBeVisible();
-    // The section label (text "Pinned" + its count pill) is followed by the pinned rows.
-    const pinnedGroup = explorer.locator("div.flex", { hasText: /^Pinned1$/ }).locator("xpath=following-sibling::*[1]");
-    await expect(pinnedGroup.getByRole("button", { name: "employees", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "employees", exact: true })).toHaveCount(1);
+    const items = explorer.getByRole("treeitem", { name: /^(employees|departments)$/ });
+    await expect(items.first()).toHaveAttribute("aria-label", "employees");
+    await page.getByRole("button", { name: "Pin departments" }).click({ force: true });
+    await expect(items.first()).toHaveAttribute("aria-label", "departments");
+    await expect(explorer.getByRole("treeitem", { name: "departments", exact: true }).getByLabel("pinned")).toBeVisible();
 
     await page.reload();
     await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(explorer.getByText("Pinned", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Unpin employees" }).click({ force: true });
-    await expect(explorer.getByText("Pinned", { exact: true })).toHaveCount(0);
+    await expect(items.first()).toHaveAttribute("aria-label", "departments");
+    await page.getByRole("button", { name: "Unpin departments" }).click({ force: true });
+    await expect(items.first()).toHaveAttribute("aria-label", "employees");
   });
 
-  test("search keeps matches expanded with column counts, highlights and an Assistant row", async ({ page }) => {
+  test("the explorer is a tree with groups, a details pane and keyboard navigation", async ({ page }) => {
+    await openWithSamples(page);
+    const explorer = page.getByRole("complementary", { name: "Tables panel" });
+    const tree = explorer.getByRole("tree");
+    await expect(tree.getByRole("treeitem", { name: "Tables", exact: true })).toContainText("2");
+    // Columns are not listed inline; selecting a row opens the details pane with full types.
+    await expect(explorer.getByTitle(/^Insert dept_id/)).toHaveCount(0);
+    await explorer.getByRole("button", { name: "departments", exact: true }).click({ position: { x: 24, y: 12 } });
+    const details = explorer.getByRole("region", { name: "departments details" });
+    await expect(details).toContainText("4 rows");
+    await expect(details.getByTitle(/^Insert dept_id/)).toBeVisible();
+    // Resize with the keyboard.
+    const sep = explorer.getByRole("separator", { name: "Resize details" });
+    const before = Number(await sep.getAttribute("aria-valuenow"));
+    await sep.focus();
+    await page.keyboard.press("ArrowUp");
+    expect(Number(await sep.getAttribute("aria-valuenow"))).toBe(before + 5);
+    await details.getByRole("button", { name: "Close details" }).click();
+    await expect(details).toHaveCount(0);
+
+    // Arrow keys move through the tree; Enter opens the table page.
+    await tree.getByRole("treeitem", { name: "employees", exact: true }).focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(tree.getByRole("treeitem", { name: "departments", exact: true })).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("ArrowLeft");
+    await expect(tree.getByRole("treeitem", { name: "Tables", exact: true })).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(tree.getByRole("treeitem", { name: "employees", exact: true })).toHaveCount(0);
+    await page.keyboard.press("ArrowRight");
+    await expect(tree.getByRole("treeitem", { name: "employees", exact: true })).toBeVisible();
+  });
+
+  test("search keeps matches, shows matching columns with counts, highlights and an Assistant row", async ({ page }) => {
     await openWithSamples(page);
     await page.getByLabel("Search tables and columns").fill("dept");
-    const departments = page.getByRole("button", { name: "departments", exact: true });
+    const tree = page.getByRole("tree");
+    const departments = tree.getByRole("treeitem", { name: "departments", exact: true });
     await expect(departments).toHaveAttribute("aria-expanded", "true");
     await expect(departments).toContainText("2 of 4 columns");
-    const employees = page.getByRole("button", { name: "employees", exact: true });
+    const employees = tree.getByRole("treeitem", { name: "employees", exact: true });
     await expect(employees).toContainText("1 of 5 columns");
     await expect(page.getByTitle(/^Insert dept_id/)).toHaveCount(2);
     await expect(page.locator("mark").first()).toHaveText("dept");

@@ -148,8 +148,11 @@ test.describe("Spaces", () => {
     await page.getByRole("button", { name: "Delete Blank" }).click({ force: true });
     await page.getByRole("button", { name: "Confirm delete Blank" }).click();
     await expect(page.getByRole("button", { name: /^Space: (Playground|Analysis|Fresh copy)/ })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByText("Deleted Blank.")).toBeVisible();
 
     await page.getByRole("button", { name: /^Space: / }).click();
+    await expect(page.getByRole("button", { name: /^Analysis/ })).toBeVisible();
     await page.getByRole("button", { name: /^Analysis/ }).click();
     await expect(page.getByRole("button", { name: /^Space: Analysis/ })).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(600);

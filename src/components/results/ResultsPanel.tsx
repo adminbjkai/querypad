@@ -73,6 +73,7 @@ export default function ResultsPanel() {
     })
   );
   const plugins = useWorkspaceStore((s) => s.plugins);
+  const opening = useWorkspaceStore((s) => !s._hydrated);
   const openAi = useUiStore((s) => s.openAi);
   // Header distributions: an explicit choice is remembered, otherwise on for results of up to 50 columns.
   const statsPref = useSyncExternalStore(subscribeStats, readStats, () => null);
@@ -179,6 +180,26 @@ export default function ResultsPanel() {
             Fix with AI
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (!result && opening) {
+    // The space is still opening: rows at the grid's own size, so nothing moves when it arrives.
+    return (
+      <div aria-hidden="true" className="flex h-full flex-col bg-surface">
+        <div className="flex h-8 items-center gap-6 border-b border-line bg-raised px-4">
+          {[18, 12, 16, 10].map((w, i) => (
+            <div key={i} className="qp-skeleton h-3" style={{ width: `${w}%` }} />
+          ))}
+        </div>
+        {Array.from({ length: 7 }, (_, r) => (
+          <div key={r} className="flex h-7 items-center gap-6 border-b border-line px-4">
+            {[18, 12, 16, 10].map((w, i) => (
+              <div key={i} className="qp-skeleton h-2.5" style={{ width: `${w - (r % 3)}%` }} />
+            ))}
+          </div>
+        ))}
       </div>
     );
   }

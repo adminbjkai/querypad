@@ -107,13 +107,21 @@ Focus = `:focus-visible` 2px accent outline, offset 2. Disabled = 45% opacity.
   table sorted by #, name or type (`aria-sort`) plus a "Table details" rail (`aside`, 280px on large
   screens); Preview = the results grid over the first 100 rows, no SQL tab; Profile = Row count and
   Columns stat tiles then the column cards.
-- Tables panel (the explorer, titled "Tables"; its header carries Add data only once data exists, the
-  empty state carries it otherwise): pinned tables sit first under a "Pinned" label (pin glyph, remembered
-  per space in local storage); hovering a row for ~400 ms or focusing it opens a 272px summary card beside the panel
-  (`role="dialog"`, "name summary": shape, source, loaded time, keys, Open / Preview; Escape or leave
-  closes; never on touch); searching keeps every match expanded with an accent "n of m columns" chip,
-  `<mark>` on `bg-accent-soft`, "of total" after section counts, and a trailing "Ask the Assistant
-  about …" row. Add data stages each file with an editable, validated table name before "Load".
+- Tables panel (the explorer, "Database Explorer" style): header "Tables" + count chip, Refresh (re-reads the
+  catalog), Add data (once data exists) and a ⋯ menu (Add data…, Expand all, Collapse all, Profile all); an
+  `Objects | Sources` `Segmented` (Sources lists loaded files, their resulting table, and unrestored ones
+  flagged); a search ("Search tables and columns") and a Filter ▾ menu (Tables, Views, With joins, Profiled)
+  whose active filters show as removable chips. Objects is a `role="tree"` (arrows, Home/End, Left/Right
+  collapse and expand, Enter opens the table page, Space selects): space (database icon) → "Tables N" /
+  "Views N" groups (collapse state remembered per space) → 28px rows (icon, mono name, pin glyph for pinned
+  tables, which sort first). Hovering ~400 ms or focusing a row opens the 272px summary card beside the panel
+  (`role="dialog"`, "name summary"; Escape or leave closes; never on touch). Selecting a row opens a bottom
+  details pane (~45% of the body, `role="separator"` "Resize details" — drag or Up/Down keys, remembered):
+  mono name, row count, ⋯ (Open table page, Preview, Profile, Copy name, Insert name, Remove) and ×, then 24px
+  column rows (kind glyph, mono name, full DuckDB type uppercase faint at the right, key/join marks); clicking
+  a column inserts it at the editor cursor. Columns are listed under tables only while searching (accent
+  "n of m columns" chip, `<mark>` on `bg-accent-soft`, "of total" on group counts, trailing "Ask the Assistant
+  about …" row). Add data stages each file with an editable, validated table name before "Load".
 - Sample-data banner: a 36px `bg-accent-soft` strip under the page header with an "Add data" action
   and a dismiss remembered per space — never a floating toast.
 - Toasts: one icon and color per tone (info accent, success ok, warning warn, error danger) on a

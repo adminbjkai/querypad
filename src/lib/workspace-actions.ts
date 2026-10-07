@@ -1,4 +1,4 @@
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { selectEngineReady, useWorkspaceStore } from "@/stores/workspace-store";
 import { toast, useUiStore } from "@/stores/ui-store";
 import { buildShareUrl } from "@/lib/sharing/encode";
 import { buildAgentContext } from "@/lib/agent/context";
@@ -16,6 +16,7 @@ const activeTab = () => ws().tabs.find((t) => t.id === ws().activeTabId);
 
 /** Run the editor selection if there is one, otherwise the whole active tab. */
 export function runActive(): void {
+  if (!selectEngineReady(ws())) return; // engine still starting or space still opening (the Run button says so)
   useUiStore.getState().setWorkspacePage("workbench");
   const selection = getSelectedText()?.trim();
   void ws().runQuery(undefined, selection || undefined);

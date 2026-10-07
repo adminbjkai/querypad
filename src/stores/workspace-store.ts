@@ -26,7 +26,7 @@ import {
   type SpaceMeta,
 } from "@/lib/persistence";
 import { indexEntryStale, snapshotKey } from "@/lib/persistence/snapshot";
-import { getConnection } from "@/lib/duckdb/instance";
+import { getConnection, getDB } from "@/lib/duckdb/instance";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
 import { relationshipKey } from "@/lib/discovery/relationships";
 import {
@@ -253,6 +253,13 @@ interface WorkspaceState {
   updateNotebookCells: (id: string, cells: NotebookCell[]) => void;
 }
 
+/**
+ * True once SQL can run against the loaded data: the engine is up and the space is open (or, on a
+ * first visit, its sample tables are already in). Tables only appear once their bytes are in DuckDB.
+ */
+export const selectEngineReady = (s: Pick<WorkspaceState, "dbReady" | "_hydrated" | "tables">): boolean =>
+  s.dbReady && (s._hydrated || s.tables.length > 0);
+
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   dbReady: false,
   setDbReady: (ready) => set({ dbReady: ready }),
@@ -266,6 +273,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ _hydrated: false, persistEnabled: true });
     try {
       if (fromShared) {
+        await getDB();
         await resetEngine();
         set({ ...emptySpaceData() });
       }
@@ -275,6 +283,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         const meta = newMeta(PLAYGROUND_NAME);
         set({ spaces: [meta], spaceId: meta.id });
         await saveSpaceIndex({ activeId: meta.id, spaces: [meta] });
+        await getDB();
         await get().loadSampleData().catch((err) => console.error("Failed to load sample data:", err));
         await persistEverything(meta.id);
         return;
@@ -1008,7 +1017,9 @@ async function openSpace(spaceId: string): Promise<void> {
     })();
     return pluginsReady;
   };
+  // Bytes download while the engine is still starting; each file loads once both are ready.
   const persisted = await loadSpace(spaceId, async (entry, state) => {
+    await getDB();
     await pluginsLoaded(state.pluginUrls ?? []);
     if (stale()) return;
     try {
@@ -1044,6 +1055,7 @@ async function openSpace(spaceId: string): Promise<void> {
   const views: ViewInfo[] = [];
   const unrestoredViews: { name: string; sql: string }[] = [];
   if (persisted.views?.length) {
+    await getDB();
     const { restoreViews, describeRelation } = await import("@/lib/duckdb/catalog");
     const failed = new Set((await restoreViews(persisted.views)).map((v) => v.name));
     for (const view of persisted.views) {

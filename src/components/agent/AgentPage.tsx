@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef, useState } from "react";
 import { useAgentStore, type AgentMessage, type SessionStatus } from "@/stores/agent-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { selectEngineReady, useWorkspaceStore } from "@/stores/workspace-store";
 import Markdown from "@/components/assistant/Markdown";
 import { Icon } from "@/components/ui/icons";
 import { btn } from "@/components/ui/primitives";
@@ -144,7 +144,7 @@ export default function AgentPage() {
 
   const send = (value?: string) => {
     const message = (value ?? text).trim();
-    if (!message) return;
+    if (!message || !selectEngineReady(useWorkspaceStore.getState())) return;
     setText("");
     void useAgentStore.getState().send(message);
   };

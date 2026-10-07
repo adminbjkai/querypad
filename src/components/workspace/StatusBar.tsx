@@ -75,7 +75,7 @@ export default function StatusBar() {
     <footer className="flex h-6 shrink-0 items-center gap-2 overflow-hidden sm:gap-4 border-t border-line bg-chrome px-3 text-[11px] text-muted" aria-label="Status bar">
       <span className="flex shrink-0 items-center gap-1.5" title={dbReady ? "DuckDB-Wasm is running in your browser" : "DuckDB is starting"}>
         <span className={`size-1.5 rounded-full ${dbReady ? "bg-ok" : "bg-warn"}`} aria-hidden="true" />
-        DuckDB{version ? ` ${version}` : ""} {dbReady ? "ready" : "starting"}
+        {dbReady ? `DuckDB${version ? ` ${version}` : ""} ready` : "Starting engine…"}
       </span>
       {spaceName && (
         <span className="hidden min-w-0 items-center gap-1.5 sm:flex" title="Current space">

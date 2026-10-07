@@ -39,6 +39,7 @@ export default function Home() {
   const verdicts = useWorkspaceStore((s) => s.relationshipVerdicts);
   const unrestoredFiles = useWorkspaceStore((s) => s.unrestoredFiles);
   const unrestoredViews = useWorkspaceStore((s) => s.unrestoredViews);
+  const opening = useWorkspaceStore((s) => !s._hydrated);
 
   const hasData = tables.length + views.length > 0;
   const relationships = useMemo(
@@ -67,7 +68,7 @@ export default function Home() {
           <div className="mt-7 text-left">
             <Composer />
           </div>
-          {hasData ? (
+          {hasData || opening ? (
             <ul className="mt-4 flex flex-wrap justify-center gap-2" aria-label="Suggested questions">
               {CHIPS.map((c, i) => (
                 <li key={c} className={i >= 2 ? "max-sm:hidden" : undefined}>
@@ -92,7 +93,20 @@ export default function Home() {
           </div>
         )}
 
-        {hasData ? (
+        {opening ? (
+          <dl aria-hidden="true" aria-label="Workspace summary" className="mt-10 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line py-4 sm:grid-cols-4">
+            {["Datasets", "Rows", "Relationships", "Profiled"].map((label) => (
+              <div key={label} className="min-w-0">
+                <dt>
+                  <SectionLabel as="div">{label}</SectionLabel>
+                </dt>
+                <dd className="mt-0.5 flex h-6 items-center">
+                  <div className="qp-skeleton h-4 w-16" />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : hasData ? (
           <>
             <QuickActions />
             <dl aria-label="Workspace summary" className="mt-10 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line py-4 sm:grid-cols-4">

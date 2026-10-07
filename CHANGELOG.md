@@ -7,6 +7,23 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.16.1 — No loading splash, and a Database Explorer for tables
+
+- **Instant shell**: the real navigation, header and status bar appear straight away instead of a
+  full-screen "Loading QueryPad / Starting DuckDB / Restoring your workspace" splash. The engine
+  starts at page load while your space and its files download in parallel; the status bar reads
+  "Starting engine…" then "DuckDB vX ready", results and Home stats show same-size skeleton rows in
+  place, and Run / Agent send enable once the engine is ready. The splash remains only for a fatal
+  engine error
+- **Database Explorer**: the Tables panel is now a tree modelled on Snowflake's — space → Tables /
+  Views groups with counts → objects, an `Objects | Sources` switch (Sources lists loaded files),
+  search with a Filter menu (Tables, Views, With joins, Profiled), refresh and a ⋯ menu, keyboard
+  navigation, and a resizable details pane under the tree with the selected table's columns and
+  full types (BIGINT, VARCHAR, DATE…) and key markers
+- **Faster first visit**: the 34 MB DuckDB module and the editor assets are served precompressed
+  (about 7.7 MB for the engine) with long-lived caching, straight from disk by the front proxy
+  (`scripts/precompress-assets.mjs`, run on install)
+
 ## v0.16.0 — An Agent that plans and writes, Notebooks, Folders, and one design system across the app
 
 - **Navigation**: the rail is now three Snowsight-style groups — Workspace (Home, Agent, SQL,

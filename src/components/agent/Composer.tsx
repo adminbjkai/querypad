@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { useAgentStore } from "@/stores/agent-store";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { selectEngineReady, useWorkspaceStore } from "@/stores/workspace-store";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
 import ModelPicker from "@/components/ai/ModelPicker";
 import { Icon } from "@/components/ui/icons";
@@ -30,6 +30,7 @@ export default function Composer({
   const planOnly = useAgentStore((s) => s.planOnly);
   const tables = useWorkspaceStore((s) => s.tables);
   const views = useWorkspaceStore((s) => s.views);
+  const ready = useWorkspaceStore(selectEngineReady);
   const focusAfter = useRef(false);
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export default function Composer({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
-                onSend();
+                if (ready) onSend();
               }
             }}
             rows={Math.min(8, Math.max(2, text.split("\n").length))}
@@ -128,10 +129,10 @@ export default function Composer({
             ) : (
               <button
                 onClick={onSend}
-                disabled={!text.trim()}
+                disabled={!text.trim() || !ready}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                 aria-label="Send to agent"
-                title="Send (Enter)"
+                title={ready ? "Send (Enter)" : "Engine starting…"}
               >
                 <Icon name="arrowUp" size={16} />
               </button>

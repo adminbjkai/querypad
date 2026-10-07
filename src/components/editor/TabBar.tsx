@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { selectEngineReady, useWorkspaceStore } from "@/stores/workspace-store";
 import { saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
@@ -22,6 +22,7 @@ import type { SavedQuery } from "@/types";
  * and shed their labels below container widths so they never overlap the tabs.
  */
 export default function TabBar() {
+  const ready = useWorkspaceStore(selectEngineReady);
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
   const addTab = useWorkspaceStore((s) => s.addTab);
@@ -226,9 +227,9 @@ export default function TabBar() {
         </button>
         <button
           onClick={runActive}
-          disabled={!active?.query.trim() || active?.isExecuting}
+          disabled={!ready || !active?.query.trim() || active?.isExecuting}
           className={btn.primary}
-          title={`Run (${MOD}+Enter). Runs only the selection if you have one.`}
+          title={!ready ? "Engine starting…" : `Run (${MOD}+Enter). Runs only the selection if you have one.`}
         >
           {active?.isExecuting ? <Spinner className="size-3" /> : <Icon name="play" size={14} className="fill-current" />}
           Run
