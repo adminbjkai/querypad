@@ -223,7 +223,7 @@ export default function AiAssistant() {
                     <CheckBadge turn={turn} />
                     <span className="flex-1" />
                     <button onClick={() => applySql(turn.sql, true)} className={`${i === turns.length - 1 ? btn.primary : btn.secondary} h-7`}>
-                      <Icon name="play" size={12} />
+                      <Icon name="play" size={14} />
                       Use and run
                     </button>
                     <button onClick={() => applySql(turn.sql, false)} className={`${btn.ghost} h-7`}>
@@ -238,7 +238,7 @@ export default function AiAssistant() {
                       aria-label="Copy SQL"
                       title="Copy SQL"
                     >
-                      <Icon name="copy" size={13} />
+                      <Icon name="copy" size={14} />
                     </button>
                   </div>
                   {turn.check === "failed" && turn.checkError && (
@@ -301,7 +301,7 @@ export default function AiAssistant() {
           </div>
           {busy ? (
             <button onClick={() => abortRef.current?.abort()} className={btn.secondary}>
-              <Icon name="stop" size={13} />
+              <Icon name="stop" size={14} />
               Stop
             </button>
           ) : (

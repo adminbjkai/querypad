@@ -84,7 +84,7 @@ export default function StatusBar() {
         </span>
       )}
       <span className="flex shrink-0 items-center gap-1.5" title="Storage location and network connectivity; this is not a save confirmation">
-        <Icon name={online ? "folder" : "alert"} size={12} className={online ? "text-faint" : "text-warn"} />
+        <Icon name={online ? "database" : "alert"} size={12} className={online ? "text-faint" : "text-warn"} />
         {!persistEnabled ? "Shared session" : !online ? "Offline" : storage === "server" ? "Server storage" : storage === "browser" ? "Browser storage" : "Checking storage…"}
       </span>
 

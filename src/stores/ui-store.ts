@@ -113,6 +113,10 @@ function initialSplit(): number {
 }
 
 let toastSeq = 0;
+const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const TOAST_MS = 4000;
+const TOAST_ERROR_MS = 8000;
+const MAX_TOASTS = 3;
 
 export const useUiStore = create<UiState>((set, get) => ({
   workspacePage: "workbench",
@@ -194,12 +198,27 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
 
   toasts: [],
+  // Same message again bumps the existing toast's timer instead of stacking a duplicate; at most 3 show.
   toast: (message, tone = "info") => {
-    const id = ++toastSeq;
-    set((s) => ({ toasts: [...s.toasts.slice(-3), { id, tone, message }] }));
-    setTimeout(() => get().dismissToast(id), tone === "error" ? 7000 : 3500);
+    const existing = get().toasts.find((t) => t.message === message);
+    const id = existing?.id ?? ++toastSeq;
+    if (existing) {
+      clearTimeout(toastTimers.get(id));
+      if (existing.tone !== tone) set((s) => ({ toasts: s.toasts.map((t) => (t.id === id ? { ...t, tone } : t)) }));
+    } else {
+      set((s) => {
+        const dropped = s.toasts.slice(0, Math.max(0, s.toasts.length - (MAX_TOASTS - 1)));
+        dropped.forEach((t) => clearTimeout(toastTimers.get(t.id)));
+        return { toasts: [...s.toasts.slice(-(MAX_TOASTS - 1)), { id, tone, message }] };
+      });
+    }
+    toastTimers.set(id, setTimeout(() => get().dismissToast(id), tone === "error" ? TOAST_ERROR_MS : TOAST_MS));
   },
-  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  dismissToast: (id) => {
+    clearTimeout(toastTimers.get(id));
+    toastTimers.delete(id);
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+  },
 }));
 
 /** Shorthand for non-React callers. */

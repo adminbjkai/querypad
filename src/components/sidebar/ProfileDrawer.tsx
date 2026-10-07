@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import type { ColumnProfile, TableProfileState } from "@/types";
 import { Icon } from "@/components/ui/icons";
-import { KindGlyph, Spinner, btn } from "@/components/ui/primitives";
+import { Chip, KindGlyph, SectionLabel, Spinner, btn } from "@/components/ui/primitives";
 
 const IDLE: TableProfileState = { status: "idle", profile: null, error: null };
 
@@ -31,11 +31,11 @@ export function ColumnCard({ column, rowCount }: { column: ColumnProfile; rowCou
   const distinct = column.distinctCount;
   const unique = distinct !== null && rowCount > 0 && distinct === rowCount - column.nullCount && column.nullCount === 0;
   return (
-    <li className="px-3 py-2.5 transition-colors hover:bg-raised/60">
+    <li className="px-3 py-2.5 transition-colors hover:bg-sunken">
       <div className="flex items-center gap-1">
         <KindGlyph kind={column.kind} type={column.type} />
         <span className="min-w-0 truncate font-mono text-[12px] font-medium text-ink">{column.name}</span>
-        {unique && <span className="rounded bg-join-soft px-1 text-[10px] font-medium leading-4 text-join">unique</span>}
+        {unique && <Chip tone="join">unique</Chip>}
         <span className="ml-auto shrink-0 pl-2 font-mono text-[11px] text-faint">{column.type.toLowerCase()}</span>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] tabular-nums text-muted">
@@ -61,7 +61,7 @@ export function ColumnCard({ column, rowCount }: { column: ColumnProfile; rowCou
               <span className="truncate font-mono text-ink">{top.value || "(empty)"}</span>
               <span className="tabular-nums text-faint">{top.count.toLocaleString()}</span>
               <span className="col-span-2">
-                <Meter fraction={rowCount > 0 ? top.count / rowCount : 0} className="bg-accent/70" />
+                <Meter fraction={rowCount > 0 ? top.count / rowCount : 0} className="bg-accent" />
               </span>
             </li>
           ))}
@@ -129,11 +129,16 @@ export default function ProfileDrawer({ tableName, onClose }: { tableName: strin
           </div>
         )}
         {state.status === "ready" && state.profile && (
-          <ul className="divide-y divide-line">
+          <>
+            <SectionLabel as="div" className="border-b border-line px-3 py-2" count={state.profile.columns.length}>
+              Columns
+            </SectionLabel>
+            <ul className="divide-y divide-line">
             {state.profile.columns.map((column) => (
               <ColumnCard key={column.name} column={column} rowCount={state.profile!.rowCount} />
             ))}
-          </ul>
+            </ul>
+          </>
         )}
       </div>
     </aside>

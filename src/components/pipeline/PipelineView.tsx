@@ -90,14 +90,14 @@ export default function PipelineView() {
                     className="shrink-0 rounded p-0.5 text-faint opacity-0 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
                     aria-label={`Delete ${p.title}`}
                   >
-                    <Icon name="x" size={12} />
+                    <Icon name="x" size={14} />
                   </button>
                 )}
               </div>
             );
           })}
           <button onClick={addPipeline} className="flex w-9 shrink-0 items-center justify-center text-muted hover:bg-sunken hover:text-ink" aria-label="New pipeline">
-            <Icon name="plus" size={15} />
+            <Icon name="plus" size={16} />
           </button>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 border-l border-line bg-chrome px-2">
@@ -113,7 +113,7 @@ export default function PipelineView() {
                 <span className="hidden @min-[480px]:inline">Step</span>
               </button>
               <button onClick={() => void run()} disabled={running || pipeline.steps.length === 0} className={btn.primary}>
-                {running ? <Spinner className="size-3" /> : <Icon name="play" size={13} className="fill-current" />}
+                {running ? <Spinner className="size-3" /> : <Icon name="play" size={14} className="fill-current" />}
                 Run pipeline
               </button>
             </>
@@ -123,7 +123,7 @@ export default function PipelineView() {
 
       {!pipeline ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-1.5 bg-surface p-6 text-center">
-          <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
             <Icon name="flow" size={18} />
           </span>
           <p className="text-[14px] font-medium text-ink">No pipeline</p>
@@ -133,25 +133,25 @@ export default function PipelineView() {
             New pipeline
           </button>
         </div>
+      ) : pipeline.steps.length === 0 ? (
+        // One empty state for the whole canvas; the steps / graph / results panes appear with the first step.
+        <div className="qp-dotgrid flex flex-1 flex-col items-center justify-center gap-1.5 bg-surface p-6 text-center">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
+            <Icon name="flow" size={18} />
+          </span>
+          <p className="text-[14px] font-medium text-ink">No steps yet</p>
+          <p className="max-w-sm text-balance text-[13px] text-muted">
+            Each step is a SQL query saved as a temporary table named after the step; later steps can select from earlier ones by name.
+          </p>
+          <button onClick={() => addStep(pipeline.id)} className={`${btn.primary} mt-2`}>
+            <Icon name="plus" size={14} />
+            Add the first step
+          </button>
+        </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col @min-[720px]:flex-row">
           <div className="flex max-h-[45%] w-full shrink-0 flex-col gap-2.5 overflow-y-auto border-b border-line bg-chrome p-3 @min-[720px]:max-h-none @min-[720px]:w-[340px] @min-[720px]:border-b-0 @min-[720px]:border-r">
-            {pipeline.steps.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-line-strong bg-surface p-4 text-[13px] leading-5 text-muted">
-                <span className="mb-2 flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
-                  <Icon name="flow" size={18} />
-                </span>
-                <p className="text-[14px] font-medium text-ink">No steps yet</p>
-                <span className="block text-balance">
-                  Each step is a SQL query saved as a temporary table named after the step. Later steps can select from earlier ones by name.
-                </span>
-                <button onClick={() => addStep(pipeline.id)} className={`${btn.secondary} mt-3`}>
-                  <Icon name="plus" size={14} />
-                  Add the first step
-                </button>
-              </div>
-            ) : (
-              pipeline.steps.map((step) => (
+            {pipeline.steps.map((step) => (
                 <PipelineStepCard
                   key={step.id}
                   step={step}
@@ -162,8 +162,7 @@ export default function PipelineView() {
                   onUpdateQuery={(query) => updateStep(pipeline.id, step.id, { query })}
                   onRemove={() => removeStep(pipeline.id, step.id)}
                 />
-              ))
-            )}
+              ))}
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="h-[200px] shrink-0 border-b border-line bg-surface @min-[720px]:h-1/2 @min-[720px]:min-h-[160px]">

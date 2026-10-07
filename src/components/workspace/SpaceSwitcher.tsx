@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useWorkspaceStore, PLAYGROUND_NAME, type SpaceTemplate } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
-import { Spinner, btn, input } from "@/components/ui/primitives";
+import { Dialog, Spinner, btn, input } from "@/components/ui/primitives";
 
 function relative(at: number): string {
   const minutes = Math.round((Date.now() - at) / 60000);
@@ -27,7 +27,7 @@ const AVATAR_TONES = ["bg-accent-soft text-accent", "bg-join-soft text-join", "b
 function SpaceAvatar({ name }: { name: string }) {
   const tone = AVATAR_TONES[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % AVATAR_TONES.length];
   return (
-    <span className={`flex size-5 shrink-0 items-center justify-center rounded-[5px] text-[11px] font-semibold ${tone}`} aria-hidden="true">
+    <span className={`flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold ring-1 ring-line ${tone}`} aria-hidden="true">
       {name.trim().charAt(0).toUpperCase() || "S"}
     </span>
   );
@@ -55,6 +55,11 @@ export default function SpaceSwitcher({ compact = false }: { compact?: boolean }
   const panelId = useId();
 
   const current = spaces.find((s) => s.id === spaceId);
+  const deleting = confirmDelete ? spaces.find((s) => s.id === confirmDelete) : undefined;
+  const closeDelete = () => {
+    setConfirmDelete(null);
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -78,7 +83,6 @@ export default function SpaceSwitcher({ compact = false }: { compact?: boolean }
     if (!open) {
       setNaming(null);
       setRenaming(null);
-      setConfirmDelete(null);
     }
   }, [open]);
 
@@ -105,8 +109,8 @@ export default function SpaceSwitcher({ compact = false }: { compact?: boolean }
       <button
         ref={triggerRef}
         onClick={() => setOpen(!open)}
-        className={`flex h-9 items-center gap-2 rounded-lg text-[13px] text-ink transition-colors hover:bg-sunken ${
-          compact ? "w-9 justify-center" : "w-full px-2"
+        className={`flex h-8 items-center gap-2 rounded-md text-[13px] text-ink transition-colors hover:bg-sunken ${
+          compact ? "w-9 justify-center" : "w-full px-1.5"
         } ${open ? "bg-sunken" : ""}`}
         aria-label={`Space: ${current?.name ?? "none"}. Switch or save spaces`}
         aria-expanded={open}
@@ -118,19 +122,19 @@ export default function SpaceSwitcher({ compact = false }: { compact?: boolean }
         {!compact && (
           <>
             <span className="min-w-0 flex-1 truncate text-left font-medium">{current?.name ?? "Space"}</span>
-            <Icon name="chevronDown" size={13} className="text-faint" />
+            <Icon name="chevronDown" size={14} className="text-faint" />
           </>
         )}
       </button>
 
       {open && (
-        <div id={panelId} className="qp-pop absolute left-0 top-full z-50 mt-1 max-h-[min(75vh,36rem)] w-[320px] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-pop" role="dialog" aria-label="Spaces">
+        <div id={panelId} className="qp-pop absolute left-0 top-full z-50 mt-1 max-h-[min(75vh,36rem)] w-[320px] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-lg border border-line bg-surface p-1.5 shadow-pop" role="dialog" aria-label="Spaces">
           <p className="px-2 pb-1 pt-1 text-[12px] text-muted">Your spaces — saved for every device</p>
           <ul className="max-h-[40vh] overflow-y-auto">
             {spaces.map((space) => {
               const active = space.id === spaceId;
               return (
-                <li key={space.id} className="group/space flex items-center gap-1 rounded-lg hover:bg-raised">
+                <li key={space.id} className="group/space flex items-center gap-1 rounded-md hover:bg-raised">
                   {renaming === space.id ? (
                     <form
                       className="flex flex-1 gap-1 p-1"
@@ -171,21 +175,18 @@ export default function SpaceSwitcher({ compact = false }: { compact?: boolean }
                           aria-label={`Rename ${space.name}`}
                           title="Rename"
                         >
-                          <Icon name="file" size={13} />
+                          <Icon name="file" size={14} />
                         </button>
                         <button
                           onClick={() => {
-                            if (confirmDelete !== space.id) {
-                              setConfirmDelete(space.id);
-                              return;
-                            }
-                            void run(() => deleteSpace(space.id), `Deleted ${space.name}.`);
+                            setOpen(false);
+                            setConfirmDelete(space.id);
                           }}
-                          className={`rounded p-1 ${confirmDelete === space.id ? "bg-danger-soft text-danger" : "text-muted hover:bg-danger-soft hover:text-danger"}`}
-                          aria-label={confirmDelete === space.id ? `Confirm delete ${space.name}` : `Delete ${space.name}`}
-                          title={confirmDelete === space.id ? "Click again to delete this space and its data" : "Delete"}
+                          className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger"
+                          aria-label={`Delete ${space.name}`}
+                          title="Delete"
                         >
-                          <Icon name="trash" size={13} />
+                          <Icon name="trash" size={14} />
                         </button>
                       </div>
                     </>
@@ -224,7 +225,7 @@ export default function SpaceSwitcher({ compact = false }: { compact?: boolean }
                 <button
                   key={option.template}
                   onClick={() => startNaming(option.template)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-raised"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-raised"
                 >
                   <Icon name={option.icon} size={14} className="text-muted" />
                   <span>
@@ -236,6 +237,35 @@ export default function SpaceSwitcher({ compact = false }: { compact?: boolean }
             )}
           </div>
         </div>
+      )}
+
+      {deleting && (
+        <Dialog
+          title={`Delete ${deleting.name}?`}
+          onClose={closeDelete}
+          width="max-w-sm"
+          footer={
+            <>
+              <button onClick={closeDelete} className={btn.secondary}>
+                Cancel
+              </button>
+              <button
+                onClick={() => void run(() => deleteSpace(deleting.id), `Deleted ${deleting.name}.`).then(closeDelete)}
+                disabled={busy}
+                className={btn.danger}
+                aria-label={`Confirm delete ${deleting.name}`}
+              >
+                {busy && <Spinner className="size-3" />}
+                Delete space
+              </button>
+            </>
+          }
+        >
+          <p className="text-[13px] leading-5 text-muted">
+            This deletes the space and its {deleting.tableCount} {deleting.tableCount === 1 ? "dataset" : "datasets"}, tabs and history on every device. Saved snippets and your
+            other spaces stay.
+          </p>
+        </Dialog>
       )}
     </div>
   );

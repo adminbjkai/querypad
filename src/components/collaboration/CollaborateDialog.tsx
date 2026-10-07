@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { toast } from "@/stores/ui-store";
 import { connectToRoom, defaultCollabUrl } from "@/lib/collaboration/sync";
 import { copyText } from "@/lib/export/clipboard";
-import { Dialog, Spinner, btn, input } from "@/components/ui/primitives";
+import { Dialog, Segmented, Spinner, btn, input } from "@/components/ui/primitives";
 
 export function inviteLink(roomId: string): string {
   return `${location.origin}/?room=${encodeURIComponent(roomId)}`;
@@ -19,6 +19,7 @@ export default function CollaborateDialog({ onClose }: { onClose: () => void }) 
   const [roomId, setRoomId] = useState("");
   const [server, setServer] = useState(defaultCollabUrl);
   const [showServer, setShowServer] = useState(false);
+  const formId = useId();
 
   const submit = async () => {
     const raw = mode === "create" ? crypto.randomUUID().slice(0, 8) : roomId.trim();
@@ -40,22 +41,35 @@ export default function CollaborateDialog({ onClose }: { onClose: () => void }) 
   };
 
   return (
-    <Dialog title="Collaborate live" onClose={onClose} width="max-w-sm">
-      <div className="mb-4 flex rounded-lg bg-sunken p-0.5" role="tablist">
-        {(["create", "join"] as const).map((m) => (
-          <button
-            key={m}
-            role="tab"
-            aria-selected={mode === m}
-            onClick={() => setMode(m)}
-            className={`h-7 flex-1 rounded-md text-[13px] ${mode === m ? "bg-surface font-medium text-ink shadow-sm" : "text-muted"}`}
-          >
-            {m === "create" ? "Start a room" : "Join a room"}
+    <Dialog
+      title="Collaborate live"
+      onClose={onClose}
+      width="max-w-sm"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={btn.secondary}>
+            Cancel
           </button>
-        ))}
-      </div>
+          <button type="submit" form={formId} disabled={connecting || (mode === "join" && !roomId.trim())} className={btn.primary}>
+            {connecting && <Spinner className="size-3" />}
+            {connecting ? "Connecting…" : mode === "create" ? "Start room and copy invite" : "Join room"}
+          </button>
+        </>
+      }
+    >
+      <Segmented
+        value={mode}
+        onChange={setMode}
+        ariaLabel="Room mode"
+        className="mb-4"
+        options={[
+          { value: "create", label: "Start a room" },
+          { value: "join", label: "Join a room" },
+        ]}
+      />
 
       <form
+        id={formId}
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
@@ -85,11 +99,6 @@ export default function CollaborateDialog({ onClose }: { onClose: () => void }) 
         )}
 
         {error && <p className="rounded-md bg-danger-soft px-2.5 py-2 text-[12px] text-danger">{error}</p>}
-
-        <button type="submit" disabled={connecting || (mode === "join" && !roomId.trim())} className={`${btn.primary} w-full`}>
-          {connecting && <Spinner className="size-3" />}
-          {connecting ? "Connecting…" : mode === "create" ? "Start room and copy invite" : "Join room"}
-        </button>
       </form>
     </Dialog>
   );

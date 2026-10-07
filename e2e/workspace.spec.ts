@@ -255,7 +255,9 @@ test.describe("Snippet library", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByLabel("Snippet SQL")).toHaveValue(/ORDER BY budget DESC/);
     await dialog.getByLabel("Snippet name").fill("Biggest budgets");
-    await dialog.getByLabel("Snippet folder").fill("Reports");
+    await dialog.getByRole("button", { name: "Snippet folder" }).click();
+    await a.getByRole("menuitemradio", { name: "New folder…" }).click();
+    await dialog.getByLabel("New folder name").fill("Reports");
     await dialog.getByLabel("Snippet description").fill("Departments by budget");
     await dialog.getByRole("button", { name: "Save snippet" }).click();
     await expect(dialog).toHaveCount(0);
@@ -308,7 +310,7 @@ test.describe("Snippet library", () => {
     await b.getByRole("button", { name: "Snippet Top budgets" }).hover();
     await b.getByRole("button", { name: "More for Top budgets" }).click();
     await b.getByRole("menuitem", { name: "Delete" }).click();
-    await b.getByRole("button", { name: "Confirm delete Top budgets" }).click();
+    await b.getByRole("dialog", { name: "Delete snippet" }).getByRole("button", { name: "Confirm delete Top budgets" }).click();
     await expect(b.getByRole("button", { name: "Snippet Top budgets" })).toHaveCount(0);
     await expect(a.getByRole("button", { name: "Snippet Top budgets" })).toHaveCount(0, { timeout: 15_000 });
     await a.reload();
@@ -407,13 +409,18 @@ test.describe("Charts", () => {
     await page.getByRole("tab", { name: "Chart" }).click();
     const settings = page.getByRole("complementary", { name: "Chart settings" });
     await expect(settings).toBeVisible();
-    await page.getByRole("radio", { name: "Bar", exact: true }).click();
-    await settings.getByLabel("X axis column").selectOption("dept_name");
-    await settings.getByLabel("Series 1 column").selectOption("salary");
-    await settings.getByLabel("Series 1 aggregation").selectOption("avg");
+    // Chart settings use the styled Select: a labeled trigger opening a menu of menuitemradio rows.
+    const pick = async (label: string, option: string) => {
+      await settings.getByRole("button", { name: label, exact: true }).click();
+      await page.getByRole("menuitemradio", { name: option, exact: true }).click();
+    };
+    await pick("Chart type", "Bar");
+    await pick("X axis column", "dept_name");
+    await pick("Series 1 column", "salary");
+    await pick("Series 1 aggregation", "Average");
     await expect(page.locator(".recharts-bar-rectangle").first()).toBeVisible();
     await expect(page.locator(".recharts-bar-rectangle")).toHaveCount(4);
-    await page.getByRole("radio", { name: "Scorecard" }).click();
+    await pick("Chart type", "Scorecard");
     await expect(page.locator(".recharts-bar-rectangle")).toHaveCount(0);
   });
 });

@@ -23,14 +23,14 @@ export default function SemanticModel() {
     <section aria-label="Semantic model" className="mt-10">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[15px] font-semibold text-ink">Your data, connected</h2>
+          <h2 className="text-[14px] font-semibold leading-5 text-ink">Your data, connected</h2>
           <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted" role="status">
             {discovery.status === "loading" ? (
               <><Spinner />Discovering relationships…</>
             ) : discovery.status === "error" ? (
-              <><Icon name="alert" size={13} className="text-warn" />Discovery needs attention</>
+              <><Icon name="alert" size={14} className="text-warn" />Discovery needs attention</>
             ) : discovery.status === "ready" ? (
-              <><Icon name="check" size={13} className="text-ok" />{relationships.length} {relationships.length === 1 ? "connection" : "connections"} found</>
+              <><Icon name="check" size={14} className="text-ok" />{relationships.length} {relationships.length === 1 ? "connection" : "connections"} found</>
             ) : (
               "Discovery starts when two tables are loaded."
             )}
@@ -44,11 +44,11 @@ export default function SemanticModel() {
         {model.entities.map((entity) => (
           <div key={entity.table} className="rounded-xl border border-line bg-surface p-4 transition-colors hover:border-line-strong">
             <div className="flex items-center gap-2">
-              <Icon name="table" size={15} className="text-accent" />
-              <h3 className="truncate text-[13px] font-semibold text-ink" title={entity.name}>{entity.name}</h3>
+              <Icon name="table" size={16} className="text-accent" />
+              <h3 className="truncate text-[14px] font-semibold leading-5 text-ink" title={entity.name}>{entity.name}</h3>
             </div>
             <p className="mt-1 truncate font-mono text-[11px] text-muted" title={entity.table}>{entity.table}</p>
-            <div className="mt-3 space-y-1.5 text-xs text-muted">
+            <div className="mt-3 space-y-1.5 text-[12px] text-muted">
               {entity.belongsTo.length > 0 && <p className="break-words">Belongs to <span className="font-medium text-ink">{entity.belongsTo.join(", ")}</span></p>}
               {entity.hasMany.length > 0 && <p className="break-words">Has many <span className="font-medium text-ink">{entity.hasMany.join(", ")}</span></p>}
               {entity.hasOne.length > 0 && <p className="break-words">Has one <span className="font-medium text-ink">{entity.hasOne.join(", ")}</span></p>}

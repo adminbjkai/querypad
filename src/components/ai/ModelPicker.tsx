@@ -5,6 +5,7 @@ import { useAiStore, currentEffort } from "@/stores/ai-store";
 import { AI_PROVIDER_OPTIONS, getAiProviderConfig, type AiProvider, type AiProviderConfig } from "@/lib/ai/providers";
 import { getApiKey } from "@/lib/ai/api-key";
 import { Icon } from "@/components/ui/icons";
+import { SectionLabel, Segmented } from "@/components/ui/primitives";
 
 /**
  * One model picker for every AI surface. Groups: CLIs signed in on this server (no key),
@@ -61,7 +62,7 @@ export default function ModelPicker({ align = "right", compact = false }: { alig
       <span className="w-[76px] shrink-0 truncate whitespace-nowrap text-[11px] font-medium text-muted">{p.vendor ?? p.label}</span>
       <span className="min-w-0 flex-1 truncate">{p.modelLabel}</span>
       {note && <span className="shrink-0 text-[11px] text-faint">{note}</span>}
-      {p.id === provider && <Icon name="check" size={13} className="shrink-0 text-accent" />}
+      {p.id === provider && <Icon name="check" size={14} className="shrink-0 text-accent" />}
     </button>
   );
 
@@ -80,7 +81,7 @@ export default function ModelPicker({ align = "right", compact = false }: { alig
           {config.modelLabel}
           {effortNote && <span className="text-muted"> · {effortNote}</span>}
         </span>
-        <Icon name="chevronDown" size={12} className="shrink-0 text-faint" />
+        <Icon name="chevronDown" size={14} className="shrink-0 text-faint" />
       </button>
 
       {open && (
@@ -91,33 +92,27 @@ export default function ModelPicker({ align = "right", compact = false }: { alig
             align === "right" ? "right-0" : "left-0"
           }`}
         >
-          <p className="px-2 pb-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-faint">Signed in on this server · no key</p>
+          <SectionLabel as="div" className="px-2 pb-1 pt-1">Signed in on this server · no key</SectionLabel>
           {local.map((p) => option(p, serverProviders.includes(p.id) ? null : "unavailable", !serverProviders.includes(p.id)))}
           {serverKeyed.length > 0 && (
             <>
-              <p className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-faint">Server API keys</p>
+              <SectionLabel as="div" className="px-2 pb-1 pt-2">Server API keys</SectionLabel>
               {serverKeyed.map((p) => option(p, null))}
             </>
           )}
-          <p className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-faint">Your API key</p>
+          <SectionLabel as="div" className="px-2 pb-1 pt-2">Your API key</SectionLabel>
           {ownKey.map((p) => option(p, getApiKey(p.id) ? "key saved" : "add key"))}
 
           {config.efforts && config.efforts.length > 0 && (
             <div className="mt-1.5 flex items-center justify-between border-t border-line px-2 pb-0.5 pt-2">
               <span className="text-[12px] text-muted">Effort</span>
-              <div className="flex rounded-md bg-sunken p-0.5" role="radiogroup" aria-label="Reasoning effort">
-                {config.efforts.map((e) => (
-                  <button
-                    key={e}
-                    role="radio"
-                    aria-checked={effort === e}
-                    onClick={() => setEffort(provider, e)}
-                    className={`h-6 rounded px-2.5 text-[12px] capitalize ${effort === e ? "bg-surface font-medium text-ink shadow-sm" : "text-muted hover:text-ink"}`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                size="sm"
+                ariaLabel="Reasoning effort"
+                value={effort ?? config.efforts[0]}
+                onChange={(e) => setEffort(provider, e)}
+                options={config.efforts.map((e) => ({ value: e, label: <span className="capitalize">{e}</span> }))}
+              />
             </div>
           )}
         </div>

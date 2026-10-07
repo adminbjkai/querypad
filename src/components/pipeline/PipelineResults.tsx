@@ -8,7 +8,7 @@ export default function PipelineResults({ stepName, result }: { stepName: string
   if (!result) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1.5 bg-surface p-6 text-center">
-        <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+        <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
           <Icon name="table" size={18} />
         </span>
         <p className="text-[14px] font-medium text-ink">No results yet</p>
@@ -19,9 +19,9 @@ export default function PipelineResults({ stepName, result }: { stepName: string
   if (result.error) {
     return (
       <div className="h-full bg-surface p-4">
-        <div className="rounded-lg border border-danger/40 bg-danger-soft p-3">
+        <div className="rounded-lg border border-line bg-danger-soft p-3">
           <p className="flex items-center gap-2 text-[13px] font-semibold text-danger">
-            <Icon name="alert" size={15} />
+            <Icon name="alert" size={16} />
             Step <span className="font-mono">{stepName}</span> failed
           </p>
           <pre className="mt-2 whitespace-pre-wrap font-mono text-[12px] text-ink">{result.error.message}</pre>

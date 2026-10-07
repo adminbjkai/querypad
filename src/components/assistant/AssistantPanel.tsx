@@ -10,7 +10,7 @@ import ModelPicker from "@/components/ai/ModelPicker";
 import Markdown from "./Markdown";
 import ChatList from "./ChatList";
 import { Icon } from "@/components/ui/icons";
-import { MOD, btn } from "@/components/ui/primitives";
+import { MOD, SectionLabel, btn } from "@/components/ui/primitives";
 
 const SUGGESTIONS = [
   "Summarize the tables in this space",
@@ -24,7 +24,7 @@ function SqlCard({ sql, streaming }: { sql: string; streaming: boolean }) {
   return (
     <div className="group/sql relative overflow-hidden rounded-lg border border-line bg-raised">
       <div className="flex items-center justify-between border-b border-line px-3 py-1">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-faint">SQL</span>
+        <SectionLabel as="div">SQL</SectionLabel>
         {!streaming && (
           <button
             onClick={() => void copyText(sql).then(() => toast("SQL copied."))}
@@ -59,10 +59,10 @@ function RunCard({ run }: { run: AssistantRun | undefined; sql: string }) {
   if (!run) return <Working label="Looking at the data…" />;
   const r = run.result;
   return (
-    <div className="my-1 rounded-lg border border-line bg-raised/50">
+    <div className="my-1 rounded-lg border border-line bg-surface">
       <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[12px] text-muted hover:text-ink" aria-expanded={open}>
-        <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
-        <Icon name="table" size={12} />
+        <Icon name={open ? "chevronDown" : "chevronRight"} size={14} />
+        <Icon name="table" size={14} />
         <span className="flex-1 tabular-nums">
           {run.error ? <span className="text-danger">Lookup failed</span> : `Looked at the data · ${r?.rowCount.toLocaleString()} rows · ${r?.executionTimeMs} ms`}
         </span>
@@ -317,8 +317,8 @@ export default function AssistantPanel() {
       aria-label="Assistant"
     >
       <ResizeHandle />
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-line bg-chrome px-3">
-        <Icon name="sparkle" size={15} className="mr-1 text-accent" />
+      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line bg-chrome px-3">
+        <Icon name="sparkle" size={16} className="mr-1 text-accent" />
         <h2 className="text-[13px] font-semibold text-ink">Assistant</h2>
         <span className="flex-1" />
         <button
@@ -328,7 +328,7 @@ export default function AssistantPanel() {
           aria-label="All chats"
           aria-pressed={showChats}
         >
-          <Icon name="chat" size={15} />
+          <Icon name="chat" size={16} />
         </button>
         <button
           onClick={() => {
@@ -341,10 +341,10 @@ export default function AssistantPanel() {
           title="New conversation"
           aria-label="New conversation"
         >
-          <Icon name="plus" size={15} />
+          <Icon name="plus" size={16} />
         </button>
         <button onClick={() => useUiStore.getState().setAssistantOpen(false)} className={btn.icon} title={`Collapse (${MOD}+I)`} aria-label="Collapse assistant">
-          <Icon name="panelRight" size={15} />
+          <Icon name="panelRight" size={16} />
         </button>
       </div>
 
@@ -367,7 +367,7 @@ export default function AssistantPanel() {
                       className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-[13px] text-ink transition-colors hover:border-line-strong hover:bg-raised"
                     >
                       {s}
-                      <Icon name="chevronRight" size={13} className="text-faint" />
+                      <Icon name="chevronRight" size={14} className="text-faint" />
                     </button>
                   ))}
                 </div>
@@ -397,7 +397,7 @@ export default function AssistantPanel() {
               className={`${btn.secondary} absolute bottom-3 left-1/2 z-10 -translate-x-1/2 shadow-pop`}
               aria-label="Scroll to latest response"
             >
-              <Icon name="chevronDown" size={13} />
+              <Icon name="chevronDown" size={14} />
               New response
             </button>
           )}
@@ -452,7 +452,7 @@ export default function AssistantPanel() {
                   aria-haspopup="menu"
                   title="Add context"
                 >
-                  <Icon name="plus" size={15} />
+                  <Icon name="plus" size={16} />
                 </button>
                 {plusOpen && (
                   <div role="menu" aria-label="Add context" className="qp-pop absolute left-0 z-50 w-56 rounded-xl border border-line bg-surface p-1 shadow-pop">
@@ -492,7 +492,7 @@ export default function AssistantPanel() {
                   aria-label="Send message"
                   title="Send (Enter)"
                 >
-                  <Icon name="arrowUp" size={15} />
+                  <Icon name="arrowUp" size={16} />
                 </button>
               )}
             </div>

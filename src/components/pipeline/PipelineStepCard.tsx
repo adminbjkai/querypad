@@ -56,7 +56,7 @@ export default function PipelineStepCard({ step, result, isSelected, onSelect, o
           className="rounded p-0.5 text-faint transition-colors hover:text-danger"
           aria-label={`Remove step ${step.name}`}
         >
-          <Icon name="x" size={13} />
+          <Icon name="x" size={14} />
         </button>
       </div>
       <div className="h-[112px]" onClick={(e) => e.stopPropagation()}>

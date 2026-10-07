@@ -151,8 +151,16 @@ export async function saveCurrentAsSnippet(): Promise<void> {
     toast("Write or select some SQL first, then save it as a snippet.", "warning");
     return;
   }
-  const firstLine = sql.split("\n").find((l) => l.trim() && !l.trim().startsWith("--"))?.trim() ?? "";
-  // A renamed tab is a good name; the default "Query N" isn't, so use the first SQL line.
+  // A renamed tab is a good name; the default "Query N" isn't, so name it after the first table.
   const named = tab?.title && !/^Query \d+$/.test(tab.title) ? tab.title : null;
-  useSnippetStore.getState().openEditor({ name: named ?? firstLine.slice(0, 60), sql });
+  useSnippetStore.getState().openEditor({ name: named ?? defaultSnippetName(sql), sql });
+}
+
+/** A readable default name: "<first table> query" from the first FROM, or "Untitled snippet". */
+export function defaultSnippetName(sql: string): string {
+  const match = /\bfrom\s+(?:"([^"]+)"|([A-Za-z_][\w.]*))/i.exec(sql);
+  const ident = match?.[1] ?? match?.[2];
+  if (!ident) return "Untitled snippet";
+  const table = ident.split(".").pop() ?? ident;
+  return `${table} query`;
 }

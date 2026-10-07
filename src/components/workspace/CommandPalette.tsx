@@ -6,7 +6,7 @@ import { useUiStore } from "@/stores/ui-store";
 import { runActive, previewTable, shareWorkspace, copyAgentContext, insertSnippet, openSnippet, openTablePage } from "@/lib/workspace-actions";
 import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { Icon, type IconName } from "@/components/ui/icons";
-import { MOD } from "@/components/ui/primitives";
+import { Kbd, MOD, SectionLabel } from "@/components/ui/primitives";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { insertAtCursor } from "@/lib/editor-bridge";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
@@ -212,7 +212,7 @@ export default function CommandPalette() {
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-3 pt-[8vh] sm:p-6 sm:pt-[10vh]"
       onMouseDown={(e) => e.target === e.currentTarget && close()}
     >
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${listId}-title`} tabIndex={-1} className="qp-pop flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-dialog sm:max-h-[calc(100dvh-3rem)]">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${listId}-title`} tabIndex={-1} className="qp-pop flex max-h-[min(70dvh,640px)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-dialog">
         <h2 id={`${listId}-title`} className="sr-only">Command palette</h2>
         <div className="flex shrink-0 items-center gap-2 border-b border-line px-3">
           <Icon name="search" className="text-faint" />
@@ -258,7 +258,7 @@ export default function CommandPalette() {
             lastGroup = command.group;
             return (
               <div key={command.id}>
-                {header && <p className="px-2.5 pb-1 pt-2 text-[11px] font-medium text-faint">{command.group}</p>}
+                {header && <SectionLabel as="div" className="px-2.5 pb-1 pt-2">{command.group}</SectionLabel>}
                 <div
                   id={`${listId}-option-${i}`}
                   data-index={i}
@@ -267,7 +267,7 @@ export default function CommandPalette() {
                   tabIndex={-1}
                   onMouseMove={() => setIndex(i)}
                   onClick={() => choose(command)}
-                  className={`flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] ${
+                  className={`flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] ${
                     i === selected ? "bg-accent-soft text-ink" : "text-ink hover:bg-raised"
                   }`}
                 >
@@ -275,7 +275,12 @@ export default function CommandPalette() {
                   <span className={`min-w-0 flex-1 truncate ${command.group === "History" ? "font-mono text-[12px]" : ""}`}>
                     {command.label}
                   </span>
-                  {command.hint && <span className="text-[11px] text-faint">{command.hint}</span>}
+                  {command.hint &&
+                    (command.group === "Columns" ? (
+                      <span className="text-[11px] text-faint">{command.hint}</span>
+                    ) : (
+                      <Kbd combo={command.hint} />
+                    ))}
                 </div>
               </div>
             );

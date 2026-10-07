@@ -28,7 +28,7 @@ export default function ChatList({ conversations, activeId, onClose }: { convers
           }}
           className={`${btn.secondary} !h-7`}
         >
-          <Icon name="plus" size={13} /> New chat
+          <Icon name="plus" size={14} /> New chat
         </button>
         <button onClick={onClose} className={btn.icon} aria-label="Close chat list" title="Back to the conversation">
           <Icon name="x" size={14} />
@@ -37,7 +37,7 @@ export default function ChatList({ conversations, activeId, onClose }: { convers
       {conversations.length > SEARCH_ABOVE && (
         <div className="shrink-0 border-b border-line p-2">
           <label className="relative block">
-            <Icon name="search" size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
+            <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search chats" aria-label="Search chats" className={`${input} !pl-8`} />
           </label>
         </div>
@@ -71,7 +71,7 @@ export default function ChatList({ conversations, activeId, onClose }: { convers
                 confirming === c.id ? "bg-danger-soft !text-danger opacity-100" : "opacity-0"
               }`}
             >
-              <Icon name="trash" size={13} />
+              <Icon name="trash" size={14} />
             </button>
           </li>
         ))}

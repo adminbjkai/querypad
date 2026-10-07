@@ -1,5 +1,6 @@
 "use client";
 
+import { SectionLabel } from "@/components/ui/primitives";
 import { pct, type ColumnStats } from "./column-stats";
 
 const num = (n: number) =>
@@ -26,7 +27,7 @@ export default function ColumnDetails({ stats }: { stats: ColumnStats }) {
     <p className="mb-1 truncate font-mono text-[11px] text-faint" title={stats.type}>
       {stats.type || "unknown type"}
     </p>
-    <dl className="divide-y divide-line/60">
+    <dl className="divide-y divide-line-soft">
       <Stat label="Rows" value={stats.total.toLocaleString()} />
       <Stat label="Nulls" value={`${stats.nulls.toLocaleString()} (${pct(stats.nulls, stats.total)})`} />
       <Stat label="Distinct" value={stats.distinct.toLocaleString()} />
@@ -37,7 +38,7 @@ export default function ColumnDetails({ stats }: { stats: ColumnStats }) {
 
     {stats.histogram && (
       <section className="mt-4" aria-label="Distribution">
-        <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Distribution</h3>
+        <SectionLabel as="h3" className="mb-1.5">Distribution</SectionLabel>
         <div className="flex h-16 items-end gap-px rounded-md bg-raised px-1 pt-1">
           {stats.histogram.map((bin, i) => (
             <div
@@ -56,7 +57,7 @@ export default function ColumnDetails({ stats }: { stats: ColumnStats }) {
     )}
 
     <section className="mt-4" aria-label="Top values">
-      <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">Top values</h3>
+      <SectionLabel as="h3" className="mb-1.5">Top values</SectionLabel>
       {stats.top.length === 0 ? (
         <p className="text-[12px] text-muted">No non-null values.</p>
       ) : (

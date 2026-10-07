@@ -1,38 +1,47 @@
 "use client";
 
-import { Dialog, Kbd, MOD } from "@/components/ui/primitives";
+import { Dialog, Kbd, MOD, SectionLabel } from "@/components/ui/primitives";
 
-const SHORTCUTS: [string, string[]][] = [
+const KEYBOARD: [string, string[]][] = [
   ["Run query (or the selected part)", [MOD, "Enter"]],
   ["Ask AI to write SQL", [MOD, "K"]],
   ["Open the Assistant chat", [MOD, "I"]],
-  ["Format SQL", ["Shift", "Alt", "F"]],
-  ["Command palette", [MOD, "P"]],
-  ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
   ["Show or hide the side panel", [MOD, "B"]],
-  ["Rename a tab", ["Double-click"]],
+  ["Command palette", [MOD, "P"]],
+  ["Format SQL", ["Shift", "Alt", "F"]],
+  ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
   ["Copy selected cells", [MOD, "C"]],
   ["Resize focused editor divider", ["↑", "↓"]],
   ["Resize focused column handle", ["←", "→"]],
-  ["Sort a column", ["Click header"]],
   ["This list", ["?"]],
 ];
+
+const MOUSE: [string, string][] = [
+  ["Rename a tab", "Double-click"],
+  ["Sort a column", "Click header"],
+  ["Inspect a column", "Click its header stats"],
+];
+
+function Rows({ rows }: { rows: [string, string | string[]][] }) {
+  return (
+    <ul className="divide-y divide-line">
+      {rows.map(([label, keys]) => (
+        <li key={label} className="flex items-center justify-between gap-4 py-2 text-[13px]">
+          <span className="text-ink">{label}</span>
+          <Kbd combo={keys} />
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title="Keyboard shortcuts" onClose={onClose} width="max-w-sm">
-      <ul className="divide-y divide-line">
-        {SHORTCUTS.map(([label, keys]) => (
-          <li key={label} className="flex items-center justify-between gap-4 py-2 text-[13px]">
-            <span className="text-ink">{label}</span>
-            <span className="flex gap-1">
-              {keys.map((k) => (
-                <Kbd key={k}>{k}</Kbd>
-              ))}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <SectionLabel>Keyboard</SectionLabel>
+      <Rows rows={KEYBOARD} />
+      <SectionLabel className="mt-4">Mouse</SectionLabel>
+      <Rows rows={MOUSE} />
     </Dialog>
   );
 }

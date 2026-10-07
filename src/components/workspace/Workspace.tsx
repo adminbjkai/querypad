@@ -233,7 +233,7 @@ export default function Workspace() {
               </button>
               <button
                 onClick={() => spaceId && useUiStore.getState().dismissSampleHint(spaceId)}
-                className={`${btn.icon} size-6 shrink-0`}
+                className={`${btn.icon} size-7 shrink-0`}
                 aria-label="Dismiss"
               >
                 <Icon name="x" size={14} />
@@ -250,7 +250,7 @@ export default function Workspace() {
 
       {dragging && (
         <div className="pointer-events-none fixed inset-2 z-50 flex items-center justify-center rounded-2xl border-2 border-dashed border-accent bg-accent-soft/50">
-          <p className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-ink shadow-pop">
+          <p className="rounded-lg bg-surface px-4 py-2 text-[14px] font-medium text-ink shadow-pop">
             Drop to add as tables
           </p>
         </div>

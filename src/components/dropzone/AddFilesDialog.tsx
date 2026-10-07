@@ -1,12 +1,12 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ACCEPTED_EXTENSIONS, MAX_FILE_SIZE, SUPPORTED_EXTENSIONS, WARN_FILE_SIZE } from "@/lib/constants";
 import { formatBytes } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { toast } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
-import { Dialog, Spinner, btn } from "@/components/ui/primitives";
+import { Chip, Dialog, Spinner, Tabs, btn, type ChipTone } from "@/components/ui/primitives";
 import UrlInput from "./UrlInput";
 
 type Mode = "files" | "url";
@@ -31,6 +31,7 @@ const FORMAT_LABELS: Record<string, string> = {
 const FORMATS = SUPPORTED_EXTENSIONS.map((ext) => FORMAT_LABELS[ext] ?? ext.toUpperCase()).join(", ");
 
 const STATE_LABEL: Record<FileStatus["state"], string> = { queued: "Queued", loading: "Loading…", done: "Added", error: "Failed" };
+const STATE_TONE: Record<FileStatus["state"], ChipTone> = { queued: "neutral", loading: "accent", done: "ok", error: "danger" };
 
 /** "Add data": a large drop zone with Browse, or a URL — and a per-file status list while importing. */
 export default function AddFilesDialog({ onClose }: { onClose: () => void }) {
@@ -39,7 +40,6 @@ export default function AddFilesDialog({ onClose }: { onClose: () => void }) {
   const [files, setFiles] = useState<FileStatus[]>([]);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const tabsId = useId();
   const importFiles = useWorkspaceStore((s) => s.importFiles);
 
   const update = (id: number, patch: Partial<FileStatus>) =>
@@ -86,36 +86,22 @@ export default function AddFilesDialog({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <Dialog title="Add data" onClose={onClose} width="max-w-xl">
+    <Dialog
+      title="Add data"
+      onClose={onClose}
+      width="max-w-xl"
+      footerNote="Queries run in your browser. Loading a file with the same name replaces that table."
+      footer={
+        <button onClick={onClose} className={btn.secondary}>
+          {files.length > 0 && !busy ? "Done" : "Cancel"}
+        </button>
+      }
+    >
       <div className="flex flex-col gap-4">
-        <div role="tablist" aria-label="Data source" className="flex gap-1 border-b border-line">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              id={`${tabsId}-${tab.id}`}
-              role="tab"
-              aria-selected={mode === tab.id}
-              aria-controls={`${tabsId}-${tab.id}-panel`}
-              tabIndex={mode === tab.id ? 0 : -1}
-              onClick={() => setMode(tab.id)}
-              onKeyDown={(e) => {
-                if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-                e.preventDefault();
-                const next = tab.id === "files" ? "url" : "files";
-                setMode(next);
-                document.getElementById(`${tabsId}-${next}`)?.focus();
-              }}
-              className={`relative -mb-px h-9 px-3 text-[13px] transition-colors ${
-                mode === tab.id ? "border-b-2 border-accent font-medium text-ink" : "text-muted hover:text-ink"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <Tabs value={mode} onChange={(next) => setMode(next as Mode)} ariaLabel="Data source" tabs={tabs.map((t) => ({ value: t.id, label: t.label }))} />
 
         {mode === "files" ? (
-          <div id={`${tabsId}-files-panel`} role="tabpanel" aria-labelledby={`${tabsId}-files`} className="flex flex-col gap-3">
+          <div role="tabpanel" aria-label="Files" className="flex flex-col gap-3">
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -163,30 +149,21 @@ export default function AddFilesDialog({ onClose }: { onClose: () => void }) {
             {files.length > 0 && (
               <ul className="divide-y divide-line rounded-lg border border-line" aria-label="Import progress">
                 {files.map((file) => (
-                  <li key={file.id} className="flex items-center gap-2.5 px-3 py-2 text-[13px]">
-                    <Icon name="file" size={16} className="text-muted" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-ink">{file.name}</span>
+                  <li key={file.id} className="flex h-8 items-center gap-2.5 px-3 text-[13px]">
+                    <Icon name="file" size={16} className="shrink-0 text-muted" />
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="text-ink">{file.name}</span>
                       {file.message && (
-                        <span className={`block truncate text-[12px] ${file.state === "error" ? "text-danger" : "text-muted"}`}>{file.message}</span>
+                        <span className={`text-[12px] ${file.state === "error" ? "text-danger" : "text-muted"}`}> — {file.message}</span>
                       )}
                     </span>
                     <span className="shrink-0 text-[12px] tabular-nums text-faint">{formatBytes(file.size)}</span>
-                    <span
-                      role="status"
-                      className={`inline-flex h-5 shrink-0 items-center gap-1 rounded px-1.5 text-[11px] font-medium ${
-                        file.state === "done"
-                          ? "bg-ok-soft text-ok"
-                          : file.state === "error"
-                            ? "bg-danger-soft text-danger"
-                            : file.state === "loading"
-                              ? "bg-accent-soft text-accent"
-                              : "bg-raised text-muted"
-                      }`}
-                    >
-                      {file.state === "loading" && <Spinner className="size-2.5" />}
-                      {file.state === "done" && <Icon name="check" size={12} />}
-                      {STATE_LABEL[file.state]}
+                    <span role="status" className="shrink-0">
+                      <Chip tone={STATE_TONE[file.state]} className="gap-1">
+                        {file.state === "loading" && <Spinner className="size-2.5" />}
+                        {file.state === "done" && <Icon name="check" size={12} />}
+                        {STATE_LABEL[file.state]}
+                      </Chip>
                     </span>
                   </li>
                 ))}
@@ -194,20 +171,12 @@ export default function AddFilesDialog({ onClose }: { onClose: () => void }) {
             )}
           </div>
         ) : (
-          <div id={`${tabsId}-url-panel`} role="tabpanel" aria-labelledby={`${tabsId}-url`} className="flex flex-col gap-2">
+          <div role="tabpanel" aria-label="From URL" className="flex flex-col gap-2">
             <p className="text-[13px] text-muted">Load a public file by URL. The server must allow cross-origin requests.</p>
             <UrlInput onAdded={onClose} />
           </div>
         )}
 
-        <div className="flex items-center gap-3 border-t border-line pt-3">
-          <p className="min-w-0 flex-1 text-[12px] leading-4 text-faint">
-            Queries run in your browser. Loading a file with the same name replaces that table.
-          </p>
-          <button onClick={onClose} className={btn.secondary}>
-            {files.length > 0 && !busy ? "Done" : "Cancel"}
-          </button>
-        </div>
       </div>
     </Dialog>
   );

@@ -62,17 +62,22 @@ export default function Sidebar() {
             {panel === "tables" && (
               <div className="flex min-h-0 flex-1 flex-col">
                 <PanelHeader
-                  title="Explorer"
+                  title="Tables"
                   count={
-                    <>
-                      {tables.length} {tables.length === 1 ? "table" : "tables"}
-                      {views.length > 0 && `, ${views.length} ${views.length === 1 ? "view" : "views"}`}
-                    </>
+                    tables.length + views.length > 0 ? (
+                      <>
+                        {tables.length} {tables.length === 1 ? "table" : "tables"}
+                        {views.length > 0 && `, ${views.length} ${views.length === 1 ? "view" : "views"}`}
+                      </>
+                    ) : undefined
                   }
                 >
-                  <button onClick={() => setDialog("addFiles")} className={btn.icon} title="Add data" aria-label="Add data">
-                    <Icon name="plus" size={15} />
-                  </button>
+                  {/* The empty state carries the primary "Add data" action, so the header keeps one accessible name per page. */}
+                  {tables.length + views.length > 0 && (
+                    <button onClick={() => setDialog("addFiles")} className={btn.icon} title="Add data" aria-label="Add data">
+                      <Icon name="plus" size={16} />
+                    </button>
+                  )}
                 </PanelHeader>
                 <SearchBox value={filter} onChange={setFilter} placeholder="Search tables and columns" label="Search tables and columns" />
                 <div className="min-h-0 flex-1 overflow-y-auto pb-3">
@@ -100,9 +105,19 @@ export default function Sidebar() {
                     />
                   ))}
                   {tables.length === 0 && views.length === 0 && (
-                    <p className="px-3 py-4 text-[13px] leading-5 text-muted">
-                      No tables yet. Add data, or create one with SQL — <code className="font-mono text-[12px]">CREATE TABLE</code> results appear here.
-                    </p>
+                    <div className="flex flex-col items-center px-4 py-10 text-center">
+                      <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
+                        <Icon name="table" size={18} />
+                      </span>
+                      <p className="mt-3 text-[14px] font-medium text-ink">No tables yet</p>
+                      <p className="mt-1 text-[13px] leading-5 text-muted">
+                        Add files or create one with <code className="font-mono text-[12px]">CREATE TABLE</code>.
+                      </p>
+                      <button onClick={() => setDialog("addFiles")} className={`${btn.primary} mt-4`}>
+                        <Icon name="upload" size={16} />
+                        Add data
+                      </button>
+                    </div>
                   )}
                   {q && visibleTables.length === 0 && visibleViews.length === 0 && (tables.length > 0 || views.length > 0) && (
                     <p className="px-3 py-4 text-[13px] text-muted">Nothing matches “{filter.trim()}”.</p>

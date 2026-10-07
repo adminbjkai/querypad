@@ -7,7 +7,7 @@ import { toast } from "@/stores/ui-store";
 import { insertAtCursor } from "@/lib/editor-bridge";
 import { openTablePage, previewTable } from "@/lib/workspace-actions";
 import { Icon } from "@/components/ui/icons";
-import { KindGlyph } from "@/components/ui/primitives";
+import { HoverTray, KindGlyph, btn } from "@/components/ui/primitives";
 
 interface TableSchemaProps {
   table: TableInfo;
@@ -39,49 +39,49 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
   };
 
   return (
-    <div className="qp-table-entry group/table px-1.5 pt-1">
-      <div className="flex h-7 items-center rounded-md transition-colors hover:bg-sunken">
+    <div className="qp-table-entry px-1.5 pt-1">
+      <div className="group relative flex h-7 items-center rounded-md transition-colors hover:bg-sunken">
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={isExpanded}
           aria-label={table.name}
           className="flex h-7 min-w-0 flex-1 items-center gap-1.5 px-1.5 text-left"
         >
-          <Icon name="chevronRight" size={13} className={`text-faint transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+          <Icon name="chevronRight" size={14} className={`text-faint transition-transform ${isExpanded ? "rotate-90" : ""}`} />
           <span className="truncate font-mono text-[12px] font-medium text-ink">{table.name}</span>
-          <span className="ml-auto shrink-0 pl-2 text-[11px] tabular-nums text-faint">
+          <span className="ml-auto shrink-0 pl-2 font-mono text-[11px] tabular-nums text-faint">
             {isView ? "view" : table.rowCount.toLocaleString()}
           </span>
         </button>
-        <div className="qp-table-actions flex shrink-0 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/table:opacity-100">
-          <button onClick={() => openTablePage(table.name)} className="rounded p-1 text-muted hover:bg-line hover:text-ink" title="Open table page" aria-label={`Open ${table.name}`}>
-            <Icon name="table" size={13} />
+        <HoverTray className="qp-table-actions p-0!">
+          <button onClick={() => openTablePage(table.name)} className={btn.iconSm} title="Open table page" aria-label={`Open ${table.name}`}>
+            <Icon name="table" size={14} />
           </button>
-          <button onClick={() => previewTable(table.name)} className="rounded p-1 text-muted hover:bg-line hover:text-ink" title="Preview rows in a new tab" aria-label={`Preview ${table.name}`}>
-            <Icon name="play" size={13} />
+          <button onClick={() => previewTable(table.name)} className={btn.iconSm} title="Preview rows in a new tab" aria-label={`Preview ${table.name}`}>
+            <Icon name="play" size={14} />
           </button>
           {!isView && (
             <button
               onClick={onOpenProfile}
-              className={`rounded p-1 hover:bg-line ${profileActive ? "text-accent" : "text-muted hover:text-ink"}`}
+              className={`${btn.iconSm} ${profileActive ? "text-accent hover:text-accent" : ""}`}
               title="Quick profile beside the explorer"
               aria-label={`Profile ${table.name}`}
             >
-              <Icon name="profile" size={13} />
+              <Icon name="profile" size={14} />
             </button>
           )}
           <button
             onClick={() => void (isView ? dropView(table.name) : removeTable(table.name))}
-            className="rounded p-1 text-muted hover:bg-danger-soft hover:text-danger"
+            className={`${btn.iconSm} hover:bg-danger-soft hover:text-danger`}
             title={isView ? "Drop view" : "Remove table"}
             aria-label={`Remove ${table.name}`}
           >
-            <Icon name="x" size={13} />
+            <Icon name="x" size={14} />
           </button>
-        </div>
+        </HoverTray>
       </div>
       {isExpanded && (
-        <ul className="mb-1 ml-[13px] border-l border-line pl-1">
+        <ul className="mb-1 ml-[15px] border-l border-line pl-1">
           {columns.map((col) => {
             const mark = keyColumns.get(`${table.name}.${col.name}`);
             return (
@@ -96,12 +96,12 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
                   {mark && (
                     <Icon
                       name={mark === "key" ? "key" : "join"}
-                      size={12}
-                      className="text-join"
+                      size={14}
+                      className="shrink-0 text-join"
                       aria-label={mark === "key" ? "join key" : "references another table"}
                     />
                   )}
-                  <span className="ml-auto shrink-0 truncate pl-2 text-[11px] text-faint">{col.type.toLowerCase()}</span>
+                  <span className="ml-auto shrink-0 truncate pl-2 text-right font-mono text-[11px] text-faint">{col.type.toLowerCase()}</span>
                 </button>
               </li>
             );

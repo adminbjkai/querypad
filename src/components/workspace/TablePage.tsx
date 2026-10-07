@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore, type TablePageTab } from "@/stores/ui-store";
 import type { QueryResult, TableProfileState } from "@/types";
@@ -11,7 +11,7 @@ import { askAssistant } from "@/components/home/Composer";
 import { ColumnCard } from "@/components/sidebar/ProfileDrawer";
 import DataTable from "@/components/results/DataTable";
 import { Icon } from "@/components/ui/icons";
-import { KindGlyph, SectionLabel, Spinner, btn, input } from "@/components/ui/primitives";
+import { Chip, KindGlyph, SectionLabel, Spinner, Tabs, btn, input } from "@/components/ui/primitives";
 
 const TABS: { id: TablePageTab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -127,7 +127,6 @@ export default function TablePage() {
 
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "index", dir: "asc" });
-  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   // Profiling runs on demand; the Profile tab starts it the first time it is opened.
   useEffect(() => {
@@ -173,7 +172,7 @@ export default function TablePage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-surface p-8 text-center">
         <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
-          <Icon name="table" size={20} />
+          <Icon name="table" size={18} />
         </span>
         <p className="text-[14px] font-medium text-ink">{name ? `${name} is no longer in this space` : "No table selected"}</p>
         <p className="text-[13px] text-muted">Pick a dataset from Home or the Tables panel.</p>
@@ -183,19 +182,6 @@ export default function TablePage() {
   }
 
   const toggleSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
-
-  const onTabKey = (e: KeyboardEvent) => {
-    const i = TABS.findIndex((t) => t.id === tab);
-    let next = i;
-    if (e.key === "ArrowRight") next = (i + 1) % TABS.length;
-    else if (e.key === "ArrowLeft") next = (i - 1 + TABS.length) % TABS.length;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = TABS.length - 1;
-    else return;
-    e.preventDefault();
-    setTab(TABS[next].id);
-    tabRefs.current[TABS[next].id]?.focus();
-  };
 
   const profiled = profileState.status === "ready" && !!profileState.profile;
 
@@ -218,42 +204,30 @@ export default function TablePage() {
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <button className={btn.primary} onClick={() => previewTable(name)} title="Open SELECT * in a new SQL tab">
-              <Icon name="code" size={15} />
+              <Icon name="code" size={16} />
               Query
             </button>
             <button className={btn.secondary} onClick={() => askAssistant(`Tell me about the ${isView ? "view" : "table"} ${name}: what it contains, data quality concerns, and how it connects to the other tables.`)}>
-              <Icon name="sparkle" size={15} />
+              <Icon name="sparkle" size={16} />
               <span className="max-sm:hidden">Ask Assistant about this table</span>
               <span className="sm:hidden">Ask</span>
             </button>
             <button className={btn.secondary} onClick={() => void copyTableName(name)} aria-label="Copy name" title="Copy name">
-              <Icon name="copy" size={15} />
+              <Icon name="copy" size={16} />
               <span className="max-sm:hidden">Copy name</span>
             </button>
           </div>
         </div>
 
-        <div role="tablist" aria-label={`${name} sections`} onKeyDown={onTabKey} className="mt-5 flex gap-1 border-b border-line">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              ref={(el) => { tabRefs.current[t.id] = el; }}
-              role="tab"
-              id={`table-tab-${t.id}`}
-              aria-selected={tab === t.id}
-              aria-controls={`table-panel-${t.id}`}
-              tabIndex={tab === t.id ? 0 : -1}
-              onClick={() => setTab(t.id)}
-              className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${
-                tab === t.id ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          value={tab}
+          onChange={(next) => setTab(next as TablePageTab)}
+          ariaLabel={`${name} sections`}
+          tabs={TABS.map((t) => ({ value: t.id, label: t.label }))}
+          className="mt-5"
+        />
 
-        <div role="tabpanel" id={`table-panel-${tab}`} aria-labelledby={`table-tab-${tab}`} className="flex min-h-0 flex-1 flex-col">
+        <div role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label} className="flex min-h-0 flex-1 flex-col">
           {tab === "overview" && (
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
               <div className="min-w-0 flex-1">
@@ -262,20 +236,20 @@ export default function TablePage() {
                   <span className="text-[12px] tabular-nums text-muted">{columns.length} {columns.length === 1 ? "column" : "columns"}</span>
                 </div>
                 <div className="overflow-hidden rounded-lg border border-line">
-                  <table className="w-full text-left text-[13px]">
+                  <table className="w-full table-fixed text-left text-[13px]">
                     <thead className="bg-raised">
                       <tr>
                         <SortHeader label="#" active={sort.key === "index"} dir={sort.dir} onClick={() => toggleSort("index")} className="w-14" />
                         <SortHeader label="Column name" active={sort.key === "name"} dir={sort.dir} onClick={() => toggleSort("name")} />
                         <SortHeader label="Type" active={sort.key === "type"} dir={sort.dir} onClick={() => toggleSort("type")} className="w-40" />
-                        <th scope="col" className="h-8 px-3 text-[11px] font-medium uppercase tracking-wide text-faint max-sm:hidden">Keys</th>
+                        <th scope="col" className="h-8 w-52 px-3 text-[11px] font-medium uppercase tracking-wide text-faint max-sm:hidden">Keys</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line border-t border-line">
                       {columns.map((c) => {
                         const mark = marks.get(c.name);
                         return (
-                          <tr key={c.name} className="h-9 hover:bg-raised/60">
+                          <tr key={c.name} className="h-9 hover:bg-sunken">
                             <td className="px-3 tabular-nums text-faint">{c.index}</td>
                             <td className="px-3">
                               <span className="flex items-center gap-1">
@@ -283,16 +257,16 @@ export default function TablePage() {
                                 <span className="truncate font-mono text-[12px] font-medium text-ink">{c.name}</span>
                               </span>
                             </td>
-                            <td className="px-3 font-mono text-[12px] text-muted">{c.type.toLowerCase()}</td>
+                            <td className="truncate px-3 font-mono text-[12px] text-muted" title={c.type}>{c.type.toLowerCase()}</td>
                             <td className="px-3 max-sm:hidden">
                               <span className="flex items-center gap-1.5">
                                 {mark && (
-                                  <span className="inline-flex items-center gap-1 rounded bg-join-soft px-1.5 text-[10px] font-medium leading-4 text-join">
+                                  <Chip tone={mark === "key" ? "join" : "accent"} className="gap-1">
                                     <Icon name={mark === "key" ? "key" : "join"} size={11} />
                                     {mark === "key" ? "join key" : "references"}
-                                  </span>
+                                  </Chip>
                                 )}
-                                {uniqueColumns.has(c.name) && <span className="rounded bg-join-soft px-1 text-[10px] font-medium leading-4 text-join">unique</span>}
+                                {uniqueColumns.has(c.name) && <Chip tone="neutral">unique</Chip>}
                               </span>
                             </td>
                           </tr>
@@ -305,8 +279,8 @@ export default function TablePage() {
               </div>
 
               <aside aria-label={`${name} details`} className="w-full shrink-0 rounded-lg border border-line bg-surface px-4 py-3 lg:mt-3 lg:w-[280px]">
-                <h2 className="text-[13px] font-semibold text-ink">Table details</h2>
-                <dl className="mt-1 divide-y divide-line">
+                <SectionLabel as="h2">Table details</SectionLabel>
+                <dl className="mt-1 divide-y divide-line-soft">
                   <Detail label="Object type">{isView ? "View" : "Table"}</Detail>
                   <Detail label="Columns">{info.columns.length}</Detail>
                   <Detail label="Rows">{isView ? "—" : info.rowCount.toLocaleString()}</Detail>
@@ -320,10 +294,7 @@ export default function TablePage() {
                     )}
                   </Detail>
                 </dl>
-                <div className="mt-4 flex items-center justify-between">
-                  <SectionLabel as="h3">Relationships</SectionLabel>
-                  <span className="text-[11px] tabular-nums text-faint">{relationships.length}</span>
-                </div>
+                <SectionLabel as="h3" count={relationships.length} className="mt-4">Relationships</SectionLabel>
                 {relationships.length === 0 ? (
                   <p className="mt-1.5 text-[12px] text-muted">
                     {discovery.status === "loading" ? "Discovering…" : "None detected."}
@@ -344,7 +315,7 @@ export default function TablePage() {
                             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
                             title="Review in the Joins panel"
                           >
-                            <Icon name="join" size={13} className="shrink-0 text-join" />
+                            <Icon name="join" size={14} className="shrink-0 text-join" />
                             <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink">
                               {own.column} → {other.table}.{other.column}
                             </span>

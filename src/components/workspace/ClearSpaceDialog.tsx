@@ -23,24 +23,26 @@ export default function ClearSpaceDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Dialog title="Clear this space?" onClose={onClose} width="max-w-sm">
+    <Dialog
+      title="Clear this space?"
+      onClose={onClose}
+      width="max-w-sm"
+      footer={
+        <>
+          <button onClick={onClose} className={btn.secondary}>
+            Cancel
+          </button>
+          <button onClick={() => void clear()} disabled={busy} className={btn.danger}>
+            {busy && <Spinner className="size-3" />}
+            Clear space
+          </button>
+        </>
+      }
+    >
       <p className="text-[13px] leading-5 text-muted">
         This removes the {tableCount} {tableCount === 1 ? "dataset" : "datasets"}, tabs and history in{" "}
         <span className="font-medium text-ink">{name}</span> on every device. Saved snippets and your other spaces stay.
       </p>
-      <div className="mt-4 flex justify-end gap-2">
-        <button onClick={onClose} className={btn.secondary}>
-          Cancel
-        </button>
-        <button
-          onClick={() => void clear()}
-          disabled={busy}
-          className={btn.danger}
-        >
-          {busy && <Spinner className="size-3" />}
-          Clear space
-        </button>
-      </div>
     </Dialog>
   );
 }

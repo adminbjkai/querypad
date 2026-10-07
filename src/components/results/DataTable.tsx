@@ -446,16 +446,16 @@ export default memo(function DataTable({
                     setMenu({ column: col, x: e.clientX, y: e.clientY });
                   }}
                   title={`${col} — ${result.columnTypes[i]}. Click to sort, ${MOD}-click to select the column, Alt-click to inspect.`}
-                  className={`group relative flex min-w-0 cursor-pointer select-none flex-col border-r border-line/60 text-[12px] font-medium hover:bg-sunken ${
+                  className={`group relative flex min-w-0 cursor-pointer select-none flex-col border-r border-line text-[12px] font-medium hover:bg-sunken ${
                     active ? "text-accent" : "text-ink"
-                  } ${active && !colSelected ? "bg-accent-soft/40" : ""} ${colSelected ? "bg-accent-soft" : ""} ${inspected ? "shadow-[inset_0_-2px_0_var(--accent)]" : ""}`}
+                  } ${active && !colSelected ? "bg-accent-soft" : ""} ${colSelected ? "bg-accent-soft" : ""} ${inspected ? "shadow-[inset_0_-2px_0_var(--accent)]" : ""}`}
                 >
                   <div className="flex shrink-0 items-center gap-0.5 px-2" style={{ height: HEADER_HEIGHT }}>
                     <KindGlyph kind={kinds[i]} type={result.columnTypes[i]} />
                     <span className={`min-w-0 flex-1 truncate ${kinds[i] === "numeric" ? "text-right" : ""}`}>{col}</span>
                     <Icon
                       name={active ? (sort!.dir === "asc" ? "sortAsc" : "sortDesc") : "sort"}
-                      size={12}
+                      size={14}
                       className={active ? "text-accent stroke-[2.75]" : "text-faint opacity-0 transition-opacity group-hover:opacity-100"}
                     />
                     <button
@@ -468,7 +468,7 @@ export default memo(function DataTable({
                       }}
                       className="inline-flex size-5 shrink-0 items-center justify-center rounded text-faint opacity-0 hover:bg-line hover:text-ink group-hover:opacity-100 focus-visible:opacity-100"
                     >
-                      <Icon name="chevronDown" size={12} />
+                      <Icon name="chevronDown" size={14} />
                     </button>
                   </div>
                   {showStats && onInspect && <ColumnMiniChart result={result} column={col} index={i} onOpen={() => onInspect(col)} />}
@@ -517,7 +517,7 @@ export default memo(function DataTable({
                 <div
                   key={item.key}
                   role="row"
-                  className={`absolute left-0 grid w-full border-b border-line/40 hover:bg-sunken ${odd ? "bg-raised" : "bg-surface"}`}
+                  className={`absolute left-0 grid w-full border-b border-line-soft hover:bg-sunken ${odd ? "bg-raised" : "bg-surface"}`}
                   style={{
                     height: item.size,
                     transform: `translateY(${item.start - virtualizer.options.scrollMargin}px)`,
@@ -569,7 +569,7 @@ export default memo(function DataTable({
                         }}
                         title={isNull ? "NULL" : text.length > 500 ? `${text.slice(0, 500)}…` : text}
                         style={shadow ? { boxShadow: shadow } : undefined}
-                        className={`flex min-w-0 items-center border-r border-line/40 px-2 font-mono text-[12px] tabular-nums ${
+                        className={`flex min-w-0 items-center border-r border-line-soft px-2 font-mono text-[12px] tabular-nums ${
                           kinds[i] === "numeric" ? "justify-end" : ""
                         } ${inRange && !(isFocus && multi) ? "bg-accent-soft" : ""} ${isNull ? "" : "text-ink"}`}
                       >

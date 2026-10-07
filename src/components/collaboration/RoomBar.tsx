@@ -33,7 +33,7 @@ export default function RoomBar() {
         {people.slice(0, 5).map((peer) => (
           <span
             key={peer.id}
-            className="flex size-5 items-center justify-center rounded-full border-2 border-raised text-[9px] font-bold text-white"
+            className="flex size-5 items-center justify-center rounded-full border-2 border-raised text-[10px] font-semibold text-on-accent"
             style={{ backgroundColor: peer.color }}
             title={peer.name}
           >

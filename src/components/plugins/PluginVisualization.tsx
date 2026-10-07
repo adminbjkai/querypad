@@ -15,7 +15,7 @@ class PluginErrorBoundary extends Component<{ children: ReactNode; pluginName: s
     if (this.state.error) {
       return (
         <div className="p-4">
-          <div className="rounded-lg border border-danger/40 bg-danger-soft/50 p-3">
+          <div className="rounded-lg border border-line bg-danger-soft p-3">
             <p className="text-[13px] font-semibold text-danger">The {this.props.pluginName} plugin crashed</p>
             <pre className="mt-1 whitespace-pre-wrap font-mono text-[12px] text-ink">{this.state.error.message}</pre>
           </div>

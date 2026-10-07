@@ -39,6 +39,8 @@ export function useFocusTrap<T extends HTMLElement>(
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || !isTopFocusScope(container)) return;
+      // A portaled `Menu` owns Tab while one of its items has focus: it closes and refocuses its trigger.
+      if (document.activeElement instanceof HTMLElement && document.activeElement.closest("[role='menu']")) return;
       const elements = focusables();
       if (!elements.length) {
         event.preventDefault();

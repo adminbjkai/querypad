@@ -15,7 +15,7 @@ import ExportMenu from "./ExportMenu";
 import { resultMeta } from "./result-meta";
 import PluginVisualization from "@/components/plugins/PluginVisualization";
 import { Icon } from "@/components/ui/icons";
-import { Kbd, MOD, Spinner, btn } from "@/components/ui/primitives";
+import { Chip, Kbd, MOD, Spinner, Tabs, btn } from "@/components/ui/primitives";
 
 const ChartPanel = dynamic(() => import("./ChartPanel"), { ssr: false });
 
@@ -122,14 +122,14 @@ export default function ResultsPanel() {
         <div
           id={RESULTS_ERROR_ID}
           tabIndex={-1}
-          className="max-w-3xl rounded-lg border border-danger/40 bg-danger-soft/50 p-4 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="max-w-3xl rounded-lg border border-line bg-danger-soft p-4 outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <p className="flex items-center gap-2 text-[13px] font-semibold text-danger">
-            <Icon name="alert" size={15} />
+            <Icon name="alert" size={16} />
             The query failed
           </p>
           <p className="mt-1 text-[12px] text-muted">DuckDB could not run this statement. Review the error, then edit and run it again.</p>
-          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-danger/20 bg-surface/70 p-3 font-mono text-[12px] leading-5 text-ink">{error.message}</pre>
+          <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line-soft bg-surface p-3 font-mono text-[12px] leading-5 text-ink">{error.message}</pre>
           <button onClick={() => openAi("Fix the current query so it runs.")} className={`${btn.secondary} mt-3`}>
             <Icon name="wand" size={14} />
             Fix with AI
@@ -149,18 +149,18 @@ export default function ResultsPanel() {
             Running…
           </p>
         ) : (
-          <div className="max-w-md text-[13px] leading-6 text-muted">
-            <span className="mx-auto mb-3 flex size-11 items-center justify-center rounded-xl border border-line bg-raised text-muted shadow-sm">
+          <div className="flex max-w-md flex-col items-center gap-1">
+            <span className="mb-2 flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
               <Icon name="table" size={18} />
             </span>
-            <p className="font-semibold text-ink">Your query results will appear here</p>
-            <p className="mt-1">Explore your data with SQL, then sort, filter, inspect and export the result.</p>
-            <p className="mt-3 flex items-center justify-center gap-1.5 whitespace-nowrap">
-              Run with <Kbd>{MOD}</Kbd> <Kbd>Enter</Kbd>
+            <p className="text-[14px] font-medium text-ink">Your query results will appear here</p>
+            <p className="text-[13px] text-muted">Run a query, then sort, filter, inspect and export the result.</p>
+            <p className="mt-3 flex items-center justify-center gap-1.5 whitespace-nowrap text-[12px] text-muted">
+              <Kbd combo={[MOD, "Enter"]} /> Run
               <span aria-hidden="true" className="mx-1 text-faint">·</span>
-              Ask AI with <Kbd>{MOD}</Kbd> <Kbd>K</Kbd>
+              <Kbd combo={[MOD, "K"]} /> Ask AI
               <span aria-hidden="true" className="mx-1 text-faint">·</span>
-              Press <Kbd>?</Kbd> for shortcuts
+              <Kbd>?</Kbd> Shortcuts
             </p>
           </div>
         )}
@@ -169,33 +169,24 @@ export default function ResultsPanel() {
   }
 
   const truncated = result.rowCount > result.rows.length;
-  const viewButton = (view: View, label: string, disabled = false) => (
-    <button
-      key={view}
-      role="tab"
-      aria-selected={current.view === view}
-      disabled={disabled}
-      onClick={() => patch({ view })}
-      className={`relative h-9 px-3 text-[13px] transition-colors disabled:opacity-45 ${
-        current.view === view ? "font-medium text-ink" : "text-muted hover:text-ink"
-      }`}
-    >
-      {label}
-      {current.view === view && <span aria-hidden="true" className="absolute inset-x-2 bottom-0 h-0.5 rounded-t-sm bg-accent" />}
-    </button>
-  );
   const showTable = !(current.view === "chart" && chartConfig) && !activePlugin && current.view !== "details";
 
   return (
     <div className="relative flex h-full flex-col bg-surface">
       {scanLine}
-      <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line bg-chrome px-2 py-1">
-        <div className="flex h-8 max-w-full min-w-0 shrink-0 items-center overflow-x-auto" role="tablist" aria-label="Result view">
-          {viewButton("table", "Table")}
-          {viewButton("chart", "Chart", !chartConfig)}
-          {viewButton("details", "Details")}
-          {pluginViews.map((v) => viewButton(v.key, v.label))}
-        </div>
+      <div className="flex h-9 shrink-0 items-center gap-x-3 border-b border-line bg-chrome pl-1 pr-2">
+        <Tabs
+          value={current.view}
+          onChange={(view) => patch({ view })}
+          ariaLabel="Result view"
+          className="-mb-px shrink-0"
+          tabs={[
+            { value: "table", label: "Table" },
+            { value: "chart", label: "Chart", disabled: !chartConfig },
+            { value: "details", label: "Details" },
+            ...pluginViews.map((v) => ({ value: v.key, label: v.label })),
+          ]}
+        />
         <p className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap text-[12px] tabular-nums text-muted">
           <span>
             <span className="font-medium text-ink">{result.rowCount.toLocaleString()}</span> {result.rowCount === 1 ? "row" : "rows"}
@@ -207,11 +198,8 @@ export default function ResultsPanel() {
           <span aria-hidden="true" className="text-faint">·</span>
           <span className="hidden md:inline">{result.executionTimeMs.toLocaleString()} ms</span>
           {truncated && (
-            <span
-              className="rounded bg-warn-soft px-1.5 py-0.5 text-[11px] font-medium text-warn"
-              title={`Only the first ${MAX_RESULT_ROWS.toLocaleString()} rows are loaded into the grid. Parquet export includes all rows.`}
-            >
-              showing first {MAX_RESULT_ROWS.toLocaleString()}
+            <span title={`Only the first ${MAX_RESULT_ROWS.toLocaleString()} rows are loaded into the grid. Parquet export includes all rows.`}>
+              <Chip tone="warn">showing first {MAX_RESULT_ROWS.toLocaleString()}</Chip>
             </span>
           )}
         </p>
@@ -234,8 +222,8 @@ export default function ResultsPanel() {
                   }
                 }}
                 placeholder="Filter rows"
-                className={`h-7 rounded-md border pl-7 text-[12px] text-ink outline-none transition-[width,background-color,border-color] placeholder:text-faint focus:w-44 focus:cursor-text focus:border-accent focus:bg-raised focus:pr-2 ${
-                  current.filter ? "w-44 border-line bg-raised pr-2" : "w-7 cursor-pointer border-transparent bg-transparent pr-0 hover:bg-sunken"
+                className={`rounded-md border pl-7 text-ink outline-none transition-[width,background-color,border-color] placeholder:text-faint focus:h-8 focus:w-44 focus:cursor-text focus:border-accent focus:bg-raised focus:pr-2 focus:text-[13px] ${
+                  current.filter ? "h-8 w-44 border-line bg-raised pr-2 text-[13px]" : "h-7 w-7 cursor-pointer border-transparent bg-transparent pr-0 text-[12px] hover:bg-sunken"
                 }`}
                 aria-label="Filter rows"
               />
@@ -249,7 +237,7 @@ export default function ResultsPanel() {
               title={inspectorOpen ? "Hide column inspector" : "Show column inspector"}
               className={`${btn.icon} ${inspectorOpen ? "bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent" : ""}`}
             >
-              <Icon name="panelRight" size={15} />
+              <Icon name="panelRight" size={16} />
             </button>
           )}
           <ExportMenu result={result} query={sql} />

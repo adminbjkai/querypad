@@ -117,7 +117,7 @@ export default function ExportMenu({ result, query }: { result: QueryResult; que
         <button onClick={toggle} className={`${btn.ghost} h-7`} aria-expanded={open}>
           <Icon name="download" size={14} />
           Export
-          <Icon name="chevronDown" size={12} />
+          <Icon name="chevronDown" size={14} />
         </button>
       )}
     />

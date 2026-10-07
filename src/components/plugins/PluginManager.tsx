@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { Dialog, Spinner, btn, input } from "@/components/ui/primitives";
+import { Chip, Dialog, Spinner, btn, input } from "@/components/ui/primitives";
 
 /** Load ES-module plugins that add visualizations, exporters, or file loaders. */
 export default function PluginManager({ onClose }: { onClose: () => void }) {
@@ -28,7 +28,16 @@ export default function PluginManager({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Dialog title="Plugins" onClose={onClose}>
+    <Dialog
+      title="Plugins"
+      onClose={onClose}
+      footerNote={`${plugins.length} ${plugins.length === 1 ? "plugin" : "plugins"} loaded`}
+      footer={
+        <button onClick={onClose} className={btn.secondary}>
+          Done
+        </button>
+      }
+    >
       <p className="mb-3 rounded-md bg-warn-soft px-2.5 py-2 text-[12px] leading-[18px] text-warn">
         A plugin runs with full access to this page and your data. Only load ones whose source you trust.
       </p>
@@ -59,9 +68,7 @@ export default function PluginManager({ onClose }: { onClose: () => void }) {
                 <p className="mt-0.5 text-[12px] text-muted">{p.manifest.description}</p>
                 <p className="mt-1 flex flex-wrap gap-1">
                   {p.manifest.extensions.map((ext, i) => (
-                    <span key={i} className="rounded bg-sunken px-1.5 py-0.5 text-[11px] text-muted">
-                      {ext.type}
-                    </span>
+                    <Chip key={i}>{ext.type}</Chip>
                   ))}
                 </p>
               </div>

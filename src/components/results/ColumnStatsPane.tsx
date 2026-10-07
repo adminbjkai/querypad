@@ -63,14 +63,14 @@ function ColumnRow({
   const type = result.columnTypes[result.columns.indexOf(column)] ?? "";
 
   return (
-    <li className="border-b border-line/60">
+    <li className="border-b border-line-soft">
       <button
         onClick={onToggle}
         aria-expanded={expanded}
         title={`${column}${type ? ` — ${type}` : ""}`}
         className={`flex w-full items-center gap-1.5 px-2 py-1.5 text-left transition-colors hover:bg-sunken ${expanded ? "bg-accent-soft" : ""}`}
       >
-        <Icon name="chevronRight" size={12} className={`text-faint transition-transform ${expanded ? "rotate-90" : ""}`} />
+        <Icon name="chevronRight" size={14} className={`text-faint transition-transform ${expanded ? "rotate-90" : ""}`} />
         <KindGlyph type={type} kind={stats?.kind} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[12px] font-medium text-ink">{column}</span>

@@ -4,6 +4,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
 import { openTablePage } from "@/lib/workspace-actions";
 import { Icon, type IconName } from "@/components/ui/icons";
+import { SectionLabel } from "@/components/ui/primitives";
 
 interface Action {
   icon: IconName;
@@ -58,7 +59,7 @@ export default function QuickActions() {
 
   return (
     <section aria-label="Quick actions" className="mt-8">
-      <h2 className="px-1 pb-2 text-[11px] font-medium uppercase tracking-wide text-faint">Quick actions</h2>
+      <SectionLabel className="px-1 pb-2">Quick actions</SectionLabel>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {actions.map((a) => (
           <button
@@ -71,7 +72,7 @@ export default function QuickActions() {
               <Icon name={a.icon} size={16} />
             </span>
             <span className="min-w-0">
-              <span className="block text-[13px] font-semibold leading-5 text-ink">{a.title}</span>
+              <span className="block text-[13px] font-medium leading-5 text-ink">{a.title}</span>
               <span className="mt-0.5 block text-[12px] leading-4 text-muted max-sm:hidden">{a.body}</span>
             </span>
           </button>

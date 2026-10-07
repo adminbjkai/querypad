@@ -121,14 +121,14 @@ export default function TabBar() {
                   className={`shrink-0 rounded p-0.5 text-faint hover:bg-sunken hover:text-ink focus-visible:opacity-100 ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}
                   aria-label={`Close ${tab.title}`}
                 >
-                  <Icon name="x" size={12} />
+                  <Icon name="x" size={14} />
                 </button>
               )}
             </div>
           );
         })}
         <button onClick={() => addTab()} className="flex w-9 shrink-0 items-center justify-center text-muted hover:bg-sunken hover:text-ink" title="New tab" aria-label="New tab">
-          <Icon name="plus" size={15} />
+          <Icon name="plus" size={16} />
         </button>
       </div>
 
@@ -142,7 +142,7 @@ export default function TabBar() {
             title="Format SQL (Shift+Alt+F)"
             aria-label="Format SQL"
           >
-            <Icon name="format" size={15} />
+            <Icon name="format" size={16} />
           </button>
           <button
             onClick={() => void saveCurrentAsSnippet()}
@@ -151,7 +151,7 @@ export default function TabBar() {
             title={`Save as snippet (${MOD}+Shift+S)`}
             aria-label="Save as snippet"
           >
-            <Icon name="bookmark" size={15} />
+            <Icon name="bookmark" size={16} />
           </button>
         </div>
         <span className="h-4 w-px bg-line" aria-hidden="true" />
@@ -166,7 +166,7 @@ export default function TabBar() {
           aria-label="Ask AI"
           aria-pressed={aiOpen}
         >
-          <Icon name="sparkle" size={15} />
+          <Icon name="sparkle" size={16} />
           <span className="hidden @min-[480px]:inline">Ask AI</span>
         </button>
         <button
@@ -175,7 +175,7 @@ export default function TabBar() {
           className={btn.primary}
           title={`Run (${MOD}+Enter). Runs only the selection if you have one.`}
         >
-          {active?.isExecuting ? <Spinner className="size-3" /> : <Icon name="play" size={13} className="fill-current" />}
+          {active?.isExecuting ? <Spinner className="size-3" /> : <Icon name="play" size={14} className="fill-current" />}
           Run
           <span className={`${kbdOnAccent} hidden @min-[560px]:inline-flex`} aria-hidden="true">
             {MOD}↵

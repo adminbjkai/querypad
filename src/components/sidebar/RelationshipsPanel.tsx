@@ -11,18 +11,19 @@ import type { TableInfo } from "@/types";
 import type { Relationship, RelationshipVerdict } from "@/types/discovery";
 import { Icon } from "@/components/ui/icons";
 import PanelHeader from "./PanelHeader";
-import { Spinner, btn } from "@/components/ui/primitives";
+import { Select, Spinner, btn } from "@/components/ui/primitives";
 
 function columnsOf(tables: TableInfo[], table: string): string[] {
   return tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? [];
 }
 
-// One row of 28px actions: the verdict pair is a joined outline group, the rest are ghost buttons.
-const action = `${btn.ghost} h-7 px-2 text-[12px]`;
-const verdictBtn = `${btn.secondary} h-7 px-2 text-[12px] font-medium shadow-none`;
+// The verdict pair looks like the `Segmented` primitive but stays a pair of toggle buttons:
+// a verdict can be cleared by clicking it again, and e2e drives them as buttons.
+const verdictBtn =
+  "inline-flex h-6 items-center justify-center whitespace-nowrap rounded px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+const verdictOn = "bg-surface shadow-sm ring-1 ring-line";
 
-const select =
-  "min-w-0 flex-1 rounded-md border border-line bg-surface px-1.5 py-1 font-mono text-[12px] text-ink outline-none focus:border-accent";
+const selectClass = "w-full font-mono [&>span]:flex-1 [&>span]:text-left";
 
 function joinClause(rel: Relationship): string {
   const to = quoteIdent(rel.to.table);
@@ -53,10 +54,11 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
 
   const tone =
     verdict === "accepted" ? "border-ok/40" : verdict === "rejected" ? "border-line opacity-60" : "border-line";
+  const toOptions = (names: string[]) => names.map((n) => ({ value: n, label: n }));
 
   return (
-    <li className={`rounded-lg border bg-surface p-2.5 ${tone}`}>
-      <p className={`font-mono text-[12px] leading-[18px] text-ink [overflow-wrap:anywhere] ${verdict === "rejected" ? "line-through" : ""}`}>
+    <li className={`rounded-lg border bg-surface p-3 text-[13px] ${tone}`}>
+      <p className={`font-mono text-[13px] leading-5 text-ink [overflow-wrap:anywhere] ${verdict === "rejected" ? "line-through" : ""}`}>
         <span className="block">{rel.from.table}.{rel.from.column}</span>
         <span className="block">
           <span className="pr-1 text-join">↳</span>
@@ -65,7 +67,7 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
       </p>
       <div className="mt-2 flex items-center gap-2 text-[11px] text-muted">
         <span className="relative h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
-          <span className="absolute inset-y-0 left-0 rounded-full bg-join" style={{ width: `${rel.confidence}%` }} />
+          <span className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${rel.confidence}%` }} />
         </span>
         <span className="shrink-0 font-medium tabular-nums text-ink">{rel.confidence}%</span>
       </div>
@@ -79,34 +81,30 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
 
       {editing ? (
         <div className="mt-2 space-y-1.5">
-          <div className="flex items-center gap-1 text-[12px]">
-            <span className="font-mono text-muted">{rel.from.table}.</span>
-            <select value={fromColumn} onChange={(e) => setFromColumn(e.target.value)} className={select} aria-label="Foreign column">
-              {columnsOf(tables, rel.from.table).map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+          <div className="flex items-center gap-1">
+            <span className="shrink-0 font-mono text-[12px] text-muted">{rel.from.table}.</span>
+            <div className="min-w-0 flex-1">
+              <Select value={fromColumn} onChange={setFromColumn} options={toOptions(columnsOf(tables, rel.from.table))} ariaLabel="Foreign column" size="sm" className={selectClass} />
+            </div>
           </div>
-          <div className="flex items-center gap-1 text-[12px]">
-            <span className="text-join">↳</span>
-            <select
-              value={toTable}
-              onChange={(e) => {
-                setToTable(e.target.value);
-                setToColumn(columnsOf(tables, e.target.value)[0] ?? "");
-              }}
-              className={select}
-              aria-label="Referenced table"
-            >
-              {tableNames.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-            <select value={toColumn} onChange={(e) => setToColumn(e.target.value)} className={select} aria-label="Referenced column">
-              {columnsOf(tables, toTable).map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+          <div className="flex items-center gap-1">
+            <span className="shrink-0 text-join">↳</span>
+            <div className="min-w-0 flex-1">
+              <Select
+                value={toTable}
+                onChange={(t) => {
+                  setToTable(t);
+                  setToColumn(columnsOf(tables, t)[0] ?? "");
+                }}
+                options={toOptions(tableNames)}
+                ariaLabel="Referenced table"
+                size="sm"
+                className={selectClass}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <Select value={toColumn} onChange={setToColumn} options={toOptions(columnsOf(tables, toTable))} ariaLabel="Referenced column" size="sm" className={selectClass} />
+            </div>
           </div>
           <div className="flex gap-1.5 pt-0.5">
             <button
@@ -126,25 +124,25 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
       ) : (
         <>
           {expanded && reasons.length > 0 && (
-            <ul className="mt-2 space-y-1 border-l-2 border-join/40 pl-2 text-[12px] leading-[17px] text-muted">
+            <ul className="mt-2 space-y-1 border-l-2 border-join/40 pl-2 text-[13px] leading-5 text-muted">
               {reasons.map((reason, i) => (
                 <li key={i}>{reason}</li>
               ))}
             </ul>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-1">
-            <div className="inline-flex shrink-0 items-center" role="group" aria-label="Verdict">
+            <div className="inline-flex shrink-0 items-center rounded-md bg-raised p-0.5" role="group" aria-label="Verdict">
               <button
                 onClick={() => onVerdict(verdict === "accepted" ? null : "accepted")}
                 aria-pressed={verdict === "accepted"}
-                className={`${verdictBtn} rounded-r-none ${verdict === "accepted" ? "border-ok bg-ok-soft text-ok hover:border-ok hover:bg-ok-soft" : "hover:text-ok"}`}
+                className={`${verdictBtn} ${verdict === "accepted" ? `${verdictOn} text-ok` : "text-muted hover:text-ok"}`}
               >
                 Accept
               </button>
               <button
                 onClick={() => onVerdict(verdict === "rejected" ? null : "rejected")}
                 aria-pressed={verdict === "rejected"}
-                className={`${verdictBtn} -ml-px rounded-l-none ${verdict === "rejected" ? "border-danger bg-danger-soft text-danger hover:border-danger hover:bg-danger-soft" : "hover:text-danger"}`}
+                className={`${verdictBtn} ${verdict === "rejected" ? `${verdictOn} text-danger` : "text-muted hover:text-danger"}`}
               >
                 Reject
               </button>
@@ -156,7 +154,7 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
                 setToColumn(rel.to.column);
                 setEditing(true);
               }}
-              className={`${btn.icon} size-7`}
+              className={btn.icon}
               title="Edit this join"
               aria-label="Edit"
             >
@@ -166,14 +164,15 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
               onClick={() => {
                 if (!insertAtCursor(`${joinClause(rel)}\n`)) toast("Open the SQL editor to insert the join.", "info");
               }}
-              className={`${btn.icon} size-7`}
+              className={btn.icon}
               title={`Insert into the editor: ${joinClause(rel)}`}
               aria-label="Insert JOIN"
             >
               <Icon name="insert" size={14} />
             </button>
-            <button onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={`${action} ml-auto`}>
-              {expanded ? "Hide" : "Why?"}
+            <button onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={`${btn.ghost} ml-auto text-[12px]`} title="Explain this join">
+              Why?
+              <Icon name="chevronDown" size={14} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
             </button>
           </div>
         </>
@@ -204,7 +203,7 @@ export default function RelationshipsPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PanelHeader title="Joins" count={discovery.status === "ready" ? sorted.length : undefined}>
+      <PanelHeader title="Joins" count={discovery.status === "ready" && sorted.length > 0 ? sorted.length : undefined}>
         <button
           onClick={() => void discoverRelationships()}
           disabled={discovery.status === "loading"}
@@ -238,8 +237,8 @@ export default function RelationshipsPanel() {
           </div>
         )}
         {discovery.status === "ready" && sorted.length === 0 && (
-          <div className="flex flex-col items-center px-4 py-8 text-center">
-            <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
+          <div className="flex flex-col items-center px-4 py-10 text-center">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
               <Icon name="join" size={18} />
             </span>
             <p className="mt-3 text-[14px] font-medium text-ink">No joins yet</p>
