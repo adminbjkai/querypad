@@ -9,7 +9,7 @@ import { copyText } from "@/lib/export/clipboard";
 import DataTable from "@/components/results/DataTable";
 import Markdown from "@/components/assistant/Markdown";
 import { Icon } from "@/components/ui/icons";
-import { Chip, Dialog, Kbd, MOD, SectionLabel, Spinner, btn, kbdOnAccent, type ChipTone } from "@/components/ui/primitives";
+import { Chip, Dialog, MOD, SectionLabel, Spinner, btn, kbdOnAccent, type ChipTone } from "@/components/ui/primitives";
 import { LockGlyph } from "./glyphs";
 
 const KIND: Record<StepKind, { label: string; tone: ChipTone; title: string }> = {
@@ -278,7 +278,7 @@ export default memo(function PlanCard({ turn, status, latest }: { turn: PlanTurn
           {canRun && (
             <button onClick={() => store().runPlan()} className={btn.primary} title={`Run the plan (${MOD}+Enter)`}>
               <Icon name="play" size={12} /> {done > 0 ? "Continue plan" : "Run plan"}
-              <Kbd combo={[MOD, "↵"]} className={kbdOnAccent} />
+              <span className={kbdOnAccent}>{MOD} ↵</span>
             </button>
           )}
         </div>

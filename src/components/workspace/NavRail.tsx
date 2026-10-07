@@ -233,7 +233,7 @@ export default function NavRail() {
         <button
           onClick={() => useUiStore.getState().setPaletteOpen(true)}
           className={`flex h-8 items-center gap-2 rounded-md border border-line bg-surface text-[13px] text-faint shadow-sm transition-colors hover:border-line-strong hover:text-ink ${
-            collapsed ? "w-9 justify-center" : "min-w-0 flex-1 px-2.5"
+            collapsed ? "w-9 justify-center" : "@container min-w-0 flex-1 px-2.5"
           }`}
           aria-label="Open command palette"
           title={`Search (${MOD}+P)`}
@@ -242,7 +242,7 @@ export default function NavRail() {
           {!collapsed && (
             <>
               <span className="min-w-0 flex-1 truncate text-left">Search</span>
-              <Kbd combo={[MOD, "P"]} />
+              <Kbd combo={[MOD, "P"]} className="hidden @min-[170px]:inline-flex" />
             </>
           )}
         </button>
