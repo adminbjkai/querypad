@@ -3,10 +3,6 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { getDB } from "@/lib/duckdb/instance";
-import { decodeShare } from "@/lib/sharing/decode";
-import { loadBufferAsTable } from "@/lib/duckdb/files";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 import Splash from "@/components/workspace/Splash";
 
 const Workspace = dynamic(() => import("@/components/workspace/Workspace"), { ssr: false });
@@ -20,6 +16,14 @@ function SharedLoader() {
     let cancelled = false;
     (async () => {
       try {
+        // The engine, the store and the decoder load here, not with the page shell, so the
+        // splash shows up before a megabyte of workspace code downloads.
+        const [{ getDB }, { decodeShare }, { loadBufferAsTable }, { useWorkspaceStore }] = await Promise.all([
+          import("@/lib/duckdb/instance"),
+          import("@/lib/sharing/decode"),
+          import("@/lib/duckdb/files"),
+          import("@/stores/workspace-store"),
+        ]);
         // Viewing a link must never write to your saved spaces.
         useWorkspaceStore.setState({ persistEnabled: false });
         await getDB();

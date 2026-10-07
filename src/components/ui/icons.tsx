@@ -57,6 +57,9 @@ const PATHS = {
   chat: "M5 5h14v10H10l-4 4v-4H5z",
   home: "M4 10.5L12 4l8 6.5V20h-5.5v-5.5h-5V20H4z",
   code: "M9 8l-4 4 4 4M15 8l4 4-4 4",
+  columns: "M4 5h16v14H4zM10 5v14M16 5v14",
+  rows: "M4 5h16v14H4zM4 10h16M4 15h16",
+  database: "M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
 } as const;
 
 export type IconName = keyof typeof PATHS;
@@ -86,10 +89,11 @@ export function Icon({ name, size = 16, className, ...rest }: IconProps) {
   );
 }
 
-export function GithubMark({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.44 9.8 8.2 11.39.6.1.83-.26.83-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.33-1.76-1.33-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 016 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.58A12 12 0 0024 12c0-6.63-5.37-12-12-12z" />
-    </svg>
-  );
-}
+type NamedIconProps = Omit<IconProps, "name">;
+
+/** Semantic 16px icons for catalog surfaces (table page, explorer): same stroke set, fixed names. */
+export const TableIcon = (props: NamedIconProps) => <Icon name="table" {...props} />;
+export const ColumnsIcon = (props: NamedIconProps) => <Icon name="columns" {...props} />;
+export const RowsIcon = (props: NamedIconProps) => <Icon name="rows" {...props} />;
+export const DatabaseIcon = (props: NamedIconProps) => <Icon name="database" {...props} />;
+export const InfoIcon = (props: NamedIconProps) => <Icon name="info" {...props} />;

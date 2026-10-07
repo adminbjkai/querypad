@@ -73,7 +73,7 @@ export async function writeArtifacts(
 }
 
 /** Human- and agent-readable markdown overview of the inspection. */
-export function buildSummary(report: DiscoveryReport, skipped: string[]): string {
+function buildSummary(report: DiscoveryReport, skipped: string[]): string {
   const lines: string[] = ["# QueryPad Inspection", ""];
   lines.push(`Generated: ${new Date(report.generatedAt).toISOString()}`, "");
 

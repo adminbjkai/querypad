@@ -7,6 +7,60 @@ milestones and public product updates.
 
 Nothing yet.
 
+## v0.15.0 — A page per table, Snowsight-style column stats, and a much lighter build
+
+- **Table page**: every table and view now has its own page — breadcrumb `Space › Tables › name`,
+  Query / Ask Assistant / Copy name, and Overview (a filterable, sortable column list with keys
+  and a "Table details" rail listing its joins), Preview (the first 100 rows in the grid) and
+  Profile (row count, columns and the column cards) tabs. Open one from Home's data catalog,
+  the Explorer's table icon or the command palette ("Open table …"); the Tables item stays lit
+- **Column stats in the results header**: Snowsight-style blocks under each column — a histogram
+  (numbers, dates) or a stacked top-values bar with the null share, then min/max, the top values
+  with their shares or true/false shares for booleans; hover a bar for its range and count.
+  Toggle them from the `#` corner (on by default up to 50 columns, remembered)
+- **Results grid**: the sorted column is highlighted in the accent color, and sorting is natural
+  (`file2` before `file10`, case-insensitive)
+- **Results toolbar**: the filter box sits behind a search icon and expands in place; the row
+  count is shown once (the status bar reports "Ran in … ms"); the export menu is grouped into
+  Copy / Download / Plugins; Details shows Rows, Columns, Duration and Last run tiles
+- **Sample-data hint**: a slim dismissable banner under the page header (remembered per space)
+  replaces the floating card over the workspace
+- **Home**: quick actions — Add data, New query, Inspect a dataset, Open Assistant
+- **Navigation**: collapsed items show an accent dot instead of a count pill
+- **Model picker**: the effort suffix appears only when it differs from the model's default
+- **Phones and narrow windows**: side panels get a Close button; header buttons carry labels;
+  opening the Assistant closes a floating panel first; the query and pipeline tab strips scroll
+  sideways (the query strip also with the wheel) with the tools pinned on the right; pipelines
+  stack steps, graph and results vertically below 720px of content width
+- **Add data**: one dialog with Files | From URL tabs, a per-file status list while importing,
+  and dialogs are centered on the viewport
+- **Dark theme**: content surfaces sit one visible step above the chrome, with lifted text and
+  accent-soft contrast
+- **Joins panel**: Accept / Reject are a joined outline pair with pressed state; Edit and Insert
+  JOIN are icon buttons on the same 28px row
+- **Editor**: Monaco's hover card no longer lingers after running a query or clicking elsewhere
+- **Performance**: the standalone server output is 24 MB (`sharp`, `public`, sources, tests and
+  fixtures are no longer traced); the collaboration chunk no longer bundles a second 2.5 MB copy
+  of Monaco (y-monaco is pointed at the loaded editor — ~27 KB now); the served Monaco assets are
+  4.4 MB (only the loader, editor core, SQL tokenizer, editor worker and English messages are
+  copied); DuckDB-Wasm is served from a versioned `/duckdb/<version>/` path so the immutable cache
+  can never go stale; the grid, status bar and Assistant no longer re-render on every keystroke;
+  saves are skipped when nothing changed and the space list is patched only when the table count
+  moved or its timestamp lags by a minute; catalog sync checks only the tables a statement
+  touched; a space's files download in parallel when it opens; `/shared` loads the engine and
+  store after its shell; `npm run check` runs lint and typecheck in parallel and ends with a
+  browser-bundle guard (`scripts/check-browser-bundle.mjs`) that fails if native DuckDB,
+  `node:fs` or ws server code reaches the browser chunks
+- Fixed: the catalog could miss row changes from writes it couldn't attribute (MERGE, EXECUTE,
+  CALL …) — those now check every table; SQL typed just before a reload was lost inside the
+  save debounce (saves flush when the page is hidden, with `keepalive` for small bodies); one
+  failed file download no longer aborts opening a space (the file is listed as unrestored);
+  switching spaces while one is still loading can no longer mix its tables into the next
+- Cleanup: removed `@types/dagre`, the unused chart types and re-exports in `src/types`; one
+  `relativeTime`, `toNumber`, `sharePct`, `sqlString` and `SectionLabel` each instead of local
+  copies; the e2e overview spec is now `home.spec.ts`; README, ROADMAP, CONTRIBUTING and the
+  architecture/design docs realigned with the code
+
 ## v0.14.0 — A Snowsight-style frame, an AI-first Home and chats you can return to
 
 Modelled on Snowflake Snowsight's navigation and AI home.
@@ -160,7 +214,7 @@ Linear / Vercel design systems (documented in `docs/DESIGN.md`).
 - Joins are re-discovered for SQL-created tables like for loaded files. Empty tables
   (`CREATE TABLE … WHERE FALSE`) are linked by an explicit id-name reference
   (`employee_bio.emp_id` → `employees.emp_id`), marked "name match" and capped at 60%
-  confidence; the CLI's `relationships.md` shows their overlap as "n/a (empty)"
+  confidence; the CLI's `inspect-summary.md` shows their overlap as "n/a (empty)"
 - `WITH … INSERT/UPDATE/DELETE` statements are recognised as writes, so their changes are saved
 - Snapshots keep exact types where Parquet can't: 128-bit integers (e.g. `SUM` results) are
   stored as `DECIMAL(38,0)` and `UNION` columns as text

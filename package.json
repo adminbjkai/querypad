@@ -1,6 +1,6 @@
 {
   "name": "querypad",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "description": "Local-first data workspace: drop data files, see how they connect, and query them with SQL or plain English — DuckDB in the browser, plus a CLI.",
   "author": "QueryPad Contributors",
@@ -38,7 +38,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check:version": "node scripts/check-version.mjs",
-    "check": "npm run check:version && npm run lint && npm run typecheck && npm run build",
+    "check:bundle": "node scripts/check-browser-bundle.mjs",
+    "check": "npm run check:version && node scripts/run-parallel.mjs lint typecheck && npm run build && npm run check:bundle",
     "version": "npm run check:version",
     "collab": "node collab/server.mjs",
     "postinstall": "node scripts/copy-duckdb-wasm.mjs && node scripts/copy-editor-assets.mjs",
@@ -74,7 +75,6 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
-    "@types/dagre": "^0.7.54",
     "@types/node": "^20",
     "@types/pako": "^2.0.4",
     "@types/react": "^19",

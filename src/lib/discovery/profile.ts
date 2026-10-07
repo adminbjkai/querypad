@@ -8,6 +8,7 @@ import type {
 } from "../../types";
 import { classifyType, quoteIdent } from "../duckdb/sql-utils";
 import type { QueryRunner } from "./relationships";
+import { toNumber as toFiniteNumber } from "./numbers";
 
 /**
  * Normalize a raw engine value into a plain JS value. Handles `bigint` (Node + Arrow
@@ -26,14 +27,14 @@ export function normalizeValue(value: unknown): unknown {
   return value;
 }
 
+/** Like `toNumber`, but after engine-value normalization and accepting numeric strings. */
 function toNumber(value: unknown): number | null {
   const normalized = normalizeValue(value);
-  if (typeof normalized === "number") return Number.isFinite(normalized) ? normalized : null;
   if (typeof normalized === "string" && normalized.trim() !== "") {
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
   }
-  return null;
+  return toFiniteNumber(normalized);
 }
 
 function toScalar(value: unknown): string | number | null {

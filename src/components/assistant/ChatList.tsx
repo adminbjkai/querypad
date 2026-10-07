@@ -4,19 +4,7 @@ import { useState } from "react";
 import { useAssistantStore, type Conversation } from "@/stores/assistant-store";
 import { Icon } from "@/components/ui/icons";
 import { btn, input } from "@/components/ui/primitives";
-
-/** "Now", "5m", "3h", "5d", "2mo" — compact age of a chat. */
-export function relativeTime(at: number, now = Date.now()): string {
-  const s = Math.max(0, Math.round((now - at) / 1000));
-  if (s < 60) return "Now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d`;
-  return `${Math.floor(d / 30)}mo`;
-}
+import { relativeTime } from "@/components/home/format";
 
 const SEARCH_ABOVE = 6;
 
@@ -68,7 +56,7 @@ export default function ChatList({ conversations, activeId, onClose }: { convers
               }`}
             >
               <span className="min-w-0 flex-1 truncate">{c.title}</span>
-              <span className="shrink-0 text-[11px] tabular-nums text-faint group-hover/chat:invisible group-focus-within/chat:invisible [@media(hover:none)]:invisible">{relativeTime(c.updatedAt, now)}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-faint group-hover/chat:invisible group-focus-within/chat:invisible [@media(hover:none)]:invisible">{relativeTime(c.updatedAt, { now, compact: true })}</span>
             </button>
             <button
               onClick={() => {

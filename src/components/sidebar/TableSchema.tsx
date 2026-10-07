@@ -5,7 +5,7 @@ import type { TableInfo } from "@/types";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { toast } from "@/stores/ui-store";
 import { insertAtCursor } from "@/lib/editor-bridge";
-import { previewTable } from "@/lib/workspace-actions";
+import { openTablePage, previewTable } from "@/lib/workspace-actions";
 import { Icon } from "@/components/ui/icons";
 import { KindGlyph } from "@/components/ui/primitives";
 
@@ -54,6 +54,9 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
           </span>
         </button>
         <div className="qp-table-actions flex shrink-0 pr-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/table:opacity-100">
+          <button onClick={() => openTablePage(table.name)} className="rounded p-1 text-muted hover:bg-line hover:text-ink" title="Open table page" aria-label={`Open ${table.name}`}>
+            <Icon name="table" size={13} />
+          </button>
           <button onClick={() => previewTable(table.name)} className="rounded p-1 text-muted hover:bg-line hover:text-ink" title="Preview rows in a new tab" aria-label={`Preview ${table.name}`}>
             <Icon name="play" size={13} />
           </button>
@@ -61,7 +64,7 @@ export default function TableSchema({ table, isView, filter = "", keyColumns, pr
             <button
               onClick={onOpenProfile}
               className={`rounded p-1 hover:bg-line ${profileActive ? "text-accent" : "text-muted hover:text-ink"}`}
-              title="Profile columns"
+              title="Quick profile beside the explorer"
               aria-label={`Profile ${table.name}`}
             >
               <Icon name="profile" size={13} />

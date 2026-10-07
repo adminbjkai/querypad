@@ -1,11 +1,9 @@
 "use client";
 
-import type { ColumnStats } from "./column-stats";
+import { pct, type ColumnStats } from "./column-stats";
 
 const num = (n: number) =>
   Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 4 });
-const pct = (part: number, whole: number) => (whole === 0 ? "0%" : `${((part / whole) * 100).toFixed(part > 0 && part / whole < 0.001 ? 2 : 1).replace(/\.0$/, "")}%`);
-
 function Stat({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1 text-[12px]">

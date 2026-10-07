@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -9,8 +9,13 @@ import { runActive } from "@/lib/workspace-actions";
 import { formatSql } from "./format-sql";
 import PeerCursors from "@/components/collaboration/PeerCursors";
 import { Icon } from "@/components/ui/icons";
-import { MOD, Spinner, btn } from "@/components/ui/primitives";
+import { MOD, Spinner, btn, kbdOnAccent } from "@/components/ui/primitives";
 
+/**
+ * Query tabs plus the editor tools. The tab list scrolls sideways (hidden scrollbar, wheel
+ * scrolls it horizontally, the active tab is kept in view); the tools stay pinned on the right
+ * and shed their labels below container widths so they never overlap the tabs.
+ */
 export default function TabBar() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
@@ -24,6 +29,12 @@ export default function TabBar() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Keep the active tab visible when it changes (new tab, keyboard navigation, restore).
+  useEffect(() => {
+    document.getElementById(`query-tab-${activeTabId}`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeTabId, tabs.length]);
 
   const commit = () => {
     if (editingId && editValue.trim()) renameTab(editingId, editValue.trim());
@@ -31,8 +42,17 @@ export default function TabBar() {
   };
 
   return (
-    <div className="flex h-9 shrink-0 items-stretch border-b border-line bg-chrome">
-      <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto" role="tablist" aria-label="Query tabs">
+    <div className="@container flex h-9 shrink-0 items-stretch border-b border-line bg-chrome">
+      <div
+        ref={listRef}
+        className="qp-tabstrip flex min-w-0 flex-1 items-stretch"
+        role="tablist"
+        aria-label="Query tabs"
+        onWheel={(e) => {
+          // A plain vertical wheel over the strip scrolls it sideways (the strip never scrolls vertically).
+          if (e.deltaY !== 0 && e.deltaX === 0) listRef.current?.scrollBy({ left: e.deltaY });
+        }}
+      >
         {tabs.map((tab) => {
           const selected = tab.id === activeTabId;
           return (
@@ -63,7 +83,7 @@ export default function TabBar() {
                 setEditValue(tab.title);
               }}
               onAuxClick={(e) => e.button === 1 && tabs.length > 1 && removeTab(tab.id)}
-              className={`group relative flex shrink-0 cursor-pointer select-none items-center gap-1.5 border-r border-line px-3 text-[13px] ${
+              className={`group relative flex min-w-[88px] max-w-[180px] shrink cursor-pointer select-none items-center gap-1.5 border-r border-line px-3 text-[13px] ${
                 selected ? "bg-surface text-ink" : "text-muted hover:bg-sunken hover:text-ink"
               }`}
             >
@@ -90,7 +110,7 @@ export default function TabBar() {
                   aria-label="Tab name"
                 />
               ) : (
-                <span className="max-w-[140px] truncate">{tab.title}</span>
+                <span className="min-w-0 flex-1 truncate">{tab.title}</span>
               )}
               {tabs.length > 1 && (
                 <button
@@ -98,7 +118,7 @@ export default function TabBar() {
                     e.stopPropagation();
                     removeTab(tab.id);
                   }}
-                  className={`rounded p-0.5 text-faint hover:bg-sunken hover:text-ink focus-visible:opacity-100 ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}
+                  className={`shrink-0 rounded p-0.5 text-faint hover:bg-sunken hover:text-ink focus-visible:opacity-100 ${selected ? "" : "opacity-0 group-hover:opacity-100"}`}
                   aria-label={`Close ${tab.title}`}
                 >
                   <Icon name="x" size={12} />
@@ -112,7 +132,7 @@ export default function TabBar() {
         </button>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-l border-line px-2">
+      <div className="flex shrink-0 items-center gap-2 border-l border-line bg-chrome px-2">
         {roomId && <PeerCursors />}
         <div className="flex items-center">
           <button
@@ -147,7 +167,7 @@ export default function TabBar() {
           aria-pressed={aiOpen}
         >
           <Icon name="sparkle" size={15} />
-          <span className="hidden sm:inline">Ask AI</span>
+          <span className="hidden @min-[480px]:inline">Ask AI</span>
         </button>
         <button
           onClick={runActive}
@@ -157,7 +177,9 @@ export default function TabBar() {
         >
           {active?.isExecuting ? <Spinner className="size-3" /> : <Icon name="play" size={13} className="fill-current" />}
           Run
-          <span className="hidden text-[11px] opacity-70 lg:inline">{MOD}↵</span>
+          <span className={`${kbdOnAccent} hidden @min-[560px]:inline-flex`} aria-hidden="true">
+            {MOD}↵
+          </span>
         </button>
       </div>
     </div>

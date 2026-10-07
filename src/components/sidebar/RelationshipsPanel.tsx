@@ -17,8 +17,9 @@ function columnsOf(tables: TableInfo[], table: string): string[] {
   return tables.find((t) => t.name === table)?.columns.map((c) => c.name) ?? [];
 }
 
-const small = "h-6 px-1.5 text-[12px]";
-const subtle = "inline-flex h-6 shrink-0 items-center rounded-md border px-2 text-[12px] font-medium transition-colors";
+// One row of 28px actions: the verdict pair is a joined outline group, the rest are ghost buttons.
+const action = `${btn.ghost} h-7 px-2 text-[12px]`;
+const verdictBtn = `${btn.secondary} h-7 px-2 text-[12px] font-medium shadow-none`;
 
 const select =
   "min-w-0 flex-1 rounded-md border border-line bg-surface px-1.5 py-1 font-mono text-[12px] text-ink outline-none focus:border-accent";
@@ -132,18 +133,22 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
             </ul>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-1">
-            <button
-              onClick={() => onVerdict(verdict === "accepted" ? null : "accepted")}
-              className={`${subtle} ${verdict === "accepted" ? "border-ok bg-ok text-surface" : "border-ok/30 bg-ok-soft text-ok hover:border-ok/60"}`}
-            >
-              Accept
-            </button>
-            <button
-              onClick={() => onVerdict(verdict === "rejected" ? null : "rejected")}
-              className={`${subtle} ${verdict === "rejected" ? "border-danger bg-danger text-surface" : "border-danger/30 bg-danger-soft text-danger hover:border-danger/60"}`}
-            >
-              Reject
-            </button>
+            <div className="inline-flex shrink-0 items-center" role="group" aria-label="Verdict">
+              <button
+                onClick={() => onVerdict(verdict === "accepted" ? null : "accepted")}
+                aria-pressed={verdict === "accepted"}
+                className={`${verdictBtn} rounded-r-none ${verdict === "accepted" ? "border-ok bg-ok-soft text-ok hover:border-ok hover:bg-ok-soft" : "hover:text-ok"}`}
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => onVerdict(verdict === "rejected" ? null : "rejected")}
+                aria-pressed={verdict === "rejected"}
+                className={`${verdictBtn} -ml-px rounded-l-none ${verdict === "rejected" ? "border-danger bg-danger-soft text-danger hover:border-danger hover:bg-danger-soft" : "hover:text-danger"}`}
+              >
+                Reject
+              </button>
+            </div>
             <button
               onClick={() => {
                 setFromColumn(rel.from.column);
@@ -151,20 +156,23 @@ function RelationshipCard({ rel, tables, tableNames, verdict, edited, onVerdict,
                 setToColumn(rel.to.column);
                 setEditing(true);
               }}
-              className={`${btn.ghost} ${small}`}
+              className={`${btn.icon} size-7`}
+              title="Edit this join"
+              aria-label="Edit"
             >
-              Edit
+              <Icon name="edit" size={14} />
             </button>
             <button
               onClick={() => {
                 if (!insertAtCursor(`${joinClause(rel)}\n`)) toast("Open the SQL editor to insert the join.", "info");
               }}
-              className={`${btn.ghost} ${small}`}
-              title={joinClause(rel)}
+              className={`${btn.icon} size-7`}
+              title={`Insert into the editor: ${joinClause(rel)}`}
+              aria-label="Insert JOIN"
             >
-              Insert JOIN
+              <Icon name="insert" size={14} />
             </button>
-            <button onClick={() => setExpanded((v) => !v)} className={`${btn.ghost} ${small} ml-auto`}>
+            <button onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className={`${action} ml-auto`}>
               {expanded ? "Hide" : "Why?"}
             </button>
           </div>

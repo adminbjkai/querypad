@@ -70,7 +70,7 @@ function local(
 
 export const DEFAULT_AI_PROVIDER: AiProvider = "groq";
 
-export const AI_PROVIDER_CONFIGS: Record<AiProvider, AiProviderConfig> = {
+const AI_PROVIDER_CONFIGS: Record<AiProvider, AiProviderConfig> = {
   "local-claude": local("local-claude", "Claude", "Sonnet 5.5", "claude-sonnet-5-5", ["low", "medium"]),
   "local-codex": local("local-codex", "Codex", "GPT-6 Luna", "codex-gpt-6-luna", ["low", "medium"]),
   "local-grok": local("local-grok", "Grok", "Grok 4.7", "grok-4-7", ["low", "medium"]),

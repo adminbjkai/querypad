@@ -363,7 +363,9 @@ test.describe("Assistant panel", () => {
     await expect(page.getByRole("tab", { name: /Query 1/ })).toBeVisible();
     expect(bodies[0].system).not.toContain("App actions");
 
-    // Resize by dragging the left edge.
+    // Resize by dragging the left edge (the side panel is hidden first: the editor
+    // column keeps a 320px floor, so at 1280px wide the Assistant could not grow otherwise).
+    await page.keyboard.press(`${MOD}+b`);
     const before = (await panel.boundingBox())!.width;
     const handle = panel.getByRole("separator", { name: "Resize assistant" });
     const box = (await handle.boundingBox())!;

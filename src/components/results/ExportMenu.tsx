@@ -4,7 +4,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 import { toast } from "@/stores/ui-store";
 import type { QueryResult } from "@/types";
 import { Icon } from "@/components/ui/icons";
-import { Menu, btn, type MenuItem } from "@/components/ui/primitives";
+import { Menu, btn, type MenuEntry, type MenuItem } from "@/components/ui/primitives";
 
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -25,7 +25,8 @@ export default function ExportMenu({ result, query }: { result: QueryResult; que
   const run = (label: string, task: () => Promise<void>) => () =>
     void task().catch((err) => toast(`${label} export failed: ${err instanceof Error ? err.message : err}`, "error"));
 
-  const items: (MenuItem | "divider")[] = [
+  const items: MenuEntry[] = [
+    { heading: "Copy" },
     {
       label: "Copy as table",
       icon: "copy",
@@ -37,6 +38,7 @@ export default function ExportMenu({ result, query }: { result: QueryResult; que
       }),
     },
     "divider",
+    { heading: "Download" },
     {
       label: `CSV${truncatedNote}`,
       icon: "download",
@@ -105,7 +107,7 @@ export default function ExportMenu({ result, query }: { result: QueryResult; que
         }),
       }))
   );
-  if (pluginItems.length) items.push("divider", ...pluginItems);
+  if (pluginItems.length) items.push("divider", { heading: "Plugins" }, ...pluginItems);
 
   return (
     <Menu

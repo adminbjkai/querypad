@@ -17,10 +17,13 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
 - **Shared, engine-agnostic core** (`src/lib/discovery`, `src/lib/duckdb/sql-utils.ts`)
   is consumed by both via a `QueryRunner` abstraction.
 - Node-only code (`src/lib/duckdb-node`, `src/cli`) must never be imported by app code,
-  or the native addon leaks into the browser bundle. `npm run check`'s build step
-  verifies this.
-- Shared core under `src/lib/discovery` and `src/lib/ai` uses relative imports only (the
-  CLI runs under tsx without the `@/` alias).
+  or the native addon leaks into the browser bundle. `npm run check` ends with
+  `check:bundle` (`scripts/check-browser-bundle.mjs`), which scans the built browser chunks
+  in `.next/static/chunks` for `@duckdb/node-api`, `duckdb-node`, `node:fs` and ws server code
+  and fails if any appear.
+- Shared core (`src/lib/discovery`, `src/lib/ai`, `src/lib/duckdb/sql-utils.ts`) uses relative
+  imports only: the CLI and the unit tests (`node --import tsx --test test/*.test.ts`) run it
+  outside Next, and it must stay portable without the `@/` alias.
 - **Local AI bridge** (`local-ai/bridge.mjs`, `sandbox.mjs`) runs on the host (systemd user
   unit), not in Docker: plain Node, no deps, Unix socket + token. Every CLI runs under
   bubblewrap with tools disabled — keep it that way when adding a model (re-test that the CLI
@@ -47,7 +50,11 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   or URLs). It never changes the workspace. Each space keeps several chats in localStorage.
 - **Catalog sync**: after any non-read-only statement, `syncCatalog` reconciles the store with
   `duckdb_tables()`/`duckdb_views()` (main schema only); new/changed tables are snapshotted to
-  Parquet file entries. The `querypad` schema (relationships/keys) is internal and never listed.
+  Parquet file entries. `mutationTargets` (`src/lib/duckdb/catalog-sql.ts`) names the tables a
+  statement touched and one `readCatalogSignatures` pass (`catalog.ts`) skips untouched tables
+  whose columns and estimated rows are unchanged; when a write can't be attributed (MERGE,
+  EXECUTE, CALL …) it returns `null` and every table is checked exactly. The `querypad` schema
+  (relationships/keys) is internal and never listed.
 - **AI**: the web assistant uses `WORKSPACE_SQL_SYSTEM_PROMPT` + `buildWorkspaceContext`
   (`src/lib/ai/workspace-context.ts`) and checks answers with `checkSql`
   (`src/lib/duckdb/validate.ts`). The CLI keeps its own prompt in `generate-sql.ts`.
@@ -58,17 +65,18 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   never hardcode palette colors in components. Column kinds use `text-k-num/k-text/k-date/
   k-bool`, joins use `text-join`.
 - Shared building blocks live in `src/components/ui` (`btn`, `input`, `Dialog`, `Menu`,
-  `KindGlyph`, `Icon`). Toasts: `toast()` from `src/stores/ui-store.ts`.
-- Cross-component actions (run, share, preview) live in `src/lib/workspace-actions.ts`;
-  the editor is reachable through `src/lib/editor-bridge.ts`.
+  `KindGlyph`, `SectionLabel`, `Icon`). Toasts: `toast()` from `src/stores/ui-store.ts`.
+- Cross-component actions (run, share, preview, open a table page) live in
+  `src/lib/workspace-actions.ts`; the editor is reachable through `src/lib/editor-bridge.ts`.
 - Shell: `NavRail` (left, labeled, collapsible) → side panel (`Sidebar`, workbench only) →
-  `PageHeader` + page (`Home` or the workbench) → Assistant. Nav pages use `aria-current`,
-  panel toggles `aria-pressed`; e2e selects them as buttons by name.
+  `PageHeader` + page (`Home`, the workbench or a `TablePage`) → Assistant. Nav pages use
+  `aria-current`, panel toggles `aria-pressed`; e2e selects them as buttons by name.
 
 ## Release and verification
 
 - Keep `package.json`, `package-lock.json`, and the latest `CHANGELOG.md` release version in sync.
-- Run `npm run check` after code/config changes.
+- Run `npm run check` after code/config changes (version check → lint and typecheck in parallel
+  via `scripts/run-parallel.mjs` → `next build` → browser-bundle guard).
 - Run `npm test` when UI behavior or e2e-covered flows change (it starts its own dev
   server on port 3217 and a relay on 1999 — it never reuses another server).
 - Run `npm run test:cli` when discovery/CLI logic changes.

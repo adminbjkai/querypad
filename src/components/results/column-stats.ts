@@ -10,6 +10,9 @@ export interface ColumnStats {
   distinct: number;
   min: string | null;
   max: string | null;
+  /** Numeric bounds (numbers, or epoch milliseconds for date columns) for compact display. */
+  minNum: number | null;
+  maxNum: number | null;
   mean: number | null;
   top: { label: string; count: number }[];
   /** Equal-width bins over [minNum, maxNum]; only for numeric columns with data. */
@@ -21,7 +24,7 @@ export interface ColumnStats {
 const BINS = 20;
 
 /** Compute column statistics client-side from the (already limited) result rows. */
-export function computeColumnStats(result: QueryResult, column: string): ColumnStats {
+function computeColumnStats(result: QueryResult, column: string): ColumnStats {
   const index = result.columns.indexOf(column);
   const type = result.columnTypes[index] ?? "";
   const kind = classifyType(type);
@@ -55,6 +58,8 @@ export function computeColumnStats(result: QueryResult, column: string): ColumnS
   const histogramIsDate = nums.length === 0 && times.length > 0;
   const points = histogramIsDate ? times : nums;
   let mean: number | null = null;
+  let minNum: number | null = null;
+  let maxNum: number | null = null;
   let histogram: ColumnStats["histogram"] = null;
   if (points.length > 0) {
     let lo = points[0];
@@ -65,6 +70,8 @@ export function computeColumnStats(result: QueryResult, column: string): ColumnS
       if (n > hi) hi = n;
       sum += n;
     }
+    minNum = lo;
+    maxNum = hi;
     if (!histogramIsDate) {
       mean = sum / points.length;
       min = formatValue(lo);
@@ -82,8 +89,37 @@ export function computeColumnStats(result: QueryResult, column: string): ColumnS
     .slice(0, 5)
     .map(([label, count]) => ({ label, count }));
 
-  return { kind, type, total, nulls, distinct: counts.size, min, max, mean, top, histogram, histogramIsDate };
+  return { kind, type, total, nulls, distinct: counts.size, min, max, minNum, maxNum, mean, top, histogram, histogramIsDate };
 }
+
+/** 1234 → "1.2K", 1_500_000 → "1.5M"; small numbers keep up to two decimals. */
+export function compactNumber(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1e15) return n.toExponential(1);
+  if (abs >= 1e3) return n.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 1 });
+  if (Number.isInteger(n)) return String(n);
+  return n.toLocaleString(undefined, { maximumFractionDigits: abs < 1 ? 3 : 2 });
+}
+
+/** yyyy-mm-dd for epoch milliseconds (date columns keep ISO strings, so the day prefix is exact). */
+export function compactDate(ms: number): string {
+  const d = new Date(ms);
+  return Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : "";
+}
+
+/** Bound label for a header stats line: compact number, or the day for date columns. */
+export function compactBound(stats: ColumnStats, which: "min" | "max"): string {
+  const n = which === "min" ? stats.minNum : stats.maxNum;
+  if (n === null) return stats[which] ?? "";
+  if (stats.histogramIsDate) return compactDate(n);
+  return compactNumber(n);
+}
+
+export const sharePct = (part: number, whole: number) => (whole === 0 ? 0 : (part / whole) * 100);
+
+/** Share as text: "12.5%", two decimals for shares under 0.1%, "0%" when there is nothing to divide by. */
+export const pct = (part: number, whole: number) =>
+  whole === 0 ? "0%" : `${sharePct(part, whole).toFixed(part > 0 && part / whole < 0.001 ? 2 : 1).replace(/\.0$/, "")}%`;
 
 const cache = new WeakMap<QueryResult, Map<string, ColumnStats>>();
 

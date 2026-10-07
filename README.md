@@ -47,6 +47,10 @@ Tables:        3
 Relationships: 2
   payments.user_id ↳ users.id  (100%, many-to-one)
   events.user_id   ↳ users.id  (100%, many-to-one)
+Entities:      3
+  User (users)  → Payment, Event
+  Payment (payments)
+  Event (events)
 
 Wrote artifacts to ./data/.querypad
 ```
@@ -97,7 +101,7 @@ join is marked "name match" with a confidence capped at 60% so you verify it.
 
 | Layer | What it does | Status |
 |-------|--------------|--------|
-| **1 — Dataset Discovery** | Scan folders; detect schema, types, statistics, uniqueness, cardinality | ✅ Built (`profile`) |
+| **1 — Dataset Discovery** | Scan folders; detect schema, types, statistics, uniqueness, cardinality | ✅ Built (`inspect`) |
 | **2 — Relationship Discovery** | Infer joins automatically with confidence scores | ✅ Built (`inspect`) |
 | **3 — Semantic Model** | Roll relationships into named business entities (`User ├ Payment ├ Event`) | ✅ Built (`inspect`) |
 | **4 — AI Analyst** | Natural-language questions → SQL → execution → insight (`ask`) | ✅ Built (`ask`) |
@@ -157,11 +161,17 @@ made elsewhere within a few seconds. Served without its storage API (static host
 falls back to keeping everything in the browser.
 
 - **Start from Home** — an AI-first start page: ask a question about your data in one box
-  (it goes to the Assistant), pick a suggestion, or pick up where you left off in the Recent
-  tabs (datasets with search and sorting, queries, snippets, spaces), with live catalog counts
-  and the semantic model below. A labeled navigation on the left (Home, SQL, Pipelines;
-  Tables, Joins; History, Snippets) collapses to icons and remembers it
-- **Drop anything** — CSV, TSV, Parquet, JSON/NDJSON, Excel; several at once, then JOIN them
+  (it goes to the Assistant), pick a suggestion, use a quick action (Add data, New query,
+  Inspect a dataset, Open Assistant), or pick up where you left off in the Recent tabs
+  (datasets with search and sorting, queries, snippets, spaces), with live catalog counts and
+  the semantic model below. A labeled navigation on the left (Home, SQL, Pipelines; Tables,
+  Joins; History, Snippets) collapses to icons and remembers it
+- **Drop anything** — CSV, TSV, Parquet, JSON/NDJSON, Excel; several at once, then JOIN them.
+  The Add data dialog takes files or a URL and shows each file's status as it loads
+- **A page per table** — open any table or view from Home, the Explorer or the command
+  palette: breadcrumb (space › Tables › name), Query / Ask Assistant / Copy name, and Overview
+  (filterable, sortable columns with keys and a details rail listing its joins), Preview (the
+  first 100 rows in the grid) and Profile (row count, columns and every column's profile) tabs
 - **Understands before you ask** — every column is profiled (types, empties, distinct counts,
   ranges, top values) and joins between tables are inferred in the background
 - **Verify the joins** — the Joins panel lists inferred relationships with confidence and a
@@ -194,25 +204,30 @@ falls back to keeping everything in the browser.
 - **Snippet library** — save SQL you reuse (Ctrl/⌘+Shift+S) into folders; search it, insert at
   the cursor, run it in a tab, or autocomplete it by name. Shared by every space and device;
   export/import as JSON
-- **A results grid like a desktop tool** — mini distribution charts under each header,
-  range selection with a Sum / Avg / Min / Max footer, sticky headers and row numbers, resizable
-  columns, NULLs marked, keyboard cell navigation with Ctrl/⌘+C, a per-column menu (sort, copy
-  name or values, inspect), a column inspector with distribution, nulls, distinct values and
-  top values, a Details view with the SQL and timings, and export to CSV /
-  JSON / Markdown / HTML / Excel / Parquet / clipboard
+- **A results grid like a desktop tool** — Snowsight-style stats under each header (a
+  histogram or top-values bar with the null share, then min/max, top values or true/false
+  shares, with hover details; toggle them from the `#` corner), click a header to sort
+  (natural order, so `file2` comes before `file10`; the sorted column is highlighted), a
+  filter box that expands from its icon, range selection with a Sum / Avg / Min / Max footer,
+  sticky headers and row numbers, resizable columns, NULLs marked, keyboard cell navigation
+  with Ctrl/⌘+C, a per-column menu (sort, copy name or values, inspect), a column inspector
+  with distribution, nulls, distinct values and top values, a Details view with Rows,
+  Columns, Duration and Last run tiles plus the SQL, and an export menu (Copy / Download /
+  Plugins) for CSV / JSON / Markdown / HTML / Excel / Parquet / clipboard
 - **Charts and column stats like Snowsight** — a chart builder (bar, line, area, scatter,
   pie, scorecard; date buckets, aggregations, group-by, stacking, PNG download) and a stats
   pane listing every column with its distribution
 - **Explorer, history and status bar** — a searchable explorer for tables, views and columns
   that opens beside the navigation; history search with a succeeded/failed filter; a status bar with
-  the engine, space, storage location, last result and the active AI model; Format SQL
+  the engine and its DuckDB version, space, storage location, cursor line/column and selection
+  size, the last result (click an error to jump to it) and the active AI model; Format SQL
   (Shift+Alt+F)
 - **Search everything** — Ctrl/⌘+P finds tables, columns, snippets, history, tabs and spaces,
   and runs any command
 - **History** — each space keeps its last 100 runs with row counts, timings and failures
 - **Pipelines** — chain named SQL steps that build on each other, shown as a dependency graph
 - **Live collaboration** — start a room, send the invite link, and edit the same tabs with
-  shared cursors; files under 5 MB sync to everyone
+  shared cursors; files under 5 MB sync to everyone (up to 24 MB of files per room)
 - **Share links** — compress data + query into one URL (no server involved); opening a link
   never touches your spaces ("Save as a new space" keeps a copy)
 - **Agent context** — copy schema, profiles, the current SQL and its results for Claude Code,
@@ -228,15 +243,17 @@ falls back to keeping everything in the browser.
 - **Persistence** — each space's tables, views, tabs, SQL-generation conversations, history, pipelines and
   join verdicts are saved through `/api/store` to the server's data directory
   (`QUERYPAD_DATA_DIR`, a Docker volume in the compose setup; `.querypad-data/` in dev).
-  Open clients poll every 3 s while in use (every 15 s when idle, at once on focus) and apply
-  edits from other devices; table, view and plugin
-  changes reopen the space. Spaces already kept in a browser's IndexedDB are uploaded the
+  Open clients poll every 3 s while in use (every 15 s after 60 s without activity, at once on
+  focus) and apply edits from other devices; table, view and plugin changes reopen the space.
+  Saves are debounced and skipped when nothing changed; hiding or reloading the page flushes a
+  pending save first. Spaces already kept in a browser's IndexedDB are uploaded the
   first time that browser meets an empty server, and older layouts are migrated into a space
   called "My workspace". Assistant chats stay in localStorage per space (up to 30). Without the API the app keeps using IndexedDB. The server store has
   no accounts of its own — protect the site (e.g. basic auth) if it's reachable publicly. The first visit creates a "Playground"
   space with two sample tables.
 - **Remote files** — load Parquet/CSV/JSON from any URL that allows cross-origin requests
-- **Plugin system** — ES-module plugins can add visualizations, exporters and file loaders
+- **Plugin system** — ES-module plugins can add visualizations, exporters, file loaders and
+  transforms (extension types `visualization`, `exporter`, `fileLoader`, `transform`)
 - **Guardrails** — 100 MB per file, with a warning above 50 MB; results show the first
   10,000 rows (Parquet export writes them all)
 - **What the AI receives** — table and view schemas, column hints (value ranges and the
@@ -255,9 +272,12 @@ falls back to keeping everything in the browser.
 | Ask AI to write SQL | Ctrl/⌘ + K |
 | Command palette | Ctrl/⌘ + P |
 | Assistant chat | Ctrl/⌘ + I |
-| Save query as a snippet | Ctrl/⌘ + Shift + S |
+| Save query or selection as a snippet | Ctrl/⌘ + Shift + S |
 | Format SQL | Shift + Alt + F |
-| Toggle sidebar | Ctrl/⌘ + B |
+| Show or hide the side panel | Ctrl/⌘ + B |
+| Rename a tab | Double-click it |
+| Copy selected cells | Ctrl/⌘ + C |
+| Sort a column | Click its header |
 | Resize editor/results split | Focus separator, then ↑ / ↓; Home / End |
 | Resize a result column | Focus its resize handle, then ← / →; Home to fit |
 | Navigate a menu | ↑ / ↓, Home / End, Enter; Escape to close |
@@ -331,7 +351,7 @@ This starts two containers from one image:
 
 | Service | Listens on | Purpose |
 |---------|-----------|---------|
-| `querypad` | `127.0.0.1:8059` | Next.js standalone server (the web app and `/api/complete`) |
+| `querypad` | `127.0.0.1:8059` | Next.js standalone server (the web app, `/api/complete` and the `/api/store/*` space store) |
 | `querypad-collab` | `127.0.0.1:8061` | Yjs relay for live collaboration (`collab/server.mjs`) |
 
 Put a reverse proxy in front that sends `/collab/` (with WebSocket upgrade headers) to the
@@ -339,6 +359,9 @@ relay and everything else to the app. Optional server-side AI keys go in `.env.s
 (for example `OPENROUTER_API_KEY=…`); they are read at runtime and never sent to browsers.
 To use the AI CLIs signed in on the host instead of keys, set up the local AI bridge
 ([`local-ai/README.md`](local-ai/README.md)); compose mounts its socket folder into the app.
+The app finds the bridge through `QUERYPAD_BRIDGE_SOCKET` (a Unix socket path; preferred when
+both are set) or `QUERYPAD_BRIDGE_URL` (an HTTP URL), and authenticates with
+`QUERYPAD_BRIDGE_TOKEN`; without the token the bridge counts as not configured.
 
 ## Architecture
 

@@ -28,7 +28,7 @@ const MAX_VALUE_CHARS = 40;
 const MAX_CONTEXT_CHARS = 120_000;
 const MAX_THREAD_TURNS = 8;
 
-export interface LogEntry {
+interface LogEntry {
   sql: string;
   rowCount: number | null;
   error: string | null;

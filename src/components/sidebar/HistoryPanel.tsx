@@ -5,16 +5,7 @@ import { useWorkspaceStore, type HistoryEntry } from "@/stores/workspace-store";
 import { Icon } from "@/components/ui/icons";
 import PanelHeader, { SearchBox } from "./PanelHeader";
 import { btn } from "@/components/ui/primitives";
-
-function relativeTime(at: number): string {
-  const seconds = Math.round((Date.now() - at) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return new Date(at).toLocaleDateString();
-}
+import { relativeTime } from "@/components/home/format";
 
 type Filter = "all" | "ok" | "failed";
 const FILTERS: { id: Filter; label: string }[] = [

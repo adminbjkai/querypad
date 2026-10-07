@@ -1,11 +1,7 @@
 import { getDB, getConnection } from "./instance";
-import { quoteIdent } from "./sql-utils";
+import { quoteIdent, sqlString } from "./sql-utils";
 import { fileExtension, sanitizeTableName } from "../utils";
 import type { TableInfo, ColumnInfo } from "@/types";
-
-function sqlString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
 
 /**
  * Materialize a file's bytes as a DuckDB table named `name`.

@@ -4,11 +4,8 @@ import { useEffect, useState } from "react";
 import type { QueryResult } from "@/types";
 import { Icon } from "@/components/ui/icons";
 import { KindGlyph, btn } from "@/components/ui/primitives";
-import { getColumnStats, peekColumnStats, type ColumnStats } from "./column-stats";
+import { getColumnStats, pct, peekColumnStats, type ColumnStats } from "./column-stats";
 import ColumnDetails from "./ColumnInspector";
-
-const pct = (part: number, whole: number) =>
-  whole === 0 ? "0%" : `${((part / whole) * 100).toFixed(part > 0 && part / whole < 0.01 ? 1 : 0)}%`;
 
 /** Tiny inline chart: mini histogram for numbers/dates, a share-of-rows bar of the top values otherwise. */
 function Sparkline({ stats }: { stats: ColumnStats }) {

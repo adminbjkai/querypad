@@ -63,16 +63,14 @@ function NavItem({
       {active && <span className="absolute -left-2 top-1.5 h-5 w-[3px] rounded-r bg-accent" aria-hidden="true" />}
       <Icon name={icon} size={16} className={active ? "text-accent" : ""} />
       {!collapsed && <span className="min-w-0 flex-1 truncate text-left">{label}</span>}
-      {badge != null && (
-        <span
-          className={`rounded-full px-1.5 text-[10px] font-medium leading-4 tabular-nums ${
-            collapsed ? "absolute right-0.5 top-0 bg-join-soft text-join" : "bg-sunken text-faint group-hover:bg-raised"
-          }`}
-          aria-hidden="true"
-        >
-          {badge}
-        </span>
-      )}
+      {badge != null &&
+        (collapsed ? (
+          <span className="absolute right-2 top-1 size-1.5 rounded-full bg-accent" aria-hidden="true" />
+        ) : (
+          <span className="rounded-full bg-sunken px-1.5 text-[10px] font-medium leading-4 tabular-nums text-faint group-hover:bg-raised" aria-hidden="true">
+            {badge}
+          </span>
+        ))}
     </button>
   );
 }
@@ -136,7 +134,8 @@ export default function NavRail() {
     if (useWorkspaceStore.getState().addTab()) setPage("workbench");
   };
   const panelItem = (id: SidebarPanel, icon: IconName, label: string, count: number, hint?: string) => {
-    const active = onWorkbench && panelOpen && panel === id;
+    // A dataset's page lives under Tables, so that item stays lit there.
+    const active = (onWorkbench && panelOpen && panel === id) || (page === "table" && id === "tables");
     return (
       <NavItem
         key={id}

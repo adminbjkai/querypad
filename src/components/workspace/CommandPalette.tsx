@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
-import { runActive, previewTable, shareWorkspace, copyAgentContext, insertSnippet, openSnippet } from "@/lib/workspace-actions";
+import { runActive, previewTable, shareWorkspace, copyAgentContext, insertSnippet, openSnippet, openTablePage } from "@/lib/workspace-actions";
 import { useSnippetStore, saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { MOD } from "@/components/ui/primitives";
@@ -105,14 +105,24 @@ export default function CommandPalette() {
         run: () => openSnippet(sn.sql, sn.name, true),
       },
     ]);
-    const viewCommands: Command[] = views.map((v) => ({
-      id: `preview-view:${v.name}`,
-      group: "Tables",
-      label: `Preview view ${v.name}`,
-      detail: v.columns.map((c) => c.name).join(" "),
-      icon: "table",
-      run: () => previewTable(v.name),
-    }));
+    const viewCommands: Command[] = views.flatMap((v) => [
+      {
+        id: `preview-view:${v.name}`,
+        group: "Tables" as const,
+        label: `Preview view ${v.name}`,
+        detail: v.columns.map((c) => c.name).join(" "),
+        icon: "table" as const,
+        run: () => previewTable(v.name),
+      },
+      {
+        id: `open-view:${v.name}`,
+        group: "Tables" as const,
+        label: `Open view ${v.name}`,
+        detail: "columns details page",
+        icon: "file" as const,
+        run: () => openTablePage(v.name),
+      },
+    ]);
     const tableCommands: Command[] = tables.flatMap((t) => [
       {
         id: `preview:${t.name}`,
@@ -123,12 +133,20 @@ export default function CommandPalette() {
         run: () => previewTable(t.name),
       },
       {
+        id: `open:${t.name}`,
+        group: "Tables" as const,
+        label: `Open table ${t.name}`,
+        detail: "columns details relationships page",
+        icon: "table" as const,
+        run: () => openTablePage(t.name),
+      },
+      {
         id: `profile:${t.name}`,
         group: "Tables" as const,
         label: `Profile ${t.name}`,
-        detail: "stats nulls distinct",
+        detail: "stats nulls distinct table page",
         icon: "profile" as const,
-        run: () => { ui().showPanel("tables"); ui().setProfileTable(t.name); },
+        run: () => openTablePage(t.name, "profile"),
       },
     ]);
     // Columns: found by name (or type), insert the qualified name at the cursor.

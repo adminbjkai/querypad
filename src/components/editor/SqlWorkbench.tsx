@@ -51,7 +51,8 @@ export default function SqlWorkbench() {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // The editor column never squeezes below the point where its tab strip and Run button fit.
+    <div className="flex min-h-0 min-w-[320px] flex-1 flex-col">
       <TabBar />
       {aiOpen && <AiAssistant />}
       <div ref={containerRef} className="flex min-h-0 flex-1 flex-col">

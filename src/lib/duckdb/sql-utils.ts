@@ -1,4 +1,4 @@
-import type { ProfileColumnKind } from "@/types";
+import type { ProfileColumnKind } from "../../types";
 
 /** Quote a SQL identifier (table or column name), escaping embedded double quotes. */
 export function quoteIdent(identifier: string): string {
@@ -28,4 +28,9 @@ export function classifyType(type: string): ProfileColumnKind {
   if (base.startsWith("BOOL")) return "boolean";
   if (/^(VARCHAR|CHAR|BPCHAR|TEXT|STRING|UUID|JSON|ENUM|UTF8|LARGEUTF8)/.test(base)) return "text";
   return "other";
+}
+
+/** Quote a SQL string literal, escaping embedded single quotes. */
+export function sqlString(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
 }

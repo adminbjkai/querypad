@@ -1,5 +1,5 @@
 import type { Relationship, RelationshipVerdict } from "../../types/discovery";
-import { quoteIdent } from "./sql-utils";
+import { quoteIdent, sqlString } from "./sql-utils";
 
 /** Statements that only read; anything else may change the catalog or table contents. */
 const READ_ONLY = /^(select|with|from|values|table|explain|describe|desc|show|summarize|pragma\s+(table_info|show|database_list))\b/i;
@@ -32,29 +32,38 @@ const TARGET_PATTERNS = [
   new RegExp(String.raw`^create\s+(?:or\s+replace\s+)?table\s+(?:if\s+not\s+exists\s+)?${IDENT}`, "i"),
   new RegExp(String.raw`^copy\s+${IDENT}\s+from\b`, "i"),
 ];
+/** Statements that change the catalog without rewriting rows of an existing table. */
+const CATALOG_ONLY = /^(?:create\s+(?:or\s+replace\s+)?(?:temp(?:orary)?\s+)?(?:view|schema|index|macro|function|sequence|type)\b|drop\s+|comment\s+on\b|set\s+|reset\s+|pragma\s+|checkpoint\b|vacuum\b|analyze\b|begin\b|commit\b|rollback\b|install\s+|load\s+)/i;
 /** The write inside a `WITH … INSERT/UPDATE/DELETE` statement. */
 const WITH_TARGET = new RegExp(String.raw`\b(?:insert\s+(?:or\s+\w+\s+)?into|update|delete\s+from)\s+${IDENT}`, "i");
 
 /**
  * Lower-cased names of tables a batch of statements writes to, so their saved
  * snapshots can be refreshed. Schema-qualified names keep only the table part.
+ * Returns `null` when some write isn't understood (MERGE, EXECUTE, CALL …): the
+ * caller must then treat every table as possibly changed rather than trust the list.
  */
-export function mutationTargets(statements: string[]): Set<string> {
+export function mutationTargets(statements: string[]): Set<string> | null {
   const targets = new Set<string>();
   for (const statement of statements) {
+    if (isReadOnlyStatement(statement)) continue;
     const text = leading(statement);
     if (WITH_WRITE.test(text)) {
       const match = text.match(WITH_TARGET);
-      if (match) targets.add(unquote(match[2] ?? match[1]).toLowerCase());
+      if (!match) return null;
+      targets.add(unquote(match[2] ?? match[1]).toLowerCase());
       continue;
     }
+    let known = CATALOG_ONLY.test(text);
     for (const pattern of TARGET_PATTERNS) {
       const match = text.match(pattern);
       if (match) {
         targets.add(unquote(match[2] ?? match[1]).toLowerCase());
+        known = true;
         break;
       }
     }
+    if (!known) return null;
   }
   return targets;
 }
@@ -75,11 +84,7 @@ export function snapshotSelectSql(table: string, columns: { name: string; type: 
   return `SELECT ${list.length > 0 ? list.join(", ") : "*"} FROM main.${quoteIdent(table)}`;
 }
 
-function sqlString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
-
-export type RelationshipStatus = "accepted" | "inferred" | "rejected";
+type RelationshipStatus = "accepted" | "inferred" | "rejected";
 
 /**
  * SQL that (re)publishes the inferred join graph inside DuckDB so it can be queried:

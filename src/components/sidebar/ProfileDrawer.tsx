@@ -27,7 +27,7 @@ function Meter({ fraction, className }: { fraction: number; className: string })
   );
 }
 
-function ColumnCard({ column, rowCount }: { column: ColumnProfile; rowCount: number }) {
+export function ColumnCard({ column, rowCount }: { column: ColumnProfile; rowCount: number }) {
   const distinct = column.distinctCount;
   const unique = distinct !== null && rowCount > 0 && distinct === rowCount - column.nullCount && column.nullCount === 0;
   return (

@@ -23,7 +23,7 @@ test.describe("QueryPad", () => {
     await openWithSamples(page);
     await runSample(page);
     await expect(page.getByRole("columnheader", { name: /avg_salary/ })).toBeVisible();
-    await expect(page.getByText("Engineering")).toBeVisible();
+    await expect(page.getByRole("gridcell", { name: "Engineering" })).toBeVisible();
 
     await page.getByRole("button", { name: "History", exact: true }).click();
     await expect(page.getByText("SELECT d.dept_name").first()).toBeVisible();
@@ -34,9 +34,11 @@ test.describe("QueryPad", () => {
     await runSample(page);
     const firstCell = page.getByRole("row").nth(1).getByRole("gridcell").first();
 
-    await page.getByRole("columnheader", { name: /dept_name/ }).click();
+    // The header's name sorts; its stats block below is a separate button (opens the inspector).
+    const header = page.getByRole("columnheader", { name: /dept_name/ }).getByText("dept_name", { exact: true });
+    await header.click();
     await expect(firstCell).toHaveText("Design");
-    await page.getByRole("columnheader", { name: /dept_name/ }).click();
+    await header.click();
     await expect(firstCell).toHaveText("Sales");
 
     await page.getByLabel("Filter rows").fill("market");
@@ -128,7 +130,7 @@ test.describe("QueryPad", () => {
     await page.getByRole("button", { name: "New tab" }).click();
     await page.locator(".monaco-editor").click();
     await page.keyboard.type("SELECT 42 AS answer");
-    await page.waitForTimeout(800); // debounced save
+    await page.waitForTimeout(1400); // typing is saved after a longer debounce (and on page hide)
     await page.reload();
     await expect(page.getByRole("tab", { name: /Query 2/ })).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

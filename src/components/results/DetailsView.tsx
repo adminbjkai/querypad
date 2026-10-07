@@ -1,29 +1,37 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { QueryResult } from "@/types";
 import { copyText } from "@/lib/export/clipboard";
 import { toast } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
 import { KindGlyph, btn } from "@/components/ui/primitives";
+import { relativeTime } from "@/components/home/format";
 
 /** What produced the current result: SQL, timing, size and column types. */
 export default function DetailsView({ result, sql, at }: { result: QueryResult; sql: string; at: number }) {
   const truncated = result.rowCount > result.rows.length;
-  const summary: [string, string][] = [
-    ["Rows", result.rowCount.toLocaleString() + (truncated ? ` (showing ${result.rows.length.toLocaleString()})` : "")],
-    ["Columns", String(result.columns.length)],
-    ["Duration", `${result.executionTimeMs.toLocaleString()} ms`],
-    ["Run at", new Date(at).toLocaleString()],
+  // Ticks so "Last run" stays honest while the view is open.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const summary: { label: string; value: string; title?: string }[] = [
+    { label: "Rows", value: result.rowCount.toLocaleString() + (truncated ? ` (showing ${result.rows.length.toLocaleString()})` : "") },
+    { label: "Columns", value: result.columns.length.toLocaleString() },
+    { label: "Duration", value: `${result.executionTimeMs.toLocaleString()} ms` },
+    { label: "Last run", value: relativeTime(at, { now }), title: new Date(at).toLocaleString() },
   ];
 
   return (
     <div className="h-full overflow-auto bg-surface p-4">
-      <div className="max-w-3xl space-y-5">
-        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-4">
-          {summary.map(([label, value]) => (
+      <div className="space-y-5">
+        <dl className="grid gap-px overflow-hidden rounded-lg border border-line bg-line" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+          {summary.map(({ label, value, title }) => (
             <div key={label} className="bg-raised px-3 py-2">
-              <dt className="text-[11px] uppercase tracking-wide text-faint">{label}</dt>
-              <dd className="mt-0.5 truncate text-[13px] font-medium tabular-nums text-ink" title={value}>
+              <dt className="text-[11px] font-medium uppercase tracking-wide text-faint">{label}</dt>
+              <dd className="mt-0.5 truncate text-[13px] font-medium tabular-nums text-ink" title={title ?? value}>
                 {value}
               </dd>
             </div>

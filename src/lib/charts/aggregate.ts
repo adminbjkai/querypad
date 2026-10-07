@@ -1,5 +1,6 @@
 import type { QueryResult } from "@/types";
 import { columnShapes, type Aggregation, type ChartConfig, type DateBucket } from "./detect";
+import { toNumber } from "@/lib/discovery/numbers";
 
 export const MAX_SERIES = 12;
 const MAX_X_VALUES = 1000;
@@ -56,12 +57,6 @@ const newAcc = (agg: Aggregation): Acc => ({
   nn: 0, nums: 0, sum: 0, min: Infinity, max: -Infinity, first: null, set: agg === "distinct" ? new Set() : null,
 });
 
-export function toNumber(v: unknown): number | null {
-  if (typeof v === "number") return Number.isFinite(v) ? v : null;
-  if (typeof v === "bigint") return Number(v);
-  return null;
-}
-
 function add(acc: Acc, v: unknown) {
   if (v === null || v === undefined) return;
   acc.nn++;
@@ -97,7 +92,7 @@ function dateParts(v: unknown): [number, number, number] | null {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Start-of-bucket ISO date plus a display label. */
-export function bucketDate(v: unknown, bucket: DateBucket): { key: string; label: string } | null {
+function bucketDate(v: unknown, bucket: DateBucket): { key: string; label: string } | null {
   const parts = dateParts(v);
   if (!parts) return null;
   const [y, m, d] = parts;

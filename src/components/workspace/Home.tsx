@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/icons";
 import { btn } from "@/components/ui/primitives";
 import Composer, { askAssistant } from "@/components/home/Composer";
 import Onboarding from "@/components/home/Onboarding";
+import QuickActions from "@/components/home/QuickActions";
 import RecentTabs from "@/components/home/RecentTabs";
 import SemanticModel from "@/components/home/SemanticModel";
 import { greeting } from "@/components/home/format";
@@ -66,8 +67,8 @@ export default function Home() {
           </div>
           {hasData ? (
             <ul className="mt-4 flex flex-wrap justify-center gap-2" aria-label="Suggested questions">
-              {CHIPS.map((c) => (
-                <li key={c}>
+              {CHIPS.map((c, i) => (
+                <li key={c} className={i >= 2 ? "max-sm:hidden" : undefined}>
                   <button
                     onClick={() => askAssistant(c)}
                     className="rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] text-muted shadow-sm transition-colors hover:border-line-strong hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
@@ -91,7 +92,8 @@ export default function Home() {
 
         {hasData ? (
           <>
-            <dl aria-label="Workspace summary" className="mt-12 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line py-4 sm:grid-cols-4">
+            <QuickActions />
+            <dl aria-label="Workspace summary" className="mt-10 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line py-4 sm:grid-cols-4">
               <Stat label="Datasets" value={String(tables.length + views.length)} detail={views.length ? `${views.length} ${views.length === 1 ? "view" : "views"}` : undefined} />
               <Stat label="Rows" value={rows.toLocaleString()} />
               <Stat label="Relationships" value={String(relationships.length)} detail={`${accepted} accepted · ${relationships.length - accepted} to review`} />

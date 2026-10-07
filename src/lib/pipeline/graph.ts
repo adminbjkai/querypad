@@ -8,7 +8,7 @@ export interface AdjacencyList {
  * Build adjacency list from pipeline steps.
  * Detects references by checking if a step name appears as a word boundary in another step's SQL.
  */
-export function buildAdjacencyList(steps: PipelineStep[]): AdjacencyList {
+function buildAdjacencyList(steps: PipelineStep[]): AdjacencyList {
   const adj: AdjacencyList = {};
   for (const step of steps) {
     adj[step.id] = [];

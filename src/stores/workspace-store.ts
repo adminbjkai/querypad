@@ -23,6 +23,7 @@ import {
   type PersistedState,
   type SpaceMeta,
 } from "@/lib/persistence";
+import { indexEntryStale, snapshotKey } from "@/lib/persistence/snapshot";
 import { getConnection } from "@/lib/duckdb/instance";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
 import { relationshipKey } from "@/lib/discovery/relationships";
@@ -45,7 +46,7 @@ export interface HistoryEntry {
   error: string | null;
 }
 
-export interface ImportSummary {
+interface ImportSummary {
   added: string[];
   problems: { tone: "warning" | "error"; message: string }[];
 }
@@ -164,7 +165,7 @@ interface WorkspaceState {
    * Reconcile the sidebar with DuckDB's catalog after SQL changed it: new or modified
    * tables are snapshotted (so they persist), dropped ones removed, views refreshed.
    */
-  syncCatalog: (touched?: Set<string>) => Promise<void>;
+  syncCatalog: (touched?: Set<string> | null) => Promise<void>;
 
   // Relationship discovery + verification
   discovery: RelationshipDiscoveryState;
@@ -410,19 +411,33 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     return run;
   },
 
-  syncCatalog: async (touched = new Set()) => {
-    const { readCatalog, describeRelation, snapshotTable } = await import("@/lib/duckdb/catalog");
-    const catalog = await readCatalog();
+  syncCatalog: async (touched = new Set<string>()) => {
+    // `null` = a write we couldn't attribute (MERGE, EXECUTE …): check every table exactly.
+    const trusted = touched !== null;
+    const hit = touched ?? new Set<string>();
+    const { readCatalog, readCatalogSignatures, describeRelation, snapshotTable } = await import("@/lib/duckdb/catalog");
+    const [catalog, signatures] = await Promise.all([readCatalog(), readCatalogSignatures()]);
     const present = new Set(catalog.tables);
     const gone = get().tables.filter((t) => !present.has(t.name)).map((t) => t.name);
     if (gone.length > 0) set((state) => withoutTables(state, gone));
 
     for (const name of catalog.tables) {
       const known = get().tables.find((t) => t.name === name);
+      // One catalog query answers "untouched, same columns, same size" for most tables;
+      // only the rest pay for a DESCRIBE and an exact COUNT(*).
+      const quick = signatures.get(name);
+      const maybeChanged =
+        !trusted ||
+        !known ||
+        hit.has(name.toLowerCase()) ||
+        !quick ||
+        quick.signature !== columnSignature(known) ||
+        quick.estimatedRows !== known.rowCount;
+      if (!maybeChanged) continue;
       const info = await describeRelation(name);
       const changed =
         !known ||
-        touched.has(name.toLowerCase()) ||
+        hit.has(name.toLowerCase()) ||
         known.rowCount !== info.rowCount ||
         columnSignature(known) !== columnSignature(info);
       if (!changed) continue;
@@ -791,38 +806,62 @@ async function leaveRoom(): Promise<void> {
 }
 
 /** Load a saved space into DuckDB and the store. */
+let openGeneration = 0;
+
 async function openSpace(spaceId: string): Promise<void> {
   const store = useWorkspaceStore;
-  const persisted = await loadSpace(spaceId);
-  if (!persisted) return;
-
-  // Plugins first: a plugin may be the file loader for some saved files.
-  if (persisted.pluginUrls?.length) {
-    const { loadPluginFromUrl } = await import("@/lib/plugins/registry");
-    for (const url of persisted.pluginUrls) {
-      try {
-        const plugin = await loadPluginFromUrl(url);
-        store.setState((s) => ({
-          plugins: [...s.plugins.filter((p) => p.manifest.id !== plugin.manifest.id), plugin],
-        }));
-      } catch (err) {
-        console.error(`Failed to reload plugin from ${url}:`, err);
-      }
-    }
-  }
-
+  // Switching again while bytes are still arriving must not load the old space's
+  // tables into the new space's engine, nor publish the old tables afterwards.
+  const generation = ++openGeneration;
+  const stale = () => generation !== openGeneration;
   const { loadBufferAsTable } = await import("@/lib/duckdb/files");
-  const tables: TableInfo[] = [];
-  const fileEntries: FileEntry[] = [];
+  const restored = new Map<string, TableInfo | null>();
   const unrestoredFiles: { name: string; fileName: string }[] = [];
-  const loaded = new Set<string>();
-  for (const entry of persisted.fileEntries) {
+  // Plugins (a plugin may be the file loader for some saved files) are loaded before any
+  // table; file bytes are fetched in parallel and loaded into DuckDB as they arrive.
+  let pluginsReady: Promise<void> | null = null;
+  const pluginsLoaded = (urls: string[]) => {
+    pluginsReady ??= (async () => {
+      if (urls.length === 0) return;
+      const { loadPluginFromUrl } = await import("@/lib/plugins/registry");
+      for (const url of urls) {
+        try {
+          const plugin = await loadPluginFromUrl(url);
+          store.setState((s) => ({
+            plugins: [...s.plugins.filter((p) => p.manifest.id !== plugin.manifest.id), plugin],
+          }));
+        } catch (err) {
+          console.error(`Failed to reload plugin from ${url}:`, err);
+        }
+      }
+    })();
+    return pluginsReady;
+  };
+  const persisted = await loadSpace(spaceId, async (entry, state) => {
+    await pluginsLoaded(state.pluginUrls ?? []);
+    if (stale()) return;
     try {
-      tables.push(await loadBufferAsTable(entry.name, entry.fileName, new Uint8Array(entry.data)));
-      fileEntries.push(entry);
-      loaded.add(entry.name);
+      restored.set(entry.name, await loadBufferAsTable(entry.name, entry.fileName, new Uint8Array(entry.data)));
     } catch (err) {
       console.error(`Failed to restore ${entry.fileName}:`, err);
+      restored.set(entry.name, null);
+    }
+  });
+  if (!persisted || stale()) return;
+  await pluginsLoaded(persisted.pluginUrls ?? []);
+  if (stale()) return;
+
+  // Keep the saved order whatever order the bytes arrived in.
+  const tables: TableInfo[] = [];
+  const fileEntries: FileEntry[] = [];
+  const loaded = new Set<string>();
+  for (const entry of persisted.fileEntries) {
+    const table = restored.get(entry.name);
+    if (table) {
+      tables.push(table);
+      fileEntries.push(entry);
+      loaded.add(entry.name);
+    } else {
       unrestoredFiles.push({ name: entry.name, fileName: entry.fileName });
     }
   }
@@ -865,6 +904,7 @@ async function openSpace(spaceId: string): Promise<void> {
     aiThread: pt.aiThread ?? [],
   }));
 
+  if (stale()) return;
   store.setState({
     tables,
     views,
@@ -887,6 +927,7 @@ async function openSpace(spaceId: string): Promise<void> {
     relationshipVerdicts: persisted.relationshipVerdicts ?? {},
     relationshipOverrides: persisted.relationshipOverrides ?? [],
   });
+  markSaved(spaceId);
 }
 
 /** Profile one table and record the outcome in the store. */
@@ -923,6 +964,8 @@ async function buildProfile(name: string): Promise<TableProfile | null> {
 // the space that was active when the change happened.
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+const SAVE_DEBOUNCE_MS = 400;
+const TYPING_DEBOUNCE_MS = 1200;
 /** Counts local edits, so a pull can tell if one happened while it was fetching. */
 let localEdits = 0;
 let pendingSave: (() => Promise<void>) | null = null;
@@ -944,15 +987,33 @@ function snapshotState(): PersistedState {
   };
 }
 
-/** Write the state record and refresh the space's entry (updated time, table count). */
+/** What each space's record last looked like when written or loaded; identical states aren't re-sent. */
+const lastSaved = new Map<string, string>();
+
+/** Remember the open space's current record as already saved (after loading or pulling it). */
+function markSaved(spaceId: string): void {
+  lastSaved.set(spaceId, snapshotKey(snapshotState()));
+}
+
+/**
+ * Write the state record if it changed, then refresh the space's entry (updated time,
+ * table count) when that entry would differ — not after every keystroke batch.
+ */
 async function saveStateNow(spaceId: string, force = false): Promise<void> {
   // A debounced save that fires mid-switch must not write another space's state.
   const current = useWorkspaceStore.getState();
   if (!force && (current.spaceId !== spaceId || !current._hydrated || !current.persistEnabled)) return;
-  await saveSpaceState(spaceId, snapshotState());
+  const snapshot = snapshotState();
+  const key = snapshotKey(snapshot);
+  if (!force && lastSaved.get(spaceId) === key) return;
+  await saveSpaceState(spaceId, snapshot);
+  lastSaved.set(spaceId, key);
   const tableCount = useWorkspaceStore.getState().tables.length;
+  const now = Date.now();
+  const meta = useWorkspaceStore.getState().spaces.find((sp) => sp.id === spaceId);
+  if (!force && !indexEntryStale(meta, tableCount, now)) return;
   useWorkspaceStore.setState((s) => ({
-    spaces: s.spaces.map((sp) => (sp.id === spaceId ? { ...sp, updatedAt: Date.now(), tableCount } : sp)),
+    spaces: s.spaces.map((sp) => (sp.id === spaceId ? { ...sp, updatedAt: now, tableCount } : sp)),
   }));
   const { spaceId: activeId, spaces } = useWorkspaceStore.getState();
   await saveSpaceIndex({ activeId, spaces });
@@ -996,12 +1057,11 @@ useWorkspaceStore.subscribe((state, prev) => {
     deleteSpaceFiles(spaceId, [...prevByName.keys()].filter((n) => !nextNames.has(n))).catch(console.error);
   }
 
-  if (
+  const otherChanged =
     state.fileEntries !== prev.fileEntries ||
     state.unrestoredFiles !== prev.unrestoredFiles ||
     state.unrestoredViews !== prev.unrestoredViews ||
     state.views !== prev.views ||
-    state.tabs !== prev.tabs ||
     state.activeTabId !== prev.activeTabId ||
     state.history !== prev.history ||
     state.pipelines !== prev.pipelines ||
@@ -1009,12 +1069,14 @@ useWorkspaceStore.subscribe((state, prev) => {
     state.viewMode !== prev.viewMode ||
     state.plugins !== prev.plugins ||
     state.relationshipVerdicts !== prev.relationshipVerdicts ||
-    state.relationshipOverrides !== prev.relationshipOverrides
-  ) {
+    state.relationshipOverrides !== prev.relationshipOverrides;
+  if (otherChanged || state.tabs !== prev.tabs) {
     localEdits += 1;
     if (saveTimer) clearTimeout(saveTimer);
     pendingSave = () => saveStateNow(spaceId).catch(console.error);
-    saveTimer = setTimeout(() => void flushPendingSave(), 400);
+    // Tab-only changes are mostly typing (or results, which aren't saved): wait longer
+    // between keystrokes; saveStateNow still skips the write when nothing persisted changed.
+    saveTimer = setTimeout(() => void flushPendingSave(), otherChanged ? SAVE_DEBOUNCE_MS : TYPING_DEBOUNCE_MS);
   }
 });
 
@@ -1069,6 +1131,7 @@ function applyRemoteState(remote: PersistedState): void {
       relationshipVerdicts: remote.relationshipVerdicts ?? {},
       relationshipOverrides: remote.relationshipOverrides ?? [],
     });
+    if (s.spaceId) markSaved(s.spaceId);
   } finally {
     applyingRemote = false;
   }
@@ -1164,6 +1227,12 @@ if (typeof window !== "undefined") {
   setTimeout(tick, SYNC_ACTIVE_MS);
   document.addEventListener("visibilitychange", pull);
   window.addEventListener("focus", pull);
+  // A reload or tab close inside the typing debounce must not lose the last edit.
+  const flushOnHide = () => {
+    if (document.visibilityState === "hidden") void flushPendingSave();
+  };
+  document.addEventListener("visibilitychange", flushOnHide);
+  window.addEventListener("pagehide", () => void flushPendingSave());
 }
 
 // Publish the join graph inside DuckDB (querypad.relationships / querypad.keys) so it

@@ -14,6 +14,7 @@ export default function PageHeader() {
   const router = useRouter();
   const isSharedPage = usePathname() === "/shared";
   const page = useUiStore((s) => s.workspacePage);
+  const tablePage = useUiStore((s) => s.tablePage);
   const viewMode = useWorkspaceStore((s) => s.viewMode);
   const spaceName = useWorkspaceStore((s) => s.spaces.find((sp) => sp.id === s.spaceId)?.name);
   const hasTables = useWorkspaceStore((s) => s.tables.length > 0);
@@ -23,15 +24,29 @@ export default function PageHeader() {
   const setDialog = useUiStore((s) => s.setDialog);
   const toast = useUiStore((s) => s.toast);
 
-  const title = page === "home" ? "Home" : viewMode === "sql" ? "SQL" : "Pipelines";
+  const title = page === "home" ? "Home" : page === "table" ? (tablePage ?? "Table") : viewMode === "sql" ? "SQL" : "Pipelines";
   const space = isSharedPage ? "Shared link" : (spaceName ?? "Space");
+  const crumb = "truncate rounded text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+  const openTablesPanel = () => {
+    const ui = useUiStore.getState();
+    ui.setWorkspacePage("workbench");
+    ui.showPanel("tables");
+  };
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-3 sm:px-4">
       <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
-        <span className="truncate text-muted" title={space}>{space}</span>
+        {page === "table" ? (
+          <>
+            <button onClick={() => useUiStore.getState().setWorkspacePage("home")} className={`${crumb} max-sm:hidden`} title={space}>{space}</button>
+            <Icon name="chevronRight" size={13} className="text-faint max-sm:hidden" />
+            <button onClick={openTablesPanel} className={crumb} aria-label="All tables" title="Open the Tables panel">Tables</button>
+          </>
+        ) : (
+          <span className="truncate text-muted" title={space}>{space}</span>
+        )}
         <Icon name="chevronRight" size={13} className="text-faint" />
-        <span className="shrink-0 font-semibold text-ink" aria-current="page">{title}</span>
+        <span className={`font-semibold text-ink ${page === "table" ? "min-w-0 truncate font-mono" : "shrink-0"}`} aria-current="page">{title}</span>
       </nav>
 
       {isSharedPage && !persistEnabled && (
@@ -54,19 +69,24 @@ export default function PageHeader() {
           <RoomBar />
         ) : (
           !isSharedPage && (
-            <button onClick={() => setDialog("collaborate")} className={`${btn.ghost} max-md:hidden`}>
+            <button onClick={() => setDialog("collaborate")} className={`${btn.ghost} max-md:hidden`} aria-label="Collaborate" title="Collaborate">
               <Icon name="users" size={15} />
               Collaborate
             </button>
           )
         )}
-        <button onClick={() => void shareWorkspace()} className={btn.secondary} disabled={!hasTables} aria-label="Share">
+        <button onClick={() => void shareWorkspace()} className={btn.secondary} disabled={!hasTables} aria-label="Share" title="Share">
           <Icon name="link" size={15} />
           <span className="max-sm:hidden">Share</span>
         </button>
         {!isSharedPage && (
           <button
-            onClick={() => useUiStore.getState().setAssistantOpen(!assistantOpen)}
+            onClick={() => {
+              const ui = useUiStore.getState();
+              // On phones the side panel floats over the page; close it before showing the Assistant.
+              if (!assistantOpen && ui.sidebarOpen && window.innerWidth < 768) ui.setSidebarOpen(false);
+              ui.setAssistantOpen(!assistantOpen);
+            }}
             className={`${btn.secondary} ${assistantOpen ? "border-accent/40 bg-accent-soft text-accent hover:bg-accent-soft" : ""}`}
             aria-pressed={assistantOpen}
             aria-label="Assistant"

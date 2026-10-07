@@ -1,4 +1,4 @@
-import { AiHttpError, streamComplete, type ChatTurn } from "@/lib/ai/complete";
+import { AiHttpError, DEFAULT_MAX_TOKENS, streamComplete, type ChatTurn } from "@/lib/ai/complete";
 import { AI_PROVIDER_IDS, getAiProviderConfig, isAiProvider, type AiEffort, type AiProvider } from "@/lib/ai/providers";
 import { availableBridgeModels, streamFromBridge } from "@/lib/ai/local-bridge";
 
@@ -8,7 +8,6 @@ export const dynamic = "force-dynamic";
 
 const MAX_PROMPT_CHARS = 200_000;
 const MAX_TOKENS_LIMIT = 4096;
-const DEFAULT_MAX_TOKENS = 1024;
 const MAX_HISTORY_TURNS = 40;
 
 function serverKey(provider: AiProvider): string | undefined {

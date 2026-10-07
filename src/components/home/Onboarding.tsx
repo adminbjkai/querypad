@@ -7,7 +7,7 @@ import { useUiStore } from "@/stores/ui-store";
 import DropTarget from "@/components/dropzone/DropTarget";
 import UrlInput from "@/components/dropzone/UrlInput";
 import { Icon, type IconName } from "@/components/ui/icons";
-import { Spinner, btn } from "@/components/ui/primitives";
+import { SectionLabel, Spinner, btn } from "@/components/ui/primitives";
 import { relativeTime } from "./format";
 
 const STEPS: [IconName, string, string][] = [
@@ -15,10 +15,6 @@ const STEPS: [IconName, string, string][] = [
   ["join", "Connect", "Join keys between your files, found and scored."],
   ["sparkle", "Ask", "Write SQL, or describe what you want and let AI draft it."],
 ];
-
-function SectionLabel({ children }: { children: string }) {
-  return <h2 className="px-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-faint">{children}</h2>;
-}
 
 function IconTile({ name }: { name: IconName }) {
   return (
@@ -90,7 +86,7 @@ export default function Onboarding() {
         <div className="mt-9 grid gap-6 md:grid-cols-2">
           {recent.length > 0 && (
             <section aria-label="Recent spaces">
-              <SectionLabel>Recent spaces</SectionLabel>
+              <SectionLabel className="px-1 pb-1.5">Recent spaces</SectionLabel>
               <ul className="overflow-hidden rounded-lg border border-line">
                 {recent.map((s) => (
                   <li key={s.id} className="border-b border-line last:border-b-0">
@@ -109,7 +105,7 @@ export default function Onboarding() {
           )}
           {topSnippets.length > 0 && (
             <section aria-label="Saved snippets">
-              <SectionLabel>Snippets</SectionLabel>
+              <SectionLabel className="px-1 pb-1.5">Snippets</SectionLabel>
               <ul className="overflow-hidden rounded-lg border border-line">
                 {topSnippets.map((sn) => (
                   <li key={sn.id} className="border-b border-line last:border-b-0">

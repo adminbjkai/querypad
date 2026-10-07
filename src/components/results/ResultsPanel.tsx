@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useShallow } from "zustand/react/shallow";
 import dynamic from "next/dynamic";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -38,22 +39,36 @@ const readStats = () => {
 
 type View = "table" | "chart" | "details" | string;
 
+const EMPTY_VIEW = { result: null, view: "table" as View, filter: "", chart: null, inspectCol: null };
+
+/** Focusable id of the error card, so the status bar can bring it into view. */
+export const RESULTS_ERROR_ID = "results-error";
+
 export default function ResultsPanel() {
-  const tab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
+  // Only the fields this panel renders, as primitives/stable references: the active tab object changes on
+  // every keystroke in the editor (its `query` lives in the same record), which must not re-render the grid.
+  const { result, error, isExecuting, sql } = useWorkspaceStore(
+    useShallow((s) => {
+      const tab = s.tabs.find((t) => t.id === s.activeTabId);
+      return {
+        result: tab?.result ?? null,
+        error: tab?.error ?? null,
+        isExecuting: tab?.isExecuting ?? false,
+        sql: tab?.lastRunSql ?? "",
+      };
+    })
+  );
   const plugins = useWorkspaceStore((s) => s.plugins);
   const openAi = useUiStore((s) => s.openAi);
-  const result = tab?.result ?? null;
   // Header distributions: an explicit choice is remembered, otherwise on for results of up to 50 columns.
   const statsPref = useSyncExternalStore(subscribeStats, readStats, () => null);
   const showStats = statsPref === null ? (result?.columns.length ?? 0) <= 50 : statsPref === "1";
-  const toggleStats = () => {
+  const toggleStats = useCallback(() => {
     try {
       localStorage.setItem(STATS_KEY, showStats ? "0" : "1");
     } catch {}
     window.dispatchEvent(new Event(STATS_EVENT));
-  };
-  const error = tab?.error ?? null;
-  const isExecuting = tab?.isExecuting ?? false;
+  }, [showStats]);
 
   // View/filter/chart choices reset whenever a new result arrives.
   const [viewState, setViewState] = useState<{
@@ -62,11 +77,22 @@ export default function ResultsPanel() {
     filter: string;
     chart: ChartConfig | null;
     inspectCol: string | null;
-  }>({ result: null, view: "table", filter: "", chart: null, inspectCol: null });
-  const current = viewState.result === result ? viewState : { result, view: "table", filter: "", chart: null, inspectCol: null };
-  const patch = (next: Partial<typeof viewState>) => setViewState({ ...current, ...next, result });
+  }>(EMPTY_VIEW);
+  const current = viewState.result === result ? viewState : { ...EMPTY_VIEW, result };
+  const patch = useCallback(
+    (next: Partial<typeof viewState>) => setViewState((v) => ({ ...(v.result === result ? v : EMPTY_VIEW), ...next, result })),
+    [result]
+  );
   // The inspector drawer stays open across re-runs; its column falls back to the first one.
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const inspect = useCallback(
+    (column: string) => {
+      setInspectorOpen(true);
+      patch({ inspectCol: column });
+    },
+    [patch]
+  );
+  const followSelection = useCallback((column: string) => inspectorOpen && patch({ inspectCol: column }), [inspectorOpen, patch]);
   const inspectedColumn =
     result && inspectorOpen ? (current.inspectCol && result.columns.includes(current.inspectCol) ? current.inspectCol : result.columns[0] ?? null) : null;
 
@@ -93,7 +119,11 @@ export default function ResultsPanel() {
   if (error && !isExecuting) {
     return (
       <div className="h-full overflow-auto bg-surface p-4" role="alert">
-        <div className="max-w-3xl rounded-lg border border-danger/40 bg-danger-soft/50 p-4">
+        <div
+          id={RESULTS_ERROR_ID}
+          tabIndex={-1}
+          className="max-w-3xl rounded-lg border border-danger/40 bg-danger-soft/50 p-4 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
           <p className="flex items-center gap-2 text-[13px] font-semibold text-danger">
             <Icon name="alert" size={15} />
             The query failed
@@ -125,7 +155,7 @@ export default function ResultsPanel() {
             </span>
             <p className="font-semibold text-ink">Your query results will appear here</p>
             <p className="mt-1">Explore your data with SQL, then sort, filter, inspect and export the result.</p>
-            <p className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+            <p className="mt-3 flex items-center justify-center gap-1.5 whitespace-nowrap">
               Run with <Kbd>{MOD}</Kbd> <Kbd>Enter</Kbd>
               <span aria-hidden="true" className="mx-1 text-faint">·</span>
               Ask AI with <Kbd>{MOD}</Kbd> <Kbd>K</Kbd>
@@ -154,12 +184,7 @@ export default function ResultsPanel() {
       {current.view === view && <span aria-hidden="true" className="absolute inset-x-2 bottom-0 h-0.5 rounded-t-sm bg-accent" />}
     </button>
   );
-  const inspect = (column: string) => {
-    setInspectorOpen(true);
-    patch({ inspectCol: column });
-  };
   const showTable = !(current.view === "chart" && chartConfig) && !activePlugin && current.view !== "details";
-  const sql = tab?.lastRunSql ?? tab?.query ?? "";
 
   return (
     <div className="relative flex h-full flex-col bg-surface">
@@ -192,40 +217,42 @@ export default function ResultsPanel() {
         </p>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {current.view === "table" && (
-            <label className="relative">
-              <Icon name="filter" size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-faint" />
+            // A search icon at rest; focusing it (or typing) expands the field in place, Snowsight-style.
+            <label className="relative" title="Filter rows">
+              <Icon
+                name="search"
+                size={14}
+                className={`pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 ${current.filter ? "text-accent" : "text-muted"}`}
+              />
               <input
                 value={current.filter}
                 onChange={(e) => patch({ filter: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && current.filter) {
+                    e.stopPropagation();
+                    patch({ filter: "" });
+                  }
+                }}
                 placeholder="Filter rows"
-                className="h-7 w-28 rounded-md border border-line bg-raised pl-7 pr-2 text-[12px] text-ink outline-none placeholder:text-faint transition-[width] focus:w-44 focus:border-accent sm:w-36"
+                className={`h-7 rounded-md border pl-7 text-[12px] text-ink outline-none transition-[width,background-color,border-color] placeholder:text-faint focus:w-44 focus:cursor-text focus:border-accent focus:bg-raised focus:pr-2 ${
+                  current.filter ? "w-44 border-line bg-raised pr-2" : "w-7 cursor-pointer border-transparent bg-transparent pr-0 hover:bg-sunken"
+                }`}
                 aria-label="Filter rows"
               />
             </label>
           )}
           {current.view === "table" && result.columns.length > 0 && (
             <button
-              onClick={toggleStats}
-              aria-pressed={showStats}
-              aria-label="Show column stats"
-              title="Show column stats"
-              className={`${btn.icon} ${showStats ? "bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent" : ""}`}
-            >
-              <Icon name="profile" size={15} />
-            </button>
-          )}
-          {current.view === "table" && result.columns.length > 0 && (
-            <button
               onClick={() => (inspectorOpen ? setInspectorOpen(false) : inspect(current.inspectCol ?? result.columns[0]))}
               aria-pressed={inspectorOpen}
               aria-label="Column inspector"
-              title="Column inspector"
+              title={inspectorOpen ? "Hide column inspector" : "Show column inspector"}
               className={`${btn.icon} ${inspectorOpen ? "bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent" : ""}`}
             >
               <Icon name="panelRight" size={15} />
             </button>
           )}
-          <ExportMenu result={result} query={tab?.lastRunSql ?? tab?.query ?? ""} />
+          <ExportMenu result={result} query={sql} />
         </div>
       </div>
       <div className={`flex min-h-0 flex-1 transition-opacity ${isExecuting ? "opacity-50" : ""}`}>
@@ -243,8 +270,9 @@ export default function ResultsPanel() {
               filter={current.filter}
               inspectedColumn={inspectedColumn}
               showStats={showStats}
+              onToggleStats={toggleStats}
               onInspect={inspect}
-              onSelectColumn={(column) => inspectorOpen && patch({ inspectCol: column })}
+              onSelectColumn={followSelection}
             />
           )}
         </div>

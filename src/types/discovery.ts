@@ -1,7 +1,7 @@
 import type { TableProfile } from "./index";
 
 /** One endpoint of a relationship: a specific column in a specific table. */
-export interface ColumnRef {
+interface ColumnRef {
   table: string;
   column: string;
 }
@@ -19,7 +19,7 @@ export interface RelationshipSignals {
 }
 
 /** Cardinality of the relationship as observed in the data. */
-export type RelationshipCardinality = "one-to-one" | "many-to-one";
+type RelationshipCardinality = "one-to-one" | "many-to-one";
 
 /**
  * A directed foreign-key style relationship: `from` (the foreign column) references

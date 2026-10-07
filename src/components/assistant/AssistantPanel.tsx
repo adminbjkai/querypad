@@ -3,6 +3,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useAssistantStore, type AssistantMessage, type AssistantRun } from "@/stores/assistant-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useShallow } from "zustand/react/shallow";
 import { useUiStore, toast } from "@/stores/ui-store";
 import { copyText } from "@/lib/export/clipboard";
 import ModelPicker from "@/components/ai/ModelPicker";
@@ -226,7 +227,14 @@ export default function AssistantPanel() {
   const spaceId = useWorkspaceStore((s) => s.spaceId);
   const tableCount = useWorkspaceStore((s) => s.tables.length + s.views.length);
   const width = useUiStore((s) => s.assistantWidth);
-  const activeTab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
+  // Booleans only: the tab object itself is new on every keystroke/result, so selecting it
+  // would re-render the whole panel each time.
+  const activeTab = useWorkspaceStore(
+    useShallow((s) => {
+      const tab = s.tabs.find((t) => t.id === s.activeTabId);
+      return { hasQuery: !!tab?.query.trim(), hasError: !!tab?.error, hasResult: !!tab?.result };
+    })
+  );
   const [text, setText] = useState("");
   const [hasNewContent, setHasNewContent] = useState(false);
   const [showChats, setShowChats] = useState(false);
@@ -305,7 +313,7 @@ export default function AssistantPanel() {
   return (
     <aside
       style={{ width }}
-      className="relative flex h-full shrink-0 flex-col border-l border-line bg-surface max-md:fixed max-md:top-20 max-md:bottom-6 max-md:right-0 max-md:z-30 max-md:h-auto max-md:!w-full"
+      className="relative flex h-full min-w-0 flex-col border-l border-line bg-surface max-md:fixed max-md:top-20 max-md:bottom-6 max-md:right-0 max-md:z-30 max-md:h-auto max-md:!w-full"
       aria-label="Assistant"
     >
       <ResizeHandle />
@@ -399,10 +407,10 @@ export default function AssistantPanel() {
           {!busy && visible.length > 0 && (
             <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Quick questions">
               {[
-                activeTab?.query.trim() && "Explain the query in the editor",
-                activeTab?.error && "Why did my query fail?",
-                activeTab?.result && "Summarize this result",
-                activeTab?.result && "What chart fits this result?",
+                activeTab.hasQuery && "Explain the query in the editor",
+                activeTab.hasError && "Why did my query fail?",
+                activeTab.hasResult && "Summarize this result",
+                activeTab.hasResult && "What chart fits this result?",
                 "Any data quality issues?",
               ]
                 .filter((q): q is string => !!q)

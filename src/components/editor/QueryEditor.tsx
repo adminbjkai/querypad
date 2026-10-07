@@ -38,10 +38,25 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ),
 });
 
-// Completion provider is registered once per page; it always reads current tables.
+// Completion provider is registered once per page (module-level flag: the editor remounts per
+// tab via `key`, but Monaco's provider registry is global); it always reads current tables.
 let completionRegistered = false;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+/**
+ * Close Monaco's hover card. Monaco leaves it painted when the editor loses focus mid-hover
+ * (clicking Run, results, the Assistant) and the half-faded card then sits under the editor
+ * line until the next mouse move, so we dismiss it on blur and before every run.
+ */
+function hideHover(editor: any) {
+  const content = editor.getContribution?.("editor.contrib.contentHover");
+  if (typeof content?.hideContentHover === "function") content.hideContentHover();
+  // Older Monaco builds expose the combined controller instead.
+  const legacy = editor.getContribution?.("editor.contrib.hover");
+  if (typeof legacy?.hide === "function") legacy.hide();
+}
+
 export default function QueryEditor() {
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
   const query = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId)?.query ?? "");
@@ -96,13 +111,17 @@ export default function QueryEditor() {
       });
     });
     monaco.editor.setTheme(useUiStore.getState().theme === "dark" ? "qp-dark" : "qp-light");
+    mounted.onDidBlurEditorWidget(() => hideHover(mounted));
 
     // Actions read live state through stores, so they never run a stale query.
     editor.addAction({
       id: "querypad.run",
       label: "Run query (selection or all)",
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-      run: () => runActive(),
+      run: () => {
+        hideHover(editor);
+        runActive();
+      },
     });
     editor.addAction({
       id: "querypad.ai",

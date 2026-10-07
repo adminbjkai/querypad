@@ -12,7 +12,7 @@ export default function PipelineResults({ stepName, result }: { stepName: string
           <Icon name="table" size={18} />
         </span>
         <p className="text-[14px] font-medium text-ink">No results yet</p>
-        <p className="text-[13px] text-muted">Run the pipeline, then pick a step to see its rows.</p>
+        <p className="max-w-xs text-balance text-[13px] text-muted">Run the pipeline, then pick a step to see its rows.</p>
       </div>
     );
   }

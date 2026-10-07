@@ -60,9 +60,11 @@ export default function PipelineView() {
   const selected = pipeline?.steps.find((s) => s.id === selectedStepId);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // `@container`: below 720px of content width the steps, graph and results stack vertically
+    // instead of degrading into three slivers (narrow windows, side panel + Assistant open).
+    <div className="@container flex min-h-0 min-w-[320px] flex-1 flex-col">
       <div className="flex h-9 shrink-0 items-stretch border-b border-line bg-chrome">
-        <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto" role="tablist" aria-label="Pipelines">
+        <div className="qp-tabstrip flex min-w-0 flex-1 items-stretch" role="tablist" aria-label="Pipelines">
           {pipelines.map((p) => {
             const active = p.id === activePipelineId;
             return (
@@ -73,19 +75,19 @@ export default function PipelineView() {
                 tabIndex={0}
                 onClick={() => setActivePipeline(p.id)}
                 onKeyDown={(e) => e.key === "Enter" && setActivePipeline(p.id)}
-                className={`group relative flex shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-3 text-[13px] ${
+                className={`group relative flex min-w-[88px] max-w-[180px] shrink cursor-pointer items-center gap-1.5 border-r border-line px-3 text-[13px] ${
                   active ? "bg-surface text-ink" : "text-muted transition-colors hover:bg-sunken hover:text-ink"
                 }`}
               >
                 {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-accent" />}
-                <span className="max-w-[140px] truncate">{p.title}</span>
+                <span className="min-w-0 flex-1 truncate">{p.title}</span>
                 {pipelines.length > 1 && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       removePipeline(p.id);
                     }}
-                    className="rounded p-0.5 text-faint opacity-0 hover:text-ink group-hover:opacity-100"
+                    className="shrink-0 rounded p-0.5 text-faint opacity-0 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
                     aria-label={`Delete ${p.title}`}
                   >
                     <Icon name="x" size={12} />
@@ -98,17 +100,17 @@ export default function PipelineView() {
             <Icon name="plus" size={15} />
           </button>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 px-2">
+        <div className="flex shrink-0 items-center gap-1.5 border-l border-line bg-chrome px-2">
           {conflicts.length > 0 && (
-            <span className="rounded bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn" title="A step with a table's name replaces that table for later steps">
+            <span className="hidden max-w-[200px] truncate rounded bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn @min-[720px]:inline" title="A step with a table's name replaces that table for later steps">
               Shadows table: {conflicts.join(", ")}
             </span>
           )}
           {pipeline && (
             <>
-              <button onClick={() => addStep(pipeline.id)} className={btn.ghost}>
+              <button onClick={() => addStep(pipeline.id)} className={btn.ghost} aria-label="Add step" title="Add a step">
                 <Icon name="plus" size={14} />
-                Step
+                <span className="hidden @min-[480px]:inline">Step</span>
               </button>
               <button onClick={() => void run()} disabled={running || pipeline.steps.length === 0} className={btn.primary}>
                 {running ? <Spinner className="size-3" /> : <Icon name="play" size={13} className="fill-current" />}
@@ -125,22 +127,24 @@ export default function PipelineView() {
             <Icon name="flow" size={18} />
           </span>
           <p className="text-[14px] font-medium text-ink">No pipeline</p>
-          <p className="text-[13px] text-muted">Create a pipeline to chain SQL steps.</p>
+          <p className="max-w-xs text-balance text-[13px] text-muted">Create a pipeline to chain SQL steps.</p>
           <button onClick={addPipeline} className={`${btn.primary} mt-2`}>
             <Icon name="plus" size={14} />
             New pipeline
           </button>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <div className="flex w-full shrink-0 flex-col gap-2.5 overflow-y-auto border-b border-line bg-chrome p-3 md:w-[340px] md:border-b-0 md:border-r">
+        <div className="flex min-h-0 flex-1 flex-col @min-[720px]:flex-row">
+          <div className="flex max-h-[45%] w-full shrink-0 flex-col gap-2.5 overflow-y-auto border-b border-line bg-chrome p-3 @min-[720px]:max-h-none @min-[720px]:w-[340px] @min-[720px]:border-b-0 @min-[720px]:border-r">
             {pipeline.steps.length === 0 ? (
               <div className="rounded-lg border border-dashed border-line-strong bg-surface p-4 text-[13px] leading-5 text-muted">
                 <span className="mb-2 flex size-9 items-center justify-center rounded-lg border border-line bg-raised text-muted">
                   <Icon name="flow" size={18} />
                 </span>
                 <p className="text-[14px] font-medium text-ink">No steps yet</p>
-                Each step is a SQL query saved as a temporary table named after the step. Later steps can select from earlier ones by name.
+                <span className="block text-balance">
+                  Each step is a SQL query saved as a temporary table named after the step. Later steps can select from earlier ones by name.
+                </span>
                 <button onClick={() => addStep(pipeline.id)} className={`${btn.secondary} mt-3`}>
                   <Icon name="plus" size={14} />
                   Add the first step
@@ -162,7 +166,7 @@ export default function PipelineView() {
             )}
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="h-1/2 min-h-[160px] border-b border-line bg-surface">
+            <div className="h-[200px] shrink-0 border-b border-line bg-surface @min-[720px]:h-1/2 @min-[720px]:min-h-[160px]">
               <PipelineDag steps={pipeline.steps} results={results} selectedStepId={selectedStepId} onSelectStep={setSelectedStepId} />
             </div>
             <div className="min-h-0 flex-1">

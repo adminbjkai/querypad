@@ -5,7 +5,7 @@ import type { Relationship } from "../../types/discovery";
  * a relationship graph in, prose explanation out. No IO, no re-running discovery.
  */
 
-export interface ExplainedRelationship {
+interface ExplainedRelationship {
   relationship: Relationship;
   reasons: string[];
 }

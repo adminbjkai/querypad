@@ -11,7 +11,6 @@ import { useAiStore } from "@/stores/ai-store";
 import { useUiStore } from "@/stores/ui-store";
 import { importAndReport } from "@/lib/import";
 import { runActive } from "@/lib/workspace-actions";
-import { readPreference, writePreference } from "@/lib/preferences";
 import NavRail from "./NavRail";
 import PageHeader from "./PageHeader";
 import StatusBar from "./StatusBar";
@@ -24,6 +23,7 @@ import { btn } from "@/components/ui/primitives";
 
 const PipelineView = dynamic(() => import("@/components/pipeline/PipelineView"), { ssr: false });
 const Home = dynamic(() => import("./Home"), { ssr: false });
+const TablePage = dynamic(() => import("./TablePage"), { ssr: false });
 const CommandPalette = dynamic(() => import("./CommandPalette"), { ssr: false });
 const AddFilesDialog = dynamic(() => import("@/components/dropzone/AddFilesDialog"), { ssr: false });
 const CollaborateDialog = dynamic(() => import("@/components/collaboration/CollaborateDialog"), { ssr: false });
@@ -33,8 +33,6 @@ const ClearSpaceDialog = dynamic(() => import("./ClearSpaceDialog"), { ssr: fals
 const SnippetDialog = dynamic(() => import("@/components/editor/SnippetDialog"), { ssr: false });
 const AssistantPanel = dynamic(() => import("@/components/assistant/AssistantPanel"), { ssr: false });
 const AssistantRail = dynamic(() => import("@/components/assistant/AssistantPanel").then((m) => m.AssistantRail), { ssr: false });
-
-const WELCOME_KEY = "querypad:welcome-dismissed";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -63,9 +61,7 @@ export default function Workspace() {
   const isSharedPage = usePathname() === "/shared";
   const [dbError, setDbError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [welcomeDismissed, setWelcomeDismissed] = useState(
-    () => typeof window !== "undefined" && readPreference(WELCOME_KEY) === "1"
-  );
+  const sampleHintDismissed = useUiStore((s) => !!spaceId && s.dismissedSampleHints.includes(spaceId));
   const initStarted = useRef(false);
   const roomJoinAttempted = useRef(false);
   const dragDepth = useRef(0);
@@ -107,7 +103,7 @@ export default function Workspace() {
   }, [hydrated, isSharedPage]);
 
   // An empty space shows Home (where data is added); data arriving — added, or by switching away
-  // from an empty space — opens the workbench.
+  // from an empty space — opens the workbench. A table page never outlives its space.
   const seenData = useRef<{ space: string | null; count: number } | null>(null);
   useEffect(() => {
     if (!hydrated) return;
@@ -120,6 +116,8 @@ export default function Workspace() {
       setPage("workbench");
     } else if (dataCount === 0 && (prev.count > 0 || prev.space !== spaceId)) {
       setPage("home");
+    } else if (prev.space !== spaceId && useUiStore.getState().workspacePage === "table") {
+      setPage("workbench");
     }
   }, [hydrated, spaceId, dataCount]);
 
@@ -186,6 +184,8 @@ export default function Workspace() {
         void saveCurrentAsSnippet();
       } else if (mod && key === "i") {
         e.preventDefault();
+        // On phones the side panel floats over the page; close it so the Assistant is reachable.
+        if (!ui.assistantOpen && ui.sidebarOpen && window.innerWidth < 768) ui.setSidebarOpen(false);
         ui.setAssistantOpen(!ui.assistantOpen);
       } else if (mod && key === "b") {
         e.preventDefault();
@@ -220,37 +220,29 @@ export default function Workspace() {
       <div className="flex min-h-0 flex-1">
         <NavRail />
         {workspacePage === "workbench" && <Sidebar />}
-        <div className="relative flex min-w-0 flex-1 flex-col">
+        <div className="relative flex min-w-0 flex-1 flex-col md:min-w-[320px]">
           <PageHeader />
-          <main id="workspace-content" className="flex min-h-0 min-w-0 flex-1 flex-col" tabIndex={-1}>
-            {workspacePage === "home" ? <Home /> : viewMode === "sql" ? <SqlWorkbench /> : <PipelineView />}
-          </main>
-          {onlySampleTables && !welcomeDismissed && !isSharedPage && (
-            <div
-              role="note"
-              className="qp-pop absolute bottom-4 left-1/2 z-20 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface py-2 pl-3 pr-2 text-[13px] text-ink shadow-pop"
-            >
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
-                <Icon name="sparkle" size={14} />
-              </span>
-              <span className="min-w-0 max-w-md flex-1 basis-52">
+          {onlySampleTables && !sampleHintDismissed && !isSharedPage && (
+            <div role="note" className="flex h-9 shrink-0 items-center gap-2 border-b border-line bg-accent-soft px-3 text-[13px] text-ink sm:px-4">
+              <Icon name="sparkle" size={14} className="shrink-0 text-accent" />
+              <span className="min-w-0 flex-1 truncate">
                 You&apos;re exploring two sample tables. Drop your own files anywhere and they&apos;ll replace them.
               </span>
-              <button onClick={() => setDialog("addFiles")} className={`${btn.secondary} h-7 shrink-0`}>
+              <button onClick={() => setDialog("addFiles")} className={`${btn.ghost} h-7 shrink-0 text-accent hover:bg-surface`}>
                 Use my own data
               </button>
               <button
-                onClick={() => {
-                  setWelcomeDismissed(true);
-                  writePreference(WELCOME_KEY, "1");
-                }}
-                className={btn.icon}
+                onClick={() => spaceId && useUiStore.getState().dismissSampleHint(spaceId)}
+                className={`${btn.icon} size-6 shrink-0`}
                 aria-label="Dismiss"
               >
                 <Icon name="x" size={14} />
               </button>
             </div>
           )}
+          <main id="workspace-content" className="flex min-h-0 min-w-0 flex-1 flex-col" tabIndex={-1}>
+            {workspacePage === "home" ? <Home /> : workspacePage === "table" ? <TablePage /> : viewMode === "sql" ? <SqlWorkbench /> : <PipelineView />}
+          </main>
         </div>
         {!isSharedPage && (assistantOpen ? <AssistantPanel /> : <AssistantRail />)}
       </div>

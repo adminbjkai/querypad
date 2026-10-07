@@ -1,4 +1,5 @@
 import { formatValue } from "@/lib/utils";
+import { toNumber } from "@/lib/discovery/numbers";
 
 export interface RangeStats {
   cells: number;
@@ -11,12 +12,6 @@ export interface RangeStats {
   max: number | null;
   distinct: number;
 }
-
-const toNumber = (v: unknown): number | null => {
-  if (typeof v === "number") return Number.isFinite(v) ? v : null;
-  if (typeof v === "bigint") return Number(v);
-  return null;
-};
 
 /** Aggregate a rectangular range. Runs on demand only (selection changes), never during scroll. */
 export function computeRangeStats(

@@ -3,8 +3,7 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useSnippetStore } from "@/stores/snippet-store";
-import { useUiStore } from "@/stores/ui-store";
-import { openSnippet, previewTable } from "@/lib/workspace-actions";
+import { openSnippet, openTablePage, previewTable } from "@/lib/workspace-actions";
 import { Icon } from "@/components/ui/icons";
 import { btn, input } from "@/components/ui/primitives";
 import { relativeTime } from "./format";
@@ -59,7 +58,7 @@ function Datasets() {
             {catalog.map((t) => (
               <tr key={`${t.kind}:${t.name}`} className="hover:bg-raised/70">
                 <td className="max-w-52 px-4 py-2.5">
-                  <button onClick={() => previewTable(t.name)} className="flex max-w-full items-center gap-2.5 rounded text-left font-medium hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+                  <button onClick={() => openTablePage(t.name)} title="Open the table page" className="flex max-w-full items-center gap-2.5 rounded text-left font-medium hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><Icon name={t.kind === "View" ? "file" : "table"} size={15} /></span>
                     <span className="min-w-0">
                       <span className="block truncate" title={t.name}>{t.name}</span>
@@ -72,9 +71,7 @@ function Datasets() {
                 <td className="px-3 py-2.5">
                   <div className="flex justify-end gap-1">
                     <button className={btn.icon} aria-label={`Preview dataset ${t.name}`} title="Preview rows" onClick={() => previewTable(t.name)}><Icon name="play" size={14} /></button>
-                    {t.kind === "Table" && (
-                      <button className={btn.icon} aria-label={`Inspect dataset ${t.name}`} title="Column statistics" onClick={() => { useUiStore.getState().setWorkspacePage("workbench"); useUiStore.getState().showPanel("tables"); useUiStore.getState().setProfileTable(t.name); }}><Icon name="profile" size={15} /></button>
-                    )}
+                    <button className={btn.icon} aria-label={`Inspect dataset ${t.name}`} title="Columns, details and profile" onClick={() => openTablePage(t.name)}><Icon name="profile" size={15} /></button>
                   </div>
                 </td>
               </tr>

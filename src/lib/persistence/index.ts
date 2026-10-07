@@ -6,8 +6,6 @@ export type {
   FileEntry,
   LoadedSpace,
   PersistedState,
-  PersistedTab,
-  PersistedHistoryEntry,
   SpaceIndex,
   SpaceMeta,
 } from "./browser";
@@ -160,10 +158,13 @@ export async function saveSpaceIndex(index: SpaceIndex): Promise<void> {
 
 export async function saveSpaceState(spaceId: string, state: PersistedState): Promise<void> {
   if (!(await serverStorage())) return browser.saveSpaceState(spaceId, state);
+  const body = JSON.stringify(state);
   const { rev } = await request<{ rev: number }>(spaceUrl(spaceId), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(state),
+    body,
+    // Small writes survive page unload (keepalive bodies are capped at 64 KB).
+    keepalive: body.length < 60_000,
   });
   recordSpaceWrite(spaceId, rev);
 }
@@ -188,17 +189,40 @@ export async function deleteSpaceFiles(spaceId: string, names: string[]): Promis
   }
 }
 
-export async function loadSpace(spaceId: string): Promise<LoadedSpace | undefined> {
-  if (!(await serverStorage())) return browser.loadSpace(spaceId);
+/** Called with each saved file's bytes as they arrive; calls never overlap. */
+export type FileEntryHandler = (entry: FileEntry, state: PersistedState) => Promise<void>;
+
+/**
+ * Load a space. With `onEntry`, file bytes are fetched in parallel and handed over one at a
+ * time as they arrive (so the engine can load the first table while the rest download);
+ * every handler call has finished by the time this resolves. `fileEntries` keeps saved order.
+ */
+export async function loadSpace(spaceId: string, onEntry?: FileEntryHandler): Promise<LoadedSpace | undefined> {
+  if (!(await serverStorage())) {
+    const local = await browser.loadSpace(spaceId);
+    if (local && onEntry) for (const entry of local.fileEntries) await onEntry(entry, local);
+    return local;
+  }
   const remote = await fetchSpace(spaceId);
   if (!remote) return undefined;
-  const fileEntries: FileEntry[] = [];
-  for (const { name, fileName } of remote.state.files ?? []) {
-    if (!(name in remote.files)) continue;
-    const res = await fetch(fileUrl(spaceId, name), { cache: "no-store" });
-    if (res.ok) fileEntries.push({ name, fileName, data: new Uint8Array(await res.arrayBuffer()) });
-  }
-  return { ...remote.state, fileEntries };
+  let queue: Promise<void> = Promise.resolve();
+  const fetched = await Promise.all(
+    (remote.state.files ?? [])
+      .filter(({ name }) => name in remote.files)
+      .map(async ({ name, fileName }): Promise<FileEntry | null> => {
+        let res: Response;
+        try {
+          res = await fetch(fileUrl(spaceId, name), { cache: "no-store" });
+        } catch {
+          return null; // reported as an unrestored file, like a non-OK response
+        }
+        if (!res.ok) return null;
+        const entry = { name, fileName, data: new Uint8Array(await res.arrayBuffer()) };
+        if (onEntry) await (queue = queue.then(() => onEntry(entry, remote.state)));
+        return entry;
+      })
+  );
+  return { ...remote.state, fileEntries: fetched.filter((entry): entry is FileEntry => entry !== null) };
 }
 
 export async function deleteSpaceData(spaceId: string): Promise<void> {

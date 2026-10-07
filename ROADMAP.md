@@ -48,6 +48,10 @@ Tables:        3
 Relationships: 2
   payments.user_id ↳ users.id  (100%, many-to-one)
   events.user_id   ↳ users.id  (100%, many-to-one)
+Entities:      3
+  User (users)  → Payment, Event
+  Payment (payments)
+  Event (events)
 Wrote artifacts to ./data/.querypad
 ```
 
@@ -67,7 +71,7 @@ Architecture (engine-agnostic core, two DuckDB bindings):
 
 ```text
 src/lib/discovery/     profile.ts · signals.ts · relationships.ts · semantic-model.ts · explain.ts · sql-safety.ts
-src/lib/ai/            complete.ts (one streaming layer, 6 providers) · generate-sql.ts · providers.ts
+src/lib/ai/            complete.ts (one streaming layer: six API providers + five signed-in local CLIs) · generate-sql.ts · providers.ts · local-bridge.ts
 src/lib/duckdb-node/   connection.ts · load.ts · profile.ts (thin wrapper)   (native @duckdb/node-api)
 src/lib/duckdb/        sql-utils.ts (shared) · browser-runner.ts · profile.ts (thin wrapper)   (DuckDB-Wasm)
 src/cli/               index.ts (dispatch) · inspect.ts · ask.ts · explain.ts · artifacts.ts
@@ -163,7 +167,8 @@ join keys and the AI assistant receives the (non-rejected) relationships as cont
 
 `RelationshipsPanel.tsx` reuses the shared `src/lib/discovery` core (`discoverRelationships`,
 `buildExplanation`) — the same edges the CLI emits — so no logic is duplicated. Verdicts and
-edits are keyed by `relationshipKey` and persisted to IndexedDB. The existing browser app
+edits are keyed by `relationshipKey` and saved with the space through the server store
+(`/api/store`), with IndexedDB as the fallback. The existing browser app
 (Monaco, charts, pipelines, sharing) remains the interactive-analysis surface; the
 verification view is additive.
 
@@ -181,11 +186,13 @@ Spaces keep separate saved workspaces through the server store, with IndexedDB f
 when the API is absent and a sample-data template for fresh starts. A separate answer-only
 Assistant uses localStorage conversations per space.
 
-The Overview surface exposes a searchable, sortable live data catalog, source row counts,
-profile coverage, relationship verdict counts, recent queries, and semantic entities. It
-uses `buildSemanticModel` from the same engine-agnostic core as the CLI; rejected
-relationships are excluded. Dataset previews, profiles, relationship review, and query
-creation route directly into the existing workbench.
+Home is the AI-first start page: one composer that hands a question to the Assistant,
+quick actions, live catalog counts, Recent tabs (a searchable, sortable data catalog,
+queries, snippets, spaces) and the semantic model, built with `buildSemanticModel` from the
+same engine-agnostic core as the CLI (rejected relationships excluded). Each dataset also has
+its own table page (breadcrumb `Space › Tables › name`) with Overview, Preview and Profile
+tabs and a details rail listing its relationships; it opens from Home, the Explorer or the
+command palette, and its Query / Ask Assistant actions route into the existing workbench.
 
 ## Claude Code integration
 

@@ -26,7 +26,13 @@ test("mutationTargets finds the tables a batch writes to", () => {
     "SELECT * FROM ignored",
     "CREATE TABLE IF NOT EXISTS t5 (a INT)",
   ]);
-  assert.deepEqual([...targets].sort(), ["employee_bio", "my table", "orders", "t1", "t2", "t3", "t4", "t5"]);
+  assert.deepEqual([...(targets ?? [])].sort(), ["employee_bio", "my table", "orders", "t1", "t2", "t3", "t4", "t5"]);
+});
+
+test("mutationTargets gives up on writes it cannot attribute", () => {
+  assert.deepEqual([...(mutationTargets(["CREATE VIEW v AS SELECT 1", "DROP TABLE t"]) ?? ["x"])], []);
+  assert.equal(mutationTargets(["MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN DELETE"]), null);
+  assert.equal(mutationTargets(["EXECUTE del(1)"]), null);
 });
 
 const rels: Relationship[] = [
@@ -103,7 +109,7 @@ test("WITH-wrapped writes are not read-only and report their target", () => {
   assert.equal(isReadOnlyStatement(insert), false);
   assert.equal(isReadOnlyStatement(update), false);
   assert.equal(isReadOnlyStatement("WITH x AS (SELECT 1 AS a) SELECT * FROM x"), true);
-  assert.deepEqual([...mutationTargets([insert, update])], ["totals", "orders"]);
+  assert.deepEqual([...(mutationTargets([insert, update]) ?? [])], ["totals", "orders"]);
 });
 
 test("snapshots keep 128-bit integers exact and unions readable in Parquet", async () => {

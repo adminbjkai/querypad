@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { RESULTS_ERROR_ID } from "@/components/results/ResultsPanel";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
 import { modelLabel, useAiStore } from "@/stores/ai-store";
@@ -20,7 +22,17 @@ function subscribeOnline(callback: () => void) {
 export default function StatusBar() {
   const dbReady = useWorkspaceStore((s) => s.dbReady);
   const spaceName = useWorkspaceStore((s) => s.spaces.find((sp) => sp.id === s.spaceId)?.name ?? null);
-  const tab = useWorkspaceStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
+  // Primitives only: the tab record changes on every keystroke, and the bar must not re-render for that.
+  const run = useWorkspaceStore(
+    useShallow((s) => {
+      const tab = s.tabs.find((t) => t.id === s.activeTabId);
+      return {
+        isExecuting: tab?.isExecuting ?? false,
+        errorLine: tab?.error?.message.split("\n")[0] ?? null,
+        ms: tab?.result?.executionTimeMs ?? null,
+      };
+    })
+  );
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   const aiLabel = useAiStore((s) => s.loaded ? modelLabel(s.provider, s.efforts[s.provider]) : null);
   const persistEnabled = useWorkspaceStore((s) => s.persistEnabled);
@@ -52,15 +64,12 @@ export default function StatusBar() {
     };
   }, [dbReady]);
 
-  let result: { text: string; tone: string } | null = null;
-  if (tab?.isExecuting) result = { text: "Running…", tone: "text-muted" };
-  else if (tab?.error) result = { text: `Error: ${tab.error.message.split("\n")[0]}`, tone: "text-danger" };
-  else if (tab?.result) {
-    result = {
-      text: `${tab.result.rowCount.toLocaleString()} ${tab.result.rowCount === 1 ? "row" : "rows"} · ${tab.result.executionTimeMs} ms`,
-      tone: "text-muted",
-    };
-  }
+  const showError = () => {
+    const card = document.getElementById(RESULTS_ERROR_ID);
+    if (!card) return;
+    card.scrollIntoView({ block: "nearest" });
+    card.focus({ preventScroll: true });
+  };
 
   return (
     <footer className="flex h-6 shrink-0 items-center gap-2 overflow-hidden sm:gap-4 border-t border-line bg-chrome px-3 text-[11px] text-muted" aria-label="Status bar">
@@ -86,11 +95,22 @@ export default function StatusBar() {
           {cursor.selected > 0 && ` (${cursor.selected.toLocaleString()} selected)`}
         </span>
       )}
-      {result && (
-        <span className={`min-w-0 max-w-[50%] truncate tabular-nums ${result.tone}`} title={tab?.error?.message}>
-          {result.text}
+      {run.isExecuting ? (
+        <span className="shrink-0">Running…</span>
+      ) : run.errorLine !== null ? (
+        <button
+          onClick={showError}
+          title={run.errorLine}
+          className="inline-flex h-5 max-w-[50%] shrink-0 items-center gap-1 truncate whitespace-nowrap rounded px-1 text-danger transition-colors hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <Icon name="alert" size={12} />
+          1 error · click to view
+        </button>
+      ) : run.ms !== null ? (
+        <span className="shrink-0 tabular-nums" title="Duration of the last run (rows are counted above the results)">
+          Ran in {run.ms.toLocaleString()} ms
         </span>
-      )}
+      ) : null}
       {aiLabel && (
         <span className="hidden max-w-64 shrink-0 items-center gap-1.5 truncate xl:flex" title="AI model">
           <Icon name="sparkle" size={12} className="text-faint" />

@@ -16,7 +16,7 @@ You only reply in the chat — you can't click, edit the query or change the wor
 
 Looking at data yourself: when the answer needs actual values you don't have, put ONE plain read-only DuckDB query (SELECT, WITH … SELECT, DESCRIBE, SUMMARIZE) over the loaded tables in a fenced block with the language \`sql-run\` and stop writing. QueryPad runs it and sends you the result; then finish your answer from it. Keep these small (aggregate, or LIMIT 50). Don't use sql-run for anything else.`;
 
-export interface AssistantTab {
+interface AssistantTab {
   title: string;
   query: string;
   active: boolean;

@@ -116,7 +116,7 @@ export default function PipelineDag({
           <Icon name="flow" size={18} />
         </span>
         <p className="text-[14px] font-medium text-ink">No graph yet</p>
-        <p className="text-[13px] text-muted">Steps and their dependencies appear here as a graph.</p>
+        <p className="max-w-xs text-balance px-4 text-[13px] text-muted">Steps and their dependencies appear here as a graph.</p>
       </div>
     );
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { QueryResult } from "@/types";
 import { formatValue } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { Icon, type IconName } from "@/components/ui/icons";
 import { Kbd, KindGlyph, MOD } from "@/components/ui/primitives";
 import ColumnMiniChart, { DIST_HEIGHT } from "./ColumnMiniChart";
 import { computeRangeStats, formatNumber, rangeToTsv } from "./range-stats";
+import { sortRows, type SortDir } from "./sort";
 
 const ROW_HEIGHT = 28;
 const HEADER_HEIGHT = 32;
@@ -19,18 +20,10 @@ const NUM_COL = 56;
 const MIN_COL = 48;
 const MAX_COL = 640;
 
-type Sort = { column: string; dir: "asc" | "desc" } | null;
+type Sort = { column: string; dir: SortDir } | null;
 type Cell = { row: number; col: number };
 /** A rectangular selection; `mode` records how it was made (whole rows/columns copy differently). */
 type Sel = { anchor: Cell; focus: Cell; mode: "cell" | "row" | "col" | "all" };
-
-function compare(a: unknown, b: unknown): number {
-  if (a === b) return 0;
-  if (a === null || a === undefined) return 1; // nulls last
-  if (b === null || b === undefined) return -1;
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  return String(a).localeCompare(String(b), undefined, { numeric: true });
-}
 
 /**
  * Estimate a column width: the header needs room for the kind glyph, sort icon and menu chevron
@@ -109,11 +102,16 @@ function ColumnMenu({
   );
 }
 
-export default function DataTable({
+/**
+ * Memoized: the panel re-renders on every store change (the editor's text lives in the same tab record),
+ * so callers must pass stable callbacks for the grid to skip those renders.
+ */
+export default memo(function DataTable({
   result,
   filter = "",
   inspectedColumn = null,
   showStats = false,
+  onToggleStats,
   onInspect,
   onSelectColumn,
 }: {
@@ -121,8 +119,10 @@ export default function DataTable({
   filter?: string;
   /** Column currently shown in the inspector (highlighted in the header). */
   inspectedColumn?: string | null;
-  /** Show the mini-distribution strip under each column header. */
+  /** Show the mini-distribution and stats block under each column header. */
   showStats?: boolean;
+  /** Hosted in the row-number header; when absent the toggle is not rendered. */
+  onToggleStats?: () => void;
   onInspect?: (column: string) => void;
   /** Called when a cell is selected, so the inspector can follow the selection. */
   onSelectColumn?: (column: string) => void;
@@ -154,18 +154,9 @@ export default function DataTable({
         result.columns.some((c) => formatValue(row[c]).toLowerCase().includes(needle))
       );
     }
-    if (sort) {
-      const factor = sort.dir === "asc" ? 1 : -1;
-      out = [...out].sort((a, b) => {
-        const av = a[sort.column];
-        const bv = b[sort.column];
-        // Keep NULLs at the bottom in both directions.
-        if (av === null || av === undefined || bv === null || bv === undefined) return compare(av, bv);
-        return compare(av, bv) * factor;
-      });
-    }
+    if (sort) out = sortRows(out, sort.column, sort.dir, kinds[result.columns.indexOf(sort.column)] ?? "other");
     return out;
-  }, [result, deferredFilter, sort]);
+  }, [result, deferredFilter, sort, kinds]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
@@ -372,6 +363,7 @@ export default function DataTable({
   ];
 
   const multi = !!range && (range.r1 !== range.r2 || range.c1 !== range.c2);
+  const filterActive = deferredFilter.trim() !== "" || filterUpdating;
   const st = rangeStats;
   const sep = <span aria-hidden="true" className="text-faint">·</span>;
   const stat = (label: string, value: string) => (
@@ -400,12 +392,33 @@ export default function DataTable({
             role="row"
           >
             <div
-              className="sticky left-0 z-[2] flex cursor-pointer items-start justify-end border-r border-line bg-chrome px-3 pt-2 text-[11px] text-faint hover:text-ink"
+              className="sticky left-0 z-[2] flex cursor-pointer items-start border-r border-line bg-chrome pl-1 pr-3 text-[11px] text-faint hover:text-ink"
               role="columnheader"
               title="Select all"
               onClick={selectAll}
             >
-              #
+              <span className="flex w-full shrink-0 items-center justify-between" style={{ height: HEADER_HEIGHT }}>
+                {onToggleStats ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleStats();
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    aria-pressed={showStats}
+                    aria-label="Show column stats"
+                    title="Column stats"
+                    className={`inline-flex size-6 items-center justify-center rounded transition-colors hover:bg-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      showStats ? "text-accent" : "text-faint"
+                    }`}
+                  >
+                    <Icon name="profile" size={14} />
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <span>#</span>
+              </span>
             </div>
             {result.columns.map((col, i) => {
               const active = sort?.column === col;
@@ -435,7 +448,7 @@ export default function DataTable({
                   title={`${col} — ${result.columnTypes[i]}. Click to sort, ${MOD}-click to select the column, Alt-click to inspect.`}
                   className={`group relative flex min-w-0 cursor-pointer select-none flex-col border-r border-line/60 text-[12px] font-medium hover:bg-sunken ${
                     active ? "text-accent" : "text-ink"
-                  } ${colSelected ? "bg-accent-soft" : ""} ${inspected ? "shadow-[inset_0_-2px_0_var(--accent)]" : ""}`}
+                  } ${active && !colSelected ? "bg-accent-soft/40" : ""} ${colSelected ? "bg-accent-soft" : ""} ${inspected ? "shadow-[inset_0_-2px_0_var(--accent)]" : ""}`}
                 >
                   <div className="flex shrink-0 items-center gap-0.5 px-2" style={{ height: HEADER_HEIGHT }}>
                     <KindGlyph kind={kinds[i]} type={result.columnTypes[i]} />
@@ -443,7 +456,7 @@ export default function DataTable({
                     <Icon
                       name={active ? (sort!.dir === "asc" ? "sortAsc" : "sortDesc") : "sort"}
                       size={12}
-                      className={active ? "" : "text-faint opacity-0 group-hover:opacity-100"}
+                      className={active ? "text-accent stroke-[2.75]" : "text-faint opacity-0 transition-opacity group-hover:opacity-100"}
                     />
                     <button
                       tabIndex={-1}
@@ -582,63 +595,63 @@ export default function DataTable({
         </div>
         {menu && <ColumnMenu state={menu} items={menuItems(menu.column)} onClose={() => setMenu(null)} />}
       </div>
-      <div
-        className="flex shrink-0 items-center gap-2 border-t border-line bg-chrome px-3 text-[12px] tabular-nums"
-        style={{ height: FOOTER_HEIGHT }}
-        aria-live="polite"
-        data-testid="grid-footer"
-      >
-        {st && range ? (
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <span className="whitespace-nowrap">
-              <span className="text-ink">{st.cells.toLocaleString()}</span> <span className="text-muted">{st.cells === 1 ? "cell" : "cells"}</span>
-            </span>
-            {st.numericCount > 0 ? (
-              <>
-                {sep}
-                {stat("Sum", formatNumber(st.sum!))}
-                {sep}
-                {stat("Avg", formatNumber(st.avg!))}
-                {sep}
-                {stat("Min", formatNumber(st.min!))}
-                {sep}
-                {stat("Max", formatNumber(st.max!))}
-              </>
-            ) : (
-              <>
-                {sep}
-                {stat("Unique", st.distinct.toLocaleString())}
-              </>
-            )}
-            {st.nulls > 0 && (
-              <>
-                {sep}
-                {stat("Nulls", st.nulls.toLocaleString())}
-              </>
-            )}
-          </div>
-        ) : (
-          <p className="min-w-0 flex-1 truncate text-muted">
-            <span className="text-ink">{rows.length.toLocaleString()}</span> {rows.length === 1 ? "row" : "rows"}
-            {rows.length !== result.rows.length && <span className="text-faint"> of {result.rows.length.toLocaleString()}</span>}
-            {filterUpdating && <span className="ml-2 text-faint">Updating filter…</span>}
-            {" · "}
-            <span className="text-ink">{result.columns.length}</span> {result.columns.length === 1 ? "column" : "columns"}
-          </p>
-        )}
-        {range && (
-          <button
-            onClick={copyRange}
-            className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1.5 text-muted transition-colors hover:bg-sunken hover:text-ink"
-            title="Copy selection as TSV"
-            aria-label="Copy selection"
-          >
-            <Icon name="copy" size={12} />
-            <Kbd>{MOD}</Kbd>
-            <Kbd>C</Kbd>
-          </button>
-        )}
-      </div>
+      {(range || filterActive) && (
+        <div
+          className="flex shrink-0 items-center gap-2 border-t border-line bg-chrome px-3 text-[12px] tabular-nums"
+          style={{ height: FOOTER_HEIGHT }}
+          aria-live="polite"
+          data-testid="grid-footer"
+        >
+          {st && range ? (
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+              <span className="whitespace-nowrap">
+                <span className="text-ink">{st.cells.toLocaleString()}</span> <span className="text-muted">{st.cells === 1 ? "cell" : "cells"}</span>
+              </span>
+              {st.numericCount > 0 ? (
+                <>
+                  {sep}
+                  {stat("Sum", formatNumber(st.sum!))}
+                  {sep}
+                  {stat("Avg", formatNumber(st.avg!))}
+                  {sep}
+                  {stat("Min", formatNumber(st.min!))}
+                  {sep}
+                  {stat("Max", formatNumber(st.max!))}
+                </>
+              ) : (
+                <>
+                  {sep}
+                  {stat("Unique", st.distinct.toLocaleString())}
+                </>
+              )}
+              {st.nulls > 0 && (
+                <>
+                  {sep}
+                  {stat("Nulls", st.nulls.toLocaleString())}
+                </>
+              )}
+            </div>
+          ) : (
+            <p className="min-w-0 flex-1 truncate text-muted">
+              <span className="text-ink">{rows.length.toLocaleString()}</span> of {result.rows.length.toLocaleString()}{" "}
+              {result.rows.length === 1 ? "row matches" : "rows match"}
+              {filterUpdating && <span className="ml-2 text-faint">Updating filter…</span>}
+            </p>
+          )}
+          {range && (
+            <button
+              onClick={copyRange}
+              className="inline-flex h-5 shrink-0 items-center gap-1 rounded px-1.5 text-muted transition-colors hover:bg-sunken hover:text-ink"
+              title="Copy selection as TSV"
+              aria-label="Copy selection"
+            >
+              <Icon name="copy" size={12} />
+              <Kbd>{MOD}</Kbd>
+              <Kbd>C</Kbd>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
-}
+});

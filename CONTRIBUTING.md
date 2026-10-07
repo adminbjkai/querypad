@@ -24,27 +24,61 @@ relationships, building semantic models) before generating SQL. See
 
 ```
 src/
-  app/             # Next.js app router pages + /api/complete (server-key AI proxy)
-  components/      # React components (web app)
-    ui/            # icons, primitives (buttons, Dialog, Menu, KindGlyph), Toaster
-    workspace/     # shell: Header, CommandPalette, EmptyState, Splash
-    editor/ results/ sidebar/ pipeline/ collaboration/ dropzone/ plugins/
-  cli/             # querypad CLI: index.ts (dispatch), inspect.ts, ask.ts, explain.ts
+  app/                 # Next.js app router: page.tsx (workspace), shared/ (share links), globals.css
+    api/complete/      # server-key AI proxy (same-origin JSON only)
+    api/store/         # server file store: index, snippets/, spaces/[id]/, spaces/[id]/files/[name]/
+  components/          # React components (web app)
+    ui/                # icons, primitives (btn, input, Dialog, Menu, KindGlyph, SectionLabel), Toaster
+    workspace/         # shell: Workspace, NavRail, PageHeader, Home, TablePage, StatusBar, SpaceSwitcher,
+                       # CommandPalette, ShortcutsDialog, ClearSpaceDialog, BrandMark, Splash
+    home/              # Home pieces: Composer, QuickActions, RecentTabs, Onboarding, SemanticModel, format.ts
+    assistant/         # answer-only Assistant: AssistantPanel, ChatList, Markdown
+    ai/                # ModelPicker (provider + effort)
+    editor/            # Monaco workbench: SqlWorkbench, QueryEditor, TabBar, AiAssistant (Ctrl/⌘+K), SnippetDialog
+    results/           # grid (DataTable, ColumnMiniChart, sort.ts, column-stats.ts), inspector, stats pane,
+                       # ChartPanel/ChartSettings, DetailsView, ExportMenu, ResultsPanel
+    sidebar/           # side panel: Sidebar, PanelHeader, TableSchema, ProfileDrawer, RelationshipsPanel,
+                       # HistoryPanel, SnippetsPanel
+    pipeline/          # PipelineView, PipelineStepCard, PipelineDag, PipelineResults
+    collaboration/     # CollaborateDialog, RoomBar, PeerCursors
+    dropzone/          # AddFilesDialog (Files | From URL), DropTarget, UrlInput
+    plugins/           # PluginManager, PluginVisualization
+  cli/                 # querypad CLI: index.ts (dispatch), inspect.ts, ask.ts, explain.ts, artifacts.ts,
+                       # render.ts, ai-env.ts
   lib/
-    discovery/     # engine-agnostic core: profile.ts, signals.ts, relationships.ts, …
-    duckdb/        # browser DuckDB-Wasm: files.ts, queries.ts, catalog.ts (sync, snapshots),
-                   # catalog-sql.ts (pure), validate.ts (AI compile check), browser-runner.ts
-    duckdb-node/   # Node DuckDB: connection.ts, load.ts, profile.ts
-    ai/            # streaming completions, providers, BYOK keys, workspace-context.ts (AI prompt)
-    persistence/   # IndexedDB layout for spaces (+ migration from older versions)
-    collaboration/ # Yjs sync (tabs, per-tab text, files) over y-websocket
-  stores/          # Zustand: workspace-store (spaces, tables, tabs, AI threads, history),
-                   # ui-store (theme, panels, toasts)
-  types/           # TypeScript type definitions (incl. discovery.ts)
-collab/server.mjs  # self-hosted collaboration relay (plain Node ESM)
-test/              # Node test runner specs for discovery, AI layer, collaboration
-e2e/               # Playwright specs for the web app
-fixtures/data/     # sample related files for CLI inspection
+    discovery/         # engine-agnostic core: profile.ts, signals.ts, relationships.ts, semantic-model.ts,
+                       # explain.ts, sql-safety.ts, numbers.ts (relative imports only)
+    duckdb/            # browser DuckDB-Wasm: instance.ts (versioned wasm URL), files.ts, remote.ts, queries.ts,
+                       # catalog.ts (sync, signatures, snapshots), catalog-sql.ts (pure), validate.ts
+                       # (AI compile check), browser-runner.ts, sql-utils.ts (shared)
+    duckdb-node/       # Node DuckDB: connection.ts, load.ts, profile.ts (never imported by app code)
+    ai/                # complete.ts (streaming), providers.ts, api-key.ts (BYOK), local-bridge.ts (server),
+                       # workspace-context.ts / assistant-context.ts / schema-context.ts (prompts), generate-sql.ts
+    agent/             # context.ts (buildAgentContext for "copy for an agent"), ask-context.ts (CLI ask prompt)
+    persistence/       # spaces: index.ts (server store first, IndexedDB fallback), browser.ts (IndexedDB),
+                       # snapshot.ts (skip unchanged saves)
+    server-store/      # fs-store.ts (QUERYPAD_DATA_DIR records with revs), http.ts (route helpers)
+    collaboration/     # Yjs sync (tabs, per-tab text) and file-sync.ts (5 MB per file, 24 MB per room)
+    sharing/           # encode.ts / decode.ts for share links (data + query in the URL)
+    charts/            # chart builder: detect.ts, aggregate.ts, format.ts, png.ts
+    export/            # csv, json, markdown, html, excel, parquet, clipboard
+    pipeline/          # graph.ts (dependencies), execute.ts
+    plugins/           # registry.ts (visualization, exporter, fileLoader, transform extensions)
+    xlsx/              # Excel parsing
+    hooks/             # use-focus-trap.ts
+    workspace-actions.ts  editor-bridge.ts  import.ts  monaco-global.ts (y-monaco shim)  monaco-theme.ts
+    preferences.ts  constants.ts  utils.ts
+  stores/              # Zustand: workspace-store (spaces, tables, tabs, history, pipelines, saves and live sync),
+                       # ui-store (theme, page, panels, dialogs, toasts), ai-store (model, effort),
+                       # assistant-store (chats), snippet-store (shared library), collaboration-store
+  types/               # TypeScript type definitions (discovery.ts, pipeline.ts, plugin.ts, snippet.ts, …)
+scripts/               # copy-duckdb-wasm, copy-editor-assets (postinstall), check-version,
+                       # check-browser-bundle (after build), run-parallel (lint + typecheck)
+collab/server.mjs      # self-hosted collaboration relay (plain Node ESM)
+local-ai/              # host-side AI bridge (bridge.mjs, sandbox.mjs) for signed-in CLIs
+test/                  # Node test runner specs for discovery, AI layer, catalog, persistence, collaboration
+e2e/                   # Playwright specs for the web app
+fixtures/data/         # sample related files for CLI inspection
 ```
 
 > Node-only code (`src/cli`, `src/lib/duckdb-node`) must not be imported by app code —

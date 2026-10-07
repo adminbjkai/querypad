@@ -16,8 +16,20 @@ import { randomUUID } from "node:crypto";
  * every state or file write. <ns> is "default" unless a `querypad_ns` cookie picks another
  * (used by the e2e suite to keep parallel tests apart).
  */
-const ROOT = process.env.QUERYPAD_DATA_DIR || path.join(process.cwd(), ".querypad-data");
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * Every path under the data directory is built here and nowhere else. The root is resolved
+ * on first use, not at import, and both joins are marked `turbopackIgnore`: otherwise the
+ * build's file tracer treats a path that may start at the cwd as "trace the whole project"
+ * and copies public/, .querypad-data/, the sources and the root config into the standalone
+ * server output.
+ */
+let root: string | null = null;
+function dataPath(...parts: string[]): string {
+  root ??= process.env.QUERYPAD_DATA_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), ".querypad-data");
+  return path.join(/*turbopackIgnore: true*/ root, ...parts);
+}
 
 export interface StoredIndex {
   rev: number;
@@ -55,9 +67,10 @@ export function namespaceFrom(cookieValue: string | undefined): string {
   return cookieValue && SAFE_ID.test(cookieValue) ? cookieValue : "default";
 }
 
-const nsDir = (ns: string) => path.join(ROOT, ns);
-const spaceDir = (ns: string, id: string) => path.join(nsDir(ns), "spaces", id);
-const filesDir = (ns: string, id: string) => path.join(spaceDir(ns, id), "files");
+const spaceDir = (ns: string, id: string) => dataPath(ns, "spaces", id);
+const filesDir = (ns: string, id: string) => dataPath(ns, "spaces", id, "files");
+const stateFile = (ns: string, id: string) => dataPath(ns, "spaces", id, "state.json");
+const dataFile = (ns: string, id: string, encoded: string) => dataPath(ns, "spaces", id, "files", encoded);
 const encodeName = (name: string) => Buffer.from(name, "utf8").toString("base64url");
 const decodeName = (encoded: string) => Buffer.from(encoded, "base64url").toString("utf8");
 
@@ -113,7 +126,7 @@ async function writeJson(file: string, value: unknown): Promise<void> {
 }
 
 export async function readIndex(ns: string): Promise<StoredIndex> {
-  return (await readJsonCached<StoredIndex>(path.join(nsDir(ns), "index.json"))) ?? { rev: 0, activeId: null, spaces: [] };
+  return (await readJsonCached<StoredIndex>(dataPath(ns, "index.json"))) ?? { rev: 0, activeId: null, spaces: [] };
 }
 
 export function patchIndex(ns: string, patch: IndexPatch): Promise<WriteResult & { index: StoredIndex }> {
@@ -130,7 +143,7 @@ export function patchIndex(ns: string, patch: IndexPatch): Promise<WriteResult &
     const activeId = patch.activeId !== undefined && !deleted.has(patch.activeId ?? "") ? patch.activeId : current.activeId;
     const rev = current.rev + 1;
     const index: StoredIndex = { rev, activeId, spaces, deleted: [...deleted] };
-    await writeJson(path.join(nsDir(ns), "index.json"), index);
+    await writeJson(dataPath(ns, "index.json"), index);
     return { rev, prevRev: current.rev, index };
   });
 }
@@ -143,13 +156,13 @@ export async function isDeleted(ns: string, id: string): Promise<boolean> {
 export async function readSpaceRevs(ns: string): Promise<Record<string, number>> {
   let ids: string[];
   try {
-    ids = await readdir(path.join(nsDir(ns), "spaces"));
+    ids = await readdir(dataPath(ns, "spaces"));
   } catch {
     return {};
   }
   const revs: Record<string, number> = {};
   for (const id of ids) {
-    const rev = await readJsonCached(path.join(spaceDir(ns, id), "state.json"), (record: { rev: number }) => record.rev);
+    const rev = await readJsonCached(stateFile(ns, id), (record: { rev: number }) => record.rev);
     if (rev !== null) revs[id] = rev;
   }
   return revs;
@@ -165,7 +178,7 @@ async function readFileVersions(ns: string, id: string): Promise<Record<string, 
   const versions: Record<string, string> = {};
   for (const encoded of names) {
     if (encoded.endsWith(".tmp")) continue;
-    const info = await stat(path.join(filesDir(ns, id), encoded));
+    const info = await stat(dataFile(ns, id, encoded));
     versions[decodeName(encoded)] = `${info.size}:${info.mtimeMs}`;
   }
   return versions;
@@ -173,7 +186,7 @@ async function readFileVersions(ns: string, id: string): Promise<Record<string, 
 
 export async function readSpace(ns: string, id: string): Promise<StoredSpace | null> {
   const record = await readJson<{ rev: number; state: Record<string, unknown> }>(
-    path.join(spaceDir(ns, id), "state.json")
+    stateFile(ns, id)
   );
   if (!record) return null;
   return { ...record, files: await readFileVersions(ns, id) };
@@ -181,11 +194,14 @@ export async function readSpace(ns: string, id: string): Promise<StoredSpace | n
 
 /** Bump a space's rev, optionally replacing its state. Call inside the lock. */
 async function bump(ns: string, id: string, state?: Record<string, unknown>): Promise<WriteResult> {
-  const file = path.join(spaceDir(ns, id), "state.json");
-  const current = await readJson<{ rev: number; state: Record<string, unknown> }>(file);
+  const file = stateFile(ns, id);
+  // Replacing the state needs only the rev (cached per file version); keeping it needs the record.
+  const current = state
+    ? { rev: await readJsonCached(file, (record: { rev: number }) => record.rev), state }
+    : await readJson<{ rev: number; state: Record<string, unknown> }>(file);
   const prevRev = current?.rev ?? 0;
   const rev = prevRev + 1;
-  await writeJson(file, { rev, state: state ?? current?.state ?? {} });
+  await writeJson(file, { rev, state: current?.state ?? {} });
   return { rev, prevRev };
 }
 
@@ -201,7 +217,7 @@ export async function writeSpaceFile(
 ): Promise<WriteResult & { version: string }> {
   const dir = filesDir(ns, id);
   await mkdir(dir, { recursive: true });
-  const target = path.join(dir, encodeName(name));
+  const target = dataFile(ns, id, encodeName(name));
   // Stream to disk outside the lock (files can be large); only the swap + rev bump is locked.
   const tmp = `${target}.${randomUUID()}.tmp`;
   try {
@@ -218,7 +234,7 @@ export async function writeSpaceFile(
 }
 
 export async function openSpaceFile(ns: string, id: string, name: string): Promise<ReadableStream | null> {
-  const file = path.join(filesDir(ns, id), encodeName(name));
+  const file = dataFile(ns, id, encodeName(name));
   try {
     await stat(file);
   } catch {
@@ -229,7 +245,7 @@ export async function openSpaceFile(ns: string, id: string, name: string): Promi
 
 export function deleteSpaceFile(ns: string, id: string, name: string): Promise<WriteResult> {
   return withLock(ns, async () => {
-    await rm(path.join(filesDir(ns, id), encodeName(name)), { force: true });
+    await rm(dataFile(ns, id, encodeName(name)), { force: true });
     return bump(ns, id);
   });
 }
@@ -254,7 +270,7 @@ export interface StoredSnippets {
   deleted?: string[];
 }
 
-const snippetsFile = (ns: string) => path.join(nsDir(ns), "snippets.json");
+const snippetsFile = (ns: string) => dataPath(ns, "snippets.json");
 
 export async function readSnippets(ns: string): Promise<StoredSnippets> {
   return (await readJsonCached<StoredSnippets>(snippetsFile(ns))) ?? { rev: 0, snippets: [] };

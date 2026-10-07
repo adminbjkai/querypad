@@ -3,8 +3,9 @@ import { readPreference, writePreference } from "@/lib/preferences";
 
 export type Theme = "light" | "dark";
 export type SidebarPanel = "tables" | "joins" | "history" | "snippets";
-/** Home is the AI-first start page; the workbench holds SQL tabs and pipelines. */
-export type WorkspacePage = "home" | "workbench";
+/** Home is the AI-first start page; the workbench holds SQL tabs and pipelines; `table` is one dataset's page. */
+export type WorkspacePage = "home" | "workbench" | "table";
+export type TablePageTab = "overview" | "preview" | "profile";
 export type Dialog = "addFiles" | "collaborate" | "plugins" | "shortcuts" | "clearSpace" | null;
 
 export interface Toast {
@@ -17,6 +18,14 @@ interface UiState {
   /** Navigation is a UI preference, never part of another device's saved space. */
   workspacePage: WorkspacePage;
   setWorkspacePage: (page: WorkspacePage) => void;
+  /** The dataset shown by the `table` page, and which of its tabs is open (session state only). */
+  tablePage: string | null;
+  tablePageTab: TablePageTab;
+  openTablePage: (name: string, tab?: TablePageTab) => void;
+  setTablePageTab: (tab: TablePageTab) => void;
+  /** Spaces whose "sample data" banner was dismissed (remembered). */
+  dismissedSampleHints: string[];
+  dismissSampleHint: (spaceId: string) => void;
   /** The left navigation shows icons only (remembered). */
   navCollapsed: boolean;
   setNavCollapsed: (collapsed: boolean) => void;
@@ -75,6 +84,16 @@ const SPLIT_KEY = "querypad:split";
 const NAV_KEY = "querypad:nav-collapsed";
 const ASSISTANT_KEY = "querypad:assistant-open";
 const ASSISTANT_WIDTH_KEY = "querypad:assistant-width";
+const SAMPLE_HINT_KEY = "querypad:sample-hint-dismissed";
+
+function initialDismissedSampleHints(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(readPreference(SAMPLE_HINT_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 function initialAssistantWidth(): number {
   if (typeof window === "undefined") return 400;
@@ -97,7 +116,18 @@ let toastSeq = 0;
 
 export const useUiStore = create<UiState>((set, get) => ({
   workspacePage: "workbench",
-  setWorkspacePage: (workspacePage) => set({ workspacePage }),
+  // Leaving a page also closes the Explorer's quick profile view.
+  setWorkspacePage: (workspacePage) => set((s) => (s.workspacePage === workspacePage ? {} : { workspacePage, profileTable: null })),
+  tablePage: null,
+  tablePageTab: "overview",
+  openTablePage: (name, tab = "overview") => set({ workspacePage: "table", tablePage: name, tablePageTab: tab, profileTable: null }),
+  setTablePageTab: (tablePageTab) => set({ tablePageTab }),
+  dismissedSampleHints: initialDismissedSampleHints(),
+  dismissSampleHint: (spaceId) => {
+    const dismissedSampleHints = [...new Set([...get().dismissedSampleHints, spaceId])].slice(-50);
+    writePreference(SAMPLE_HINT_KEY, JSON.stringify(dismissedSampleHints));
+    set({ dismissedSampleHints });
+  },
   navCollapsed: readPreference(NAV_KEY) === "1",
   setNavCollapsed: (navCollapsed) => {
     writePreference(NAV_KEY, navCollapsed ? "1" : "0");
@@ -115,11 +145,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarOpen: typeof window === "undefined" || window.innerWidth >= 768,
   sidebarPanel: "tables",
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
-  showPanel: (sidebarPanel) => set({ sidebarPanel, sidebarOpen: true }),
+  // The quick profile view belongs to the Tables panel; showing another panel closes it.
+  showPanel: (sidebarPanel) => set((s) => ({ sidebarPanel, sidebarOpen: true, profileTable: sidebarPanel === "tables" ? s.profileTable : null })),
   toggleSidePanel: () =>
     set((s) => (s.workspacePage !== "workbench" ? { workspacePage: "workbench", sidebarOpen: true } : { sidebarOpen: !s.sidebarOpen })),
   togglePanel: (panel) =>
-    set((s) => (s.sidebarOpen && s.sidebarPanel === panel ? { sidebarOpen: false } : { sidebarPanel: panel, sidebarOpen: true })),
+    set((s) =>
+      s.sidebarOpen && s.sidebarPanel === panel
+        ? { sidebarOpen: false }
+        : { sidebarPanel: panel, sidebarOpen: true, profileTable: panel === "tables" ? s.profileTable : null }
+    ),
 
   profileTable: null,
   setProfileTable: (profileTable) => set({ profileTable }),

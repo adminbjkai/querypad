@@ -25,15 +25,18 @@ export const input =
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="inline-flex min-w-[1.25rem] items-center justify-center rounded border border-line bg-raised px-1 font-sans text-[11px] leading-[18px] text-muted">
+    <kbd className="inline-flex min-w-[1.25rem] items-center justify-center rounded border border-line-strong/60 bg-raised px-1 font-sans text-[11px] leading-[18px] text-muted">
       {children}
     </kbd>
   );
 }
 
-export const isMac =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 export const MOD = isMac ? "⌘" : "Ctrl";
+
+/** Shortcut chip for use inside an accent (primary) button: tinted with the button's own text color. */
+export const kbdOnAccent =
+  "inline-flex items-center rounded border border-on-accent/30 bg-on-accent/15 px-1 text-[11px] leading-4 text-on-accent";
 
 const KIND_STYLE: Record<ProfileColumnKind, { glyph: string; className: string; label: string }> = {
   numeric: { glyph: "#", className: "text-k-num", label: "number" },
@@ -58,6 +61,26 @@ export function KindGlyph({ type, kind }: { type?: string; kind?: ProfileColumnK
   );
 }
 
+/** Uppercase label over a group of items (DESIGN.md: 11px, medium, wide tracking, faint), with an optional count pill. */
+export function SectionLabel({
+  children,
+  count,
+  as: Tag = "h2",
+  className = "",
+}: {
+  children: ReactNode;
+  count?: number;
+  as?: "h2" | "h3" | "div";
+  className?: string;
+}) {
+  return (
+    <Tag className={`flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-faint ${className}`}>
+      <span>{children}</span>
+      {count !== undefined && <span className="rounded-full bg-sunken px-1.5 py-0.5 leading-none tabular-nums">{count}</span>}
+    </Tag>
+  );
+}
+
 export function Spinner({ className = "size-3.5" }: { className?: string }) {
   return (
     <span
@@ -67,7 +90,10 @@ export function Spinner({ className = "size-3.5" }: { className?: string }) {
   );
 }
 
-/** Centered modal with backdrop, Escape-to-close, and initial focus inside. */
+/**
+ * Modal centered on the viewport (a fixed overlay, independent of the side panel and Assistant),
+ * with backdrop, Escape-to-close, focus trap and focus restore to the opener.
+ */
 export function Dialog({
   title,
   onClose,
@@ -95,7 +121,7 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-3 pt-[8vh] sm:p-6 sm:pt-[10vh]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4 sm:p-6"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -127,6 +153,9 @@ export interface MenuItem {
   onSelect: () => void;
 }
 
+/** A menu row: an action, a divider, or a non-interactive section heading. */
+export type MenuEntry = MenuItem | "divider" | { heading: string };
+
 /** Small dropdown menu anchored to its trigger; closes on outside click and Escape. */
 export function Menu({
   trigger,
@@ -136,7 +165,7 @@ export function Menu({
   label,
 }: {
   trigger: (props: { open: boolean; toggle: () => void }) => ReactNode;
-  items: (MenuItem | "divider")[];
+  items: MenuEntry[];
   align?: "left" | "right";
   /** Open below the trigger, or above it (for triggers near the bottom of the screen). */
   side?: "bottom" | "top";
@@ -201,6 +230,10 @@ export function Menu({
           {items.map((item, i) =>
             item === "divider" ? (
               <div key={`d${i}`} className="my-1 h-px bg-line" />
+            ) : "heading" in item ? (
+              <div key={`h${i}`} role="presentation" className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-faint">
+                {item.heading}
+              </div>
             ) : (
               <button
                 key={item.label}

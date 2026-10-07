@@ -61,14 +61,6 @@ export interface SharePayload {
   t: { name: string; fileName: string }[];
 }
 
-export type ChartType = "bar" | "line" | "scatter" | "pie";
-
-export interface ChartConfig {
-  type: ChartType;
-  xColumn: string;
-  yColumns: string[];
-}
-
 /** One exchange with the AI assistant, kept per tab so follow-ups have context. */
 export interface AiTurn {
   id: string;
@@ -99,18 +91,3 @@ export interface EditorTab {
   aiThread?: AiTurn[];
   createdAt: number;
 }
-
-// Re-exports
-export type {
-  Pipeline,
-  PipelineStep,
-  PipelineExecutionResult,
-} from "./pipeline";
-
-export type {
-  PluginManifest,
-  PluginExtension,
-  LoadedPlugin,
-} from "./plugin";
-
-export type { PeerInfo, RoomState } from "./collaboration";

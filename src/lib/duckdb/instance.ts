@@ -9,16 +9,19 @@ export async function getDB(): Promise<duckdb.AsyncDuckDB> {
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
+    // scripts/copy-duckdb-wasm.mjs places the module under the package version, so the
+    // immutable cache header on /duckdb/* can never serve a stale build after an upgrade.
+    const mainModule = `/duckdb/${duckdb.PACKAGE_VERSION}/duckdb-eh.wasm`;
     const DUCKDB_BUNDLES: duckdb.DuckDBBundles = {
       mvp: {
-        mainModule: "/duckdb/duckdb-eh.wasm",
+        mainModule,
         mainWorker: new URL(
           "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js",
           import.meta.url
         ).toString(),
       },
       eh: {
-        mainModule: "/duckdb/duckdb-eh.wasm",
+        mainModule,
         mainWorker: new URL(
           "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js",
           import.meta.url

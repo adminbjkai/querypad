@@ -6,6 +6,7 @@ import { quoteIdent } from "@/lib/duckdb/sql-utils";
 import { getSelectedText, insertAtCursor } from "@/lib/editor-bridge";
 import { copyText } from "@/lib/export/clipboard";
 import { formatBytes } from "@/lib/utils";
+import type { QueryResult } from "@/types";
 
 /** URLs beyond this length are unreliable in some browsers and proxies. */
 const URL_SOFT_LIMIT = 64 * 1024;
@@ -25,6 +26,27 @@ export function previewTable(name: string): void {
   useUiStore.getState().setWorkspacePage("workbench");
   ws().setViewMode("sql");
   if (ws().addTab(`SELECT *\nFROM ${quoteIdent(name)}\nLIMIT 100`)) void ws().runQuery();
+}
+
+/** Fetch up to `limit` rows of a table for the table page, without opening or touching any SQL tab. */
+export async function previewRows(name: string, limit = 100): Promise<QueryResult> {
+  const { executeQuery } = await import("@/lib/duckdb/queries");
+  return executeQuery(`SELECT *\nFROM ${quoteIdent(name)}\nLIMIT ${Math.max(1, Math.floor(limit))}`);
+}
+
+/** Open one dataset's page (overview, preview or profile). */
+export function openTablePage(name: string, tab?: "overview" | "preview" | "profile"): void {
+  useUiStore.getState().openTablePage(name, tab);
+}
+
+/** Copy a table name, quoted when SQL would need it. */
+export async function copyTableName(name: string): Promise<void> {
+  try {
+    await copyText(quoteIdent(name));
+    toast(`Copied ${quoteIdent(name)}.`, "success");
+  } catch {
+    toast("Could not copy to the clipboard.", "error");
+  }
 }
 
 /** Insert snippet SQL at the editor cursor (or open it in a new tab if there's no editor). */

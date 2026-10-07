@@ -12,22 +12,13 @@ import HistoryPanel from "./HistoryPanel";
 import SnippetsPanel from "./SnippetsPanel";
 import PanelHeader, { SearchBox } from "./PanelHeader";
 import { Icon } from "@/components/ui/icons";
-import { btn } from "@/components/ui/primitives";
+import { SectionLabel, btn } from "@/components/ui/primitives";
 
 const PANEL_LABEL: Record<SidebarPanel, string> = { tables: "Tables", joins: "Joins", history: "History", snippets: "Snippets" };
 
 /** A table or view is listed when its name or any column name contains the (lowercased) filter. */
 function matchesFilter(table: TableInfo, q: string): boolean {
   return !q || table.name.toLowerCase().includes(q) || table.columns.some((c) => c.name.toLowerCase().includes(q));
-}
-
-function SectionLabel({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">
-      <span>{label}</span>
-      <span className="rounded-full bg-sunken px-1.5 py-0.5 font-medium leading-none tabular-nums">{count}</span>
-    </div>
-  );
 }
 
 export default function Sidebar() {
@@ -85,7 +76,7 @@ export default function Sidebar() {
                 </PanelHeader>
                 <SearchBox value={filter} onChange={setFilter} placeholder="Search tables and columns" label="Search tables and columns" />
                 <div className="min-h-0 flex-1 overflow-y-auto pb-3">
-                  {visibleTables.length > 0 && <SectionLabel label="Tables" count={visibleTables.length} />}
+                  {visibleTables.length > 0 && <SectionLabel as="div" className="px-3 pb-1 pt-3" count={visibleTables.length}>Tables</SectionLabel>}
                   {visibleTables.map((t) => (
                     <TableSchema
                       key={t.name}
@@ -96,7 +87,7 @@ export default function Sidebar() {
                       onOpenProfile={() => setProfileTable(visibleProfile === t.name ? null : t.name)}
                     />
                   ))}
-                  {visibleViews.length > 0 && <SectionLabel label="Views" count={visibleViews.length} />}
+                  {visibleViews.length > 0 && <SectionLabel as="div" className="px-3 pb-1 pt-3" count={visibleViews.length}>Views</SectionLabel>}
                   {visibleViews.map((v) => (
                     <TableSchema
                       key={`view:${v.name}`}

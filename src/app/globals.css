@@ -46,19 +46,21 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --paper: #0a0d12;
-  --chrome: #11151c;
-  --surface: #0e1116;
-  --raised: #151922;
-  --sunken: #1c212b;
-  --line: #232a35;
-  --line-strong: #3a4250;
+  /* Dark keeps the same role-per-step order, but content (surface/raised) sits one visible
+     step above chrome so the editor, grid, cards and the active nav card read as cards. */
+  --paper: #0b0e13;
+  --chrome: #10141a;
+  --surface: #161b23;
+  --raised: #1d232d;
+  --sunken: #252c38;
+  --line: #2a3240;
+  --line-strong: #414b5b;
   --ink: #eceef2;
-  --muted: #a1a9b6;
-  --faint: #7e8796;
+  --muted: #a7aebb;
+  --faint: #828b9a;
   --accent: #5b9dff;
   --accent-hover: #7db1ff;
-  --accent-soft: #16264a;
+  --accent-soft: #1c3566;
   --on-accent: #071226;
   --join: #f5b041;
   --join-soft: #33240b;
@@ -137,8 +139,7 @@
     outline-offset: 2px;
   }
 
-  /* Numbers line up everywhere (grid, stats, status bar). */
-  .tabular-nums,
+  /* Numbers line up everywhere (grid, stats, status bar); `tabular-nums` itself is a Tailwind utility. */
   [role="gridcell"],
   [role="status"] {
     font-variant-numeric: tabular-nums;
@@ -191,6 +192,17 @@
 
 @media (prefers-reduced-motion: reduce) {
   .qp-scan, .qp-pop, .qp-skeleton, .qp-slide-in { animation: none; }
+}
+
+/* Tab strips scroll sideways without a visible scrollbar; the wheel scrolls them horizontally (TabBar). */
+.qp-tabstrip {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.qp-tabstrip::-webkit-scrollbar {
+  display: none;
 }
 
 /* Results grid: keep column resize handles and sticky cells crisp. */

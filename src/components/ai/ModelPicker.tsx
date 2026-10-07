@@ -38,6 +38,8 @@ export default function ModelPicker({ align = "right", compact = false }: { alig
 
   const config = getAiProviderConfig(provider);
   const effort = currentEffort();
+  // The default effort is implied; only a deliberate choice earns a suffix.
+  const effortNote = effort && effort !== config.efforts?.[0] ? effort : undefined;
   const local = AI_PROVIDER_OPTIONS.filter((p) => p.kind === "local");
   const serverKeyed = AI_PROVIDER_OPTIONS.filter((p) => p.kind !== "local" && serverProviders.includes(p.id));
   const ownKey = AI_PROVIDER_OPTIONS.filter((p) => p.kind !== "local" && !serverProviders.includes(p.id));
@@ -76,7 +78,7 @@ export default function ModelPicker({ align = "right", compact = false }: { alig
         <span className="truncate">
           {!compact && <span className="text-muted">{config.vendor ?? config.label} · </span>}
           {config.modelLabel}
-          {effort && <span className="text-muted"> · {effort}</span>}
+          {effortNote && <span className="text-muted"> · {effortNote}</span>}
         </span>
         <Icon name="chevronDown" size={12} className="shrink-0 text-faint" />
       </button>

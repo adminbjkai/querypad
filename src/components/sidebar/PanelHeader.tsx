@@ -1,5 +1,9 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useUiStore } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
+import { btn } from "@/components/ui/primitives";
 
 /** The title row every sidebar panel starts with: title, a quiet count, then actions. */
 export default function PanelHeader({ title, count, children }: { title: string; count?: ReactNode; children?: ReactNode }) {
@@ -7,7 +11,13 @@ export default function PanelHeader({ title, count, children }: { title: string;
     <div className="flex h-10 shrink-0 items-center gap-2 border-b border-line bg-chrome px-3">
       <h2 className="text-[13px] font-semibold tracking-[-0.01em] text-ink">{title}</h2>
       {count !== undefined && <span className="truncate text-[11px] tabular-nums text-faint">{count}</span>}
-      <div className="ml-auto flex items-center gap-0.5">{children}</div>
+      <div className="ml-auto flex items-center gap-0.5">
+        {children}
+        {/* Phones show the panel as an overlay; give it an explicit way out. */}
+        <button onClick={() => useUiStore.getState().setSidebarOpen(false)} className={`${btn.icon} md:hidden`} aria-label="Close panel" title="Close panel">
+          <Icon name="x" size={15} />
+        </button>
+      </div>
     </div>
   );
 }

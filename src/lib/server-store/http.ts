@@ -1,6 +1,6 @@
 import { namespaceFrom } from "./fs-store";
 
-export const NAMESPACE_COOKIE = "querypad_ns";
+const NAMESPACE_COOKIE = "querypad_ns";
 
 export function json(value: unknown, status = 200): Response {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store" } });

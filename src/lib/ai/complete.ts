@@ -28,7 +28,7 @@ export interface CompleteOptions {
   signal?: AbortSignal;
 }
 
-const DEFAULT_MAX_TOKENS = 1024;
+export const DEFAULT_MAX_TOKENS = 1024;
 
 /** Error carrying the HTTP status of a failed provider/proxy response. */
 export class AiHttpError extends Error {

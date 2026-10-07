@@ -28,7 +28,7 @@ export interface ChartConfig {
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
 
-export function isDateValue(val: unknown): boolean {
+function isDateValue(val: unknown): boolean {
   return val instanceof Date || (typeof val === "string" && DATE_PATTERN.test(val));
 }
 
