@@ -36,7 +36,7 @@ export function ColumnCard({ column, rowCount }: { column: ColumnProfile; rowCou
         <KindGlyph kind={column.kind} type={column.type} />
         <span className="min-w-0 truncate font-mono text-[12px] font-medium text-ink">{column.name}</span>
         {unique && <Chip tone="join">unique</Chip>}
-        <span className="ml-auto shrink-0 pl-2 font-mono text-[11px] text-faint">{column.type.toLowerCase()}</span>
+        <span className="ml-auto shrink-0 pl-2 font-mono text-[11px] uppercase text-faint">{column.type}</span>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] tabular-nums text-muted">
         <span>{column.nullPercent >= 10 ? column.nullPercent.toFixed(0) : column.nullPercent.toFixed(1)}% empty</span>

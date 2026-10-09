@@ -7,7 +7,6 @@ import type { Notebook } from "@/types/library";
 import { relativeTime } from "@/components/home/format";
 import { Icon } from "@/components/ui/icons";
 import { Chip, Dialog, HoverTray, btn, input } from "@/components/ui/primitives";
-import { startNotebook } from "@/components/workspace/NavRail";
 import NotebookView from "./NotebookView";
 
 const cellsLabel = (n: number) => `${n} ${n === 1 ? "cell" : "cells"}`;
@@ -136,12 +135,6 @@ function NotebookList() {
                 />
               </label>
             )}
-            {notebooks.length > 0 && (
-              <button onClick={() => startNotebook()} className={btn.primary} aria-label="New notebook">
-                <Icon name="plus" size={14} />
-                New notebook
-              </button>
-            )}
           </div>
         </div>
 
@@ -151,11 +144,7 @@ function NotebookList() {
               <Icon name="notebook" size={18} />
             </span>
             <p className="text-[14px] font-medium text-ink">No notebooks yet</p>
-            <p className="text-[13px] text-muted">Mix SQL cells and notes into a document you can run top to bottom.</p>
-            <button onClick={() => startNotebook()} className={`${btn.primary} mt-4`}>
-              <Icon name="plus" size={14} />
-              New notebook
-            </button>
+            <p className="max-w-sm text-[13px] text-muted">Mix SQL cells and notes into a document you can run top to bottom. Use New notebook above to start one.</p>
           </div>
         ) : visible.length === 0 ? (
           <p className="mt-10 text-center text-[13px] text-muted">No notebooks match “{search.trim()}”.</p>

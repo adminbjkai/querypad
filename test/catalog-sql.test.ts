@@ -121,7 +121,7 @@ test("snapshots keep 128-bit integers exact and unions readable in Parquet", asy
     const columns = (await db.runner("DESCRIBE totals")).map((r) => ({ name: String(r.column_name), type: String(r.column_type) }));
     const select = snapshotSelectSql("totals", columns);
     assert.match(select, /CAST\("total" AS DECIMAL\(38,0\)\)/);
-    assert.match(select, /FROM main\."totals"$/);
+    assert.match(select, /FROM "main"\."totals"$/);
     const file = `/tmp/qp-snapshot-test-${process.pid}.parquet`;
     await db.runner(`COPY (${select}) TO '${file}' (FORMAT PARQUET)`);
     await db.runner(`CREATE TABLE restored AS SELECT * FROM read_parquet('${file}')`);

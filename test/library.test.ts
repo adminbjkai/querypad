@@ -144,6 +144,29 @@ test("notebook cell helpers add, remove, move and update without ever emptying t
   assert.equal(store().notebooks.some((n) => n.id === notebook.id), false);
 });
 
+test("an agent notebook step saves the cells and does not reuse an existing name", async () => {
+  const { runNotebookStep } = await import("../src/lib/agent/run");
+  const first = await runNotebookStep({
+    name: "Employee analysis",
+    cells: [
+      { kind: "markdown", source: "# Overview" },
+      { kind: "sql", source: "SELECT 1" },
+    ],
+  });
+  const second = await runNotebookStep({ name: "Employee analysis", cells: [{ kind: "sql", source: "SELECT 2" }] });
+  const created = store().notebooks.find((n) => n.id === first.notebookId);
+  assert.equal(created?.name, "Employee analysis");
+  assert.deepEqual(
+    created?.cells.map((c) => [c.kind, c.source]),
+    [
+      ["markdown", "# Overview"],
+      ["sql", "SELECT 1"],
+    ]
+  );
+  assert.equal(store().notebooks.find((n) => n.id === second.notebookId)?.name, "Employee analysis 2");
+  assert.equal(first.rows[0].cells, "1 SQL, 1 text");
+});
+
 test("the library and tab bindings round-trip through the server store", async () => {
   const snapshot = ws.snapshotState();
   assert.ok(snapshot.folders!.length > 0 && snapshot.savedQueries!.length > 0 && snapshot.notebooks!.length > 0);

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { toast } from "@/stores/ui-store";
+import { toast, useUiStore } from "@/stores/ui-store";
 import { relationshipKey } from "@/lib/discovery/relationships";
 import { buildExplanation } from "@/lib/discovery/explain";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
@@ -214,8 +214,13 @@ export default function RelationshipsPanel() {
           <Icon name="refresh" size={14} />
         </button>
       </PanelHeader>
+      <div className="px-3 pb-1 pt-2.5">
+        <button type="button" onClick={() => useUiStore.getState().setDesignerOpen(true)} className={`${btn.secondary} w-full`}>
+          <Icon name="join" size={14} /> Design query
+        </button>
+      </div>
       {!(discovery.status === "ready" && sorted.length === 0) && (
-        <p className="px-3 pb-2 pt-2.5 text-[12px] leading-4 text-muted">
+        <p className="px-3 pb-2 pt-1.5 text-[12px] leading-4 text-muted">
           {discovery.status === "ready"
             ? `${sorted.length} inferred from your data. Accept the right ones — AI uses them for joins.`
             : "Finding joins by comparing key values across tables…"}

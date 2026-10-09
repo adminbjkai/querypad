@@ -17,6 +17,7 @@ import { relationshipKey } from "@/lib/discovery/relationships";
 import { getApiKey } from "@/lib/ai/api-key";
 import { getAiProviderConfig, type AiProvider } from "@/lib/ai/providers";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { toast, useUiStore } from "@/stores/ui-store";
 import { useAiStore, currentEffort } from "@/stores/ai-store";
 
 /**
@@ -539,7 +540,7 @@ async function advance(mine: Run) {
   const get = useAgentStore.getState;
   const set = useAgentStore.setState;
   const live = () => run === mine && get().activeId === sessionId;
-  const { runStep } = await import("@/lib/agent/run");
+  const { runNotebookStep, runStep } = await import("@/lib/agent/run");
 
   while (run === mine && !mine.cancelled) {
     const session = get().sessions.find((s) => s.id === sessionId);
@@ -567,10 +568,16 @@ async function advance(mine: Run) {
     patchSession(sessionId, spaceId, () => ({ status: "running" }), false);
     if (live()) set({ activity: `Running step ${index + 1} of ${steps.length}…`, error: null });
     try {
-      const result = await runStep(step.sql);
-      const made = createdObject(step.sql);
+      const result = step.notebook ? await runNotebookStep(step.notebook) : await runStep(step.sql);
+      const made = step.notebook ? null : createdObject(step.sql);
       patchStep(sessionId, spaceId, planTurn.id, step.id, { status: "ok", result });
       if (made) patchSession(sessionId, spaceId, (s) => ({ created: s.created.includes(made) ? s.created : [...s.created, made] }), false);
+      if (result.notebookId) {
+        const name = String(result.rows[0]?.notebook ?? step.notebook?.name ?? "Notebook");
+        toast(`Created notebook ${name}.`);
+        const later = steps.slice(index + 1).some((s) => s.status === "pending" || s.status === "approved");
+        if (!later) useUiStore.getState().openNotebook(result.notebookId);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       patchStep(sessionId, spaceId, planTurn.id, step.id, { status: "error", error: message });

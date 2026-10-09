@@ -30,7 +30,7 @@ test.describe("Home", () => {
 
     const search = page.getByRole("textbox", { name: "Search data catalog" });
     await search.fill("budget");
-    await expect(catalog.getByText("1 datasets")).toBeVisible();
+    await expect(catalog.getByText("1 dataset")).toBeVisible();
     await expect(catalog.getByRole("row", { name: /departments/ })).toBeVisible();
     await expect(catalog.getByRole("row", { name: /employees/ })).toHaveCount(0);
 

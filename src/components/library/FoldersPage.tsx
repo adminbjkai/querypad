@@ -1,37 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
-import { SectionLabel, btn } from "@/components/ui/primitives";
+import { SectionLabel } from "@/components/ui/primitives";
 import FolderCard from "./FolderCard";
 import FolderDetail from "./FolderDetail";
 import LibraryRow from "./LibraryRow";
-import NameDialog from "./NameDialog";
 import { itemsInFolder } from "./library-items";
 
 function FolderGrid() {
   const folders = useWorkspaceStore((s) => s.folders);
   const savedQueries = useWorkspaceStore((s) => s.savedQueries);
   const notebooks = useWorkspaceStore((s) => s.notebooks);
-  const [creating, setCreating] = useState(false);
   const sorted = useMemo(() => [...folders].sort((a, b) => a.name.localeCompare(b.name)), [folders]);
   const unfiled = useMemo(() => itemsInFolder(savedQueries, notebooks, null), [savedQueries, notebooks]);
   const empty = folders.length === 0 && unfiled.length === 0;
-
-  const newFolderButton = (
-    <button onClick={() => setCreating(true)} className={btn.primary}>
-      <Icon name="plus" size={16} />
-      New folder
-    </button>
-  );
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="min-w-0 flex-1 text-[22px] font-semibold leading-7 tracking-[-0.01em] text-ink">Folders</h1>
-        {!empty && newFolderButton}
       </div>
 
       {empty ? (
@@ -40,8 +30,7 @@ function FolderGrid() {
             <Icon name="folder" size={18} />
           </span>
           <p className="mt-3 text-[14px] font-medium text-ink">No folders yet</p>
-          <p className="mt-1 text-[13px] leading-5 text-muted">Folders keep saved queries and notebooks together. Save a query from the editor to get started.</p>
-          <div className="mt-4">{newFolderButton}</div>
+          <p className="mt-1 max-w-sm text-[13px] leading-5 text-muted">Folders keep saved queries and notebooks together. Use New folder above, or save a query from the editor.</p>
         </div>
       ) : (
         <>
@@ -72,16 +61,6 @@ function FolderGrid() {
             </div>
           </section>
         </>
-      )}
-      {creating && (
-        <NameDialog
-          title="New folder"
-          label="Folder name"
-          placeholder="Reports"
-          action="Create folder"
-          onSubmit={(name) => useWorkspaceStore.getState().createFolder(name)}
-          onClose={() => setCreating(false)}
-        />
       )}
     </>
   );

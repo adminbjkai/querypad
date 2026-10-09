@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useUiStore, type TablePageTab } from "@/stores/ui-store";
+import { toast, useUiStore, type TablePageTab } from "@/stores/ui-store";
 import type { QueryResult, TableProfileState } from "@/types";
 import { relationshipKey } from "@/lib/discovery/relationships";
 import { formatBytes } from "@/lib/utils";
 import { copyTableName, previewRows, previewTable } from "@/lib/workspace-actions";
+import { copyText } from "@/lib/export/clipboard";
 import { askAssistant } from "@/components/home/Composer";
 import { ColumnCard } from "@/components/sidebar/ProfileDrawer";
 import DataTable from "@/components/results/DataTable";
@@ -198,6 +199,9 @@ export default function TablePage() {
             </div>
             <p className="mt-1.5 text-[13px] text-muted">
               {isView ? "View" : "Table"}
+              {(info.schema && info.schema !== "main") || (info.database && info.database !== "memory") ? (
+                <> · <span className="font-mono text-[12px] text-ink">{info.database ?? "memory"}.{info.schema ?? "main"}</span></>
+              ) : null}
               {fileEntry && <> · from <span className="font-mono text-[12px] text-ink">{fileEntry.fileName}</span></>}
               {!isView && <> · {info.rowCount.toLocaleString()} rows · {info.columns.length} columns</>}
             </p>
@@ -218,6 +222,28 @@ export default function TablePage() {
             </button>
           </div>
         </div>
+
+        {isView && view.sql && (
+          <section className="mt-4" aria-label="View definition">
+            <div className="mb-1.5 flex items-center gap-2">
+              <SectionLabel>Definition</SectionLabel>
+              <button type="button" onClick={() => void copyText(view.sql).then(() => toast("Definition copied."))} className={`${btn.ghost} ml-auto h-7 text-[12px]`}>
+                <Icon name="copy" size={13} /> Copy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const ws = useWorkspaceStore.getState();
+                  if (ws.addTab(view.sql)) useUiStore.getState().setWorkspacePage("workbench");
+                }}
+                className={`${btn.ghost} h-7 text-[12px]`}
+              >
+                <Icon name="code" size={13} /> Open in SQL
+              </button>
+            </div>
+            <pre className="max-h-64 overflow-auto rounded-lg border border-line bg-raised p-3 font-mono text-[12px] leading-5 text-ink">{view.sql}</pre>
+          </section>
+        )}
 
         <Tabs
           value={tab}
@@ -257,7 +283,7 @@ export default function TablePage() {
                                 <span className="truncate font-mono text-[12px] font-medium text-ink">{c.name}</span>
                               </span>
                             </td>
-                            <td className="truncate px-3 font-mono text-[12px] text-muted" title={c.type}>{c.type.toLowerCase()}</td>
+                            <td className="truncate px-3 font-mono text-[12px] uppercase text-muted" title={c.type}>{c.type}</td>
                             <td className="px-3 max-sm:hidden">
                               <span className="flex items-center gap-1.5">
                                 {mark && (

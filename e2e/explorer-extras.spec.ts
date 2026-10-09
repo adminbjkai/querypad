@@ -2,6 +2,7 @@ import { test, expect, type Page } from "./fixtures";
 
 async function openWithSamples(page: Page) {
   await page.goto("/");
+  await expect(page.locator("[data-hydrated='true']")).toBeAttached({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "departments", exact: true })).toBeVisible();
 }
@@ -59,6 +60,12 @@ test.describe("Explorer extras", () => {
     const details = explorer.getByRole("region", { name: "departments details" });
     await expect(details).toContainText("4 rows");
     await expect(details.getByTitle(/^Insert dept_id/)).toBeVisible();
+    // A table expands to its columns without a search, then collapses again so later arrow keys stay on objects.
+    await explorer.getByRole("button", { name: "Expand departments" }).click();
+    await expect(explorer.getByTitle(/^Insert dept_id/)).toHaveCount(2);
+    await expect(tree.getByRole("treeitem", { name: "departments", exact: true })).toHaveAttribute("aria-expanded", "true");
+    await explorer.getByRole("button", { name: "Collapse departments" }).click();
+    await expect(explorer.getByTitle(/^Insert dept_id/)).toHaveCount(1);
     // Resize with the keyboard.
     const sep = explorer.getByRole("separator", { name: "Resize details" });
     const before = Number(await sep.getAttribute("aria-valuenow"));

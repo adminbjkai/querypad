@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classifyStep, createdObject, dangerReason, describeDiff, diffCatalog, parsePlan, parseSummary, toPlanSteps } from "../src/lib/agent/plan";
+import { classifyStep, createdObject, dangerReason, describeDiff, diffCatalog, nextNotebookName, parsePlan, parseSummary, toPlanSteps } from "../src/lib/agent/plan";
 import { AGENT_SYSTEM_PROMPT, agentTurnInput, retryInput, summaryInput } from "../src/lib/ai/agent-prompt";
 
 const FENCED = `I'll create the table and fill it.
@@ -103,9 +103,45 @@ test("parseSummary separates the closing note from up to three suggestions", () 
   assert.deepEqual(parseSummary("Nothing changed."), { text: "Nothing changed.", suggestions: [] });
 });
 
+test("parsePlan reads a notebook step and ignores a python cell by keeping it as text", () => {
+  const reply = `I'll make the notebook.
+
+\`\`\`json
+{"summary": "Employee analysis notebook", "steps": [{
+  "title": "Create the notebook",
+  "notebook": {
+    "name": "Employee analysis",
+    "cells": [
+      {"kind": "markdown", "source": "# Overview"},
+      {"kind": "sql", "source": "SELECT COUNT(*) AS n FROM employees"},
+      {"kind": "python", "source": "print(1)"},
+      {"kind": "sql", "source": "   "}
+    ]
+  }
+}]}
+\`\`\``;
+  const { prose, plan } = parsePlan(reply);
+  assert.equal(prose, "I'll make the notebook.");
+  assert.equal(plan?.steps.length, 1);
+  const step = plan!.steps[0];
+  assert.equal(step.sql, "");
+  assert.equal(step.notebook?.name, "Employee analysis");
+  assert.equal(step.notebook?.cells.length, 3);
+  assert.equal(step.notebook?.cells[0].kind, "markdown");
+  assert.equal(step.notebook?.cells[1].kind, "sql");
+  assert.equal(step.notebook?.cells[1].source, "SELECT COUNT(*) AS n FROM employees");
+  assert.match(step.notebook?.cells[2].source ?? "", /```python\nprint\(1\)/);
+  const [ready] = toPlanSteps(plan!, () => "nb");
+  assert.equal(ready.kind, "write");
+  assert.equal(ready.notebook?.cells.length, 3);
+  assert.equal(nextNotebookName("Employee analysis", ["Employee analysis", "Employee analysis 2"]), "Employee analysis 3");
+});
+
 test("prompts carry the protocol, the session's objects, the failure and the diff", () => {
   assert.match(AGENT_SYSTEM_PROMPT, /```json/);
   assert.match(AGENT_SYSTEM_PROMPT, /never DROP, TRUNCATE or replace anything you did not create in this session/);
+  assert.match(AGENT_SYSTEM_PROMPT, /notebook/);
+  assert.match(AGENT_SYSTEM_PROMPT, /notebooks do not run Python/);
   const turn = agentTurnInput("## Tables\n(none loaded)", "Make a schema", ["customers"]);
   assert.match(turn, /Objects you created in this session[^\n]*customers/);
   assert.match(turn, /Request: Make a schema$/);

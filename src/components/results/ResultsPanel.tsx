@@ -240,7 +240,7 @@ export default function ResultsPanel() {
   return (
     <div className="relative flex h-full flex-col bg-surface">
       {scanLine}
-      <div className="flex h-9 shrink-0 items-center gap-x-3 border-b border-line bg-chrome pl-1 pr-2">
+      <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-line bg-chrome py-1 pl-1 pr-2">
         <Tabs
           value={current.view}
           onChange={(view) => patch({ view })}
@@ -253,7 +253,7 @@ export default function ResultsPanel() {
             ...pluginViews.map((v) => ({ value: v.key, label: v.label })),
           ]}
         />
-        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap text-[12px] tabular-nums text-muted">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap text-[12px] tabular-nums text-muted">
           <button
             onClick={(e) => {
               const el = e.currentTarget;

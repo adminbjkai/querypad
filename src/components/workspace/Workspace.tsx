@@ -225,6 +225,10 @@ export default function Workspace() {
       } else if (mod && e.shiftKey && key === "s") {
         e.preventDefault();
         void saveCurrentAsSnippet();
+      } else if (mod && e.shiftKey && key === "v") {
+        e.preventDefault();
+        ui.setWorkspacePage("workbench");
+        ui.toggleDesigner();
       } else if (mod && key === "i") {
         e.preventDefault();
         // On phones the side panel floats over the page; close it so the Assistant is reachable.
@@ -256,7 +260,7 @@ export default function Workspace() {
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-paper text-ink">
+    <div className="flex h-dvh flex-col bg-paper text-ink" data-hydrated={hydrated ? "true" : "false"}>
 
       <div className="flex min-h-0 flex-1">
         <NavRail />

@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useState } from "react";
 import { useAgentStore, type PlanTurn, type SessionStatus } from "@/stores/agent-store";
-import { dangerReason, type PlanStep, type StepKind, type StepResult } from "@/lib/agent/plan";
+import { dangerReason, type NotebookDraft, type PlanStep, type StepKind, type StepResult } from "@/lib/agent/plan";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { toast, useUiStore } from "@/stores/ui-store";
 import { copyText } from "@/lib/export/clipboard";
@@ -25,6 +25,26 @@ function openInSql(sql: string) {
   const ws = useWorkspaceStore.getState();
   ws.setViewMode("sql");
   if (ws.addTab(sql)) useUiStore.getState().setWorkspacePage("workbench");
+}
+
+function NotebookBlock({ notebook }: { notebook: NotebookDraft }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-line bg-raised">
+      <div className="flex h-7 items-center gap-2 border-b border-line px-2.5">
+        <SectionLabel as="div">Notebook</SectionLabel>
+        <span className="min-w-0 truncate text-[12px] font-medium text-ink">{notebook.name}</span>
+        <span className="ml-auto shrink-0 text-[11px] tabular-nums text-faint">{notebook.cells.length} cells</span>
+      </div>
+      <ol>
+        {notebook.cells.map((cell, index) => (
+          <li key={index} className="border-t border-line px-2.5 py-1.5 first:border-t-0">
+            <p className="text-[11px] font-medium text-faint">{cell.kind === "sql" ? `SQL ${index + 1}` : `Text ${index + 1}`}</p>
+            <pre className="mt-0.5 max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[12px] leading-5 text-ink">{cell.source}</pre>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 function SqlBlock({ sql }: { sql: string }) {
@@ -172,7 +192,9 @@ function StepRow({
       </div>
       {awaiting && (
         <div className="flex flex-wrap items-center gap-2 px-3 pb-2 pl-[52px]" role="group" aria-label={`Approve step ${index + 1}`}>
-          <span className="text-[12px] text-muted">{step.kind === "danger" ? `This step ${danger ?? "is destructive"}.` : "This step changes data."}</span>
+          <span className="text-[12px] text-muted">
+            {step.kind === "danger" ? `This step ${danger ?? "is destructive"}.` : step.notebook ? "This step creates a notebook in this space." : "This step changes data."}
+          </span>
           <span className="flex-1" />
           <button onClick={onRun} className={step.kind === "danger" ? btn.danger : btn.primary}>
             <Icon name="play" size={12} /> Run
@@ -189,7 +211,12 @@ function StepRow({
       )}
       {open && (
         <div className="space-y-2 px-3 pb-3 pl-[52px]">
-          <SqlBlock sql={step.sql} />
+          {step.notebook ? <NotebookBlock notebook={step.notebook} /> : <SqlBlock sql={step.sql} />}
+          {step.result?.notebookId && (
+            <button onClick={() => useUiStore.getState().openNotebook(step.result?.notebookId ?? null)} className={btn.secondary}>
+              <Icon name="notebook" size={14} /> Open notebook
+            </button>
+          )}
           {step.status === "error" && step.error && (
             <div className="rounded-lg border border-line bg-danger-soft p-3" role="alert">
               <p className="flex items-center gap-2 text-[13px] font-semibold text-danger">

@@ -77,7 +77,8 @@ page header's "Tables panel" toggle and ⌘B. Page items carry "Label (G X)" too
 (G H/A/S/N/P/T/F); exactly one item is lit at a time (a table page lights Tables). Above the groups sit the
 Search box (⌘P) and the New split control — the accent "New" half starts a query, the chevron half opens the
 menu (query, notebook, folder, pipeline, add data); collapsed, both become one `+` icon button. Counts are a
-`bg-sunken` pill; collapsed, they become a 6px accent dot. A sorted grid column shows its header and arrow
+`bg-sunken` pill while the rail is open. Collapsed, those pills hide; Joins keeps a 6px accent dot while
+joins are still waiting for a verdict. A sorted grid column shows its header and arrow
 in `text-accent`.
 Focus = `:focus-visible` 2px accent outline, offset 2. Disabled = 45% opacity.
 
@@ -95,16 +96,22 @@ Focus = `:focus-visible` 2px accent outline, offset 2. Disabled = 45% opacity.
 - Resize: pointer interaction plus keyboard adjustments and accessible values.
 - Home: greeting, one composer that hands the question to the Assistant, suggestion chips, live
   catalog counts, Recent tabs (datasets, queries, snippets, spaces) and the semantic model — never
-  decorative or fabricated statistics.
+  decorative or fabricated statistics. The headline is one color; it does not accent a single phrase.
 - Page header breadcrumbs: `Space › Tables`, `Space › Tables › name`, `Space › Notebooks › name`,
   `Space › Folders › name`, `Space › Agent`; the parent crumb returns to its list. Page actions sit before the
   space-wide ones (Collaborate, Share, Assistant): Tables → Add data; Notebooks → New notebook; Folders → New
-  folder; Agent → none. Tables page = title, count, Add data, then the `DatasetList` (search, sort, Preview /
-  Open / Profile per row) in a card, or an empty state with Add data.
+  folder; Agent → none. Those New buttons live only in the header — the list pages do not repeat them.
+  Tables page = title, count ("N tables" / "N views", never "datasets"), Add data, then the `DatasetList`
+  (search "tables or columns", sort, Preview / Open / Profile per row) in a card, or an empty state with Add data.
+  Home's catalog keeps the word "datasets".
+- SQL worksheet: under the tab strip, a 32px context row names the space, the `memory.main` schema control, the Visual Query Designer toggle (`Mod+Shift+V`), and the result limit (10,000 — the grid cap; Parquet export still includes every row).
+- Visual Query Designer: an interactive table and join canvas integrated into the worksheet. Allows picking tables, toggling included columns, automatically resolving join paths via discovered relationships, adjusting JOIN types (`INNER`, `LEFT`, `RIGHT`) and WHERE expressions, and applying the generated SQL back into the query editor.
+- Results toolbar wraps onto a second line on a narrow worksheet so Table / Chart / Details and the
+  row actions (filter, columns, inspector, next steps, export) stay on screen.
 - Table page: breadcrumb `Space › Tables › name` (the space crumb hides under 640px), a mono 22px title
   with the object icon, kind and source file, header actions (Query, Ask Assistant, Copy name), then
   Overview | Preview | Profile tabs (`role=tablist`, arrow keys). Overview = a name-filtered column
-  table sorted by #, name or type (`aria-sort`) plus a "Table details" rail (`aside`, 280px on large
+  table sorted by #, name or type (`aria-sort`; the type is the uppercase DuckDB name) plus a "Table details" rail (`aside`, 280px on large
   screens); Preview = the results grid over the first 100 rows, no SQL tab; Profile = Row count and
   Columns stat tiles then the column cards.
 - Tables panel (the explorer, "Database Explorer" style): header "Tables" + count chip, Refresh (re-reads the
@@ -119,9 +126,11 @@ Focus = `:focus-visible` 2px accent outline, offset 2. Disabled = 45% opacity.
   details pane (~45% of the body, `role="separator"` "Resize details" — drag or Up/Down keys, remembered):
   mono name, row count, ⋯ (Open table page, Preview, Profile, Copy name, Insert name, Remove) and ×, then 24px
   column rows (kind glyph, mono name, full DuckDB type uppercase faint at the right, key/join marks); clicking
-  a column inserts it at the editor cursor. Columns are listed under tables only while searching (accent
+  a column inserts it at the editor cursor. Each table and view with columns has a chevron (Show columns /
+  Hide columns); expanding lists every column with its uppercase DuckDB type and key mark, and ArrowRight /
+  ArrowLeft expand and collapse that row. While searching, matches stay expanded on their own (accent
   "n of m columns" chip, `<mark>` on `bg-accent-soft`, "of total" on group counts, trailing "Ask the Assistant
-  about …" row). Add data stages each file with an editable, validated table name before "Load".
+  about …" row) and the chevron is not a second control. Add data stages each file with an editable, validated table name before "Load".
 - Sample-data banner: a 36px `bg-accent-soft` strip under the page header with an "Add data" action
   and a dismiss remembered per space — never a floating toast.
 - Toasts: one icon and color per tone (info accent, success ok, warning warn, error danger) on a
@@ -160,7 +169,7 @@ Focus = `:focus-visible` 2px accent outline, offset 2. Disabled = 45% opacity.
   Select all and a checkbox per column — Apply hides unchecked columns in the grid and the exports;
   "✦ Next steps" opens a popover of up to three locally computed follow-ups (join a related table on
   the discovered key with its overlap, group a text column and count, profile the source table).
-- Column card: a 300px popover anchored to the header stats block — name and type, the distribution
+- Column card: a 300px popover anchored to the header stats block — name and uppercase DuckDB type, the distribution
   (histogram) or top values with share bars and a "Show rows" chip per value (applies the grid filter),
   "NN% filled · NN% null", Distinct, Min/Max, Sum/Average for numbers, then "Keys & joins" rows in
   `text-join` when the column maps to a loaded table column (unique, referenced by, value overlap);

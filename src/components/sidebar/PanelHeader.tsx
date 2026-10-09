@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useUiStore } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
-import { Chip, btn } from "@/components/ui/primitives";
+import { Chip, MOD, btn } from "@/components/ui/primitives";
 
 /** The title row every sidebar panel starts with (40px): title, a neutral count chip, then actions. */
 export default function PanelHeader({ title, count, children }: { title: string; count?: ReactNode; children?: ReactNode }) {
@@ -13,6 +13,14 @@ export default function PanelHeader({ title, count, children }: { title: string;
       {count !== undefined && <Chip className="tabular-nums">{count}</Chip>}
       <div className="ml-auto flex items-center gap-0.5">
         {children}
+        <button
+          onClick={() => useUiStore.getState().setSidebarOpen(false)}
+          className={`${btn.icon} hidden md:inline-flex`}
+          aria-label="Hide explorer"
+          title={`Hide explorer (${MOD}+B)`}
+        >
+          <Icon name="chevronRight" size={16} className="rotate-180" />
+        </button>
         {/* Phones show the panel as an overlay; give it an explicit way out. */}
         <button onClick={() => useUiStore.getState().setSidebarOpen(false)} className={`${btn.icon} md:hidden`} aria-label="Close panel" title="Close panel">
           <Icon name="x" size={16} />

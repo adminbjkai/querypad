@@ -3,17 +3,64 @@
 import { useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { MAX_RESULT_ROWS } from "@/lib/duckdb/queries";
+import { Icon } from "@/components/ui/icons";
 import TabBar from "./TabBar";
 import SqlEditor from "./QueryEditor";
 import ResultsPanel from "@/components/results/ResultsPanel";
+import QueryDesigner from "@/components/query/QueryDesigner";
+import SchemaControl from "./SchemaControl";
 
 const AiAssistant = dynamic(() => import("./AiAssistant"), { ssr: false });
+
+/** Space, schema and result limit — the worksheet's context, in the role Snowsight gives database / schema / warehouse. */
+function WorksheetContext() {
+  const spaceName = useWorkspaceStore((s) => s.spaces.find((sp) => sp.id === s.spaceId)?.name ?? "Space");
+  const designerOpen = useUiStore((s) => s.designerOpen);
+  const toggleDesigner = useUiStore((s) => s.toggleDesigner);
+  return (
+    <div className="flex h-8 shrink-0 items-center gap-4 overflow-hidden border-b border-line bg-chrome px-3 text-[12px]" aria-label="Worksheet context">
+      <span className="flex min-w-0 items-center gap-1.5" title="Tables in this worksheet belong to the open space">
+        <span className="text-faint">Space</span>
+        <Icon name="database" size={14} className="shrink-0 text-accent" />
+        <span className="truncate font-medium text-ink">{spaceName}</span>
+      </span>
+      <SchemaControl />
+      <div className="ml-auto flex items-center gap-3">
+        <button
+          type="button"
+          onClick={toggleDesigner}
+          className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[12px] font-medium transition-colors ${
+            designerOpen
+              ? "bg-accent-soft text-accent"
+              : "text-muted hover:bg-sunken hover:text-ink"
+          }`}
+          title={designerOpen ? "Switch to SQL code editor" : "Switch to Visual Query Designer"}
+          aria-label={designerOpen ? "Switch to SQL editor" : "Switch to Visual Query Designer"}
+          aria-pressed={designerOpen}
+        >
+          <Icon name={designerOpen ? "code" : "table"} size={13} />
+          <span>{designerOpen ? "Visual Designer" : "Visual Builder"}</span>
+        </button>
+        <span
+          className="flex shrink-0 items-center gap-1.5"
+          title={`The grid loads the first ${MAX_RESULT_ROWS.toLocaleString()} rows. Parquet export includes every row.`}
+        >
+          <span className="text-faint">Limit</span>
+          <span className="tabular-nums font-medium text-ink">{MAX_RESULT_ROWS.toLocaleString()}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
 
 /** Tabs, editor and results in a resizable vertical split. */
 export default function SqlWorkbench() {
   const fraction = useUiStore((s) => s.editorFraction);
   const setFraction = useUiStore((s) => s.setEditorFraction);
   const aiOpen = useUiStore((s) => s.aiOpen);
+  const designerOpen = useUiStore((s) => s.designerOpen);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
 
@@ -54,10 +101,11 @@ export default function SqlWorkbench() {
     // The editor column never squeezes below the point where its tab strip and Run button fit.
     <div className="flex min-h-0 min-w-[320px] flex-1 flex-col">
       <TabBar />
+      <WorksheetContext />
       {aiOpen && <AiAssistant />}
       <div ref={containerRef} className="flex min-h-0 flex-1 flex-col">
         <div id="querypad-editor-pane" style={{ height: `${fraction * 100}%` }} className="min-h-[96px]">
-          <SqlEditor />
+          {designerOpen ? <QueryDesigner /> : <SqlEditor />}
         </div>
         <div
           role="separator"

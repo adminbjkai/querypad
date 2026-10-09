@@ -189,6 +189,14 @@ export default function NavRail() {
   };
   const startItems: MenuEntry[] = [
     { label: "New query", icon: "code", onSelect: newQuery },
+    {
+      label: "Visual query",
+      icon: "table",
+      onSelect: () => {
+        newQuery();
+        useUiStore.getState().setDesignerOpen(true);
+      },
+    },
     { label: "New notebook", icon: "notebook", onSelect: () => startNotebook() },
     { label: "New folder", icon: "folderPlus", onSelect: startFolder },
     { label: "New pipeline", icon: "flow", onSelect: newPipeline },

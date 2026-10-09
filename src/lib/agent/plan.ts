@@ -19,12 +19,27 @@ export interface StepResult {
   ms: number;
   /** Rows an INSERT/UPDATE/DELETE touched, when DuckDB reported it. */
   affected?: number;
+  /** Set when the step created a notebook; the plan card opens it from here. */
+  notebookId?: string;
+}
+
+/** A notebook the agent will create: SQL cells the notebook can run, and markdown text cells. */
+export interface NotebookCellDraft {
+  kind: "sql" | "markdown";
+  source: string;
+}
+
+export interface NotebookDraft {
+  name: string;
+  cells: NotebookCellDraft[];
 }
 
 export interface PlanStep {
   id: string;
   title: string;
   sql: string;
+  /** Set when this step creates a notebook instead of running SQL. */
+  notebook?: NotebookDraft | null;
   kind: StepKind;
   status: StepStatus;
   result?: StepResult;
@@ -33,7 +48,7 @@ export interface PlanStep {
 
 export interface ParsedPlan {
   summary: string;
-  steps: { title: string; sql: string }[];
+  steps: { title: string; sql: string; notebook: NotebookDraft | null }[];
 }
 
 export interface PlanReply {
@@ -71,6 +86,49 @@ function tryParse(text: string): unknown {
 
 const stripSemicolon = (sql: string) => sql.trim().replace(/;\s*$/, "").trim();
 
+const MAX_NOTEBOOK_CELLS = 40;
+const MAX_CELL_SOURCE = 12_000;
+
+/**
+ * A notebook step: `{ name, cells: [{ kind: "sql"|"markdown", source }] }`.
+ * Python is not a notebook cell (nothing here runs it). A `python` cell is kept as a
+ * text cell with the source in a python fence so the code is not thrown away.
+ */
+export function parseNotebookDraft(value: unknown): NotebookDraft | null {
+  if (typeof value !== "object" || value === null) return null;
+  const raw = value as { name?: unknown; cells?: unknown };
+  if (!Array.isArray(raw.cells)) return null;
+  const cells: NotebookCellDraft[] = [];
+  for (const cell of raw.cells) {
+    if (cells.length >= MAX_NOTEBOOK_CELLS) break;
+    if (typeof cell !== "object" || cell === null) continue;
+    const item = cell as { kind?: unknown; type?: unknown; source?: unknown; sql?: unknown };
+    const kindRaw = (typeof item.kind === "string" ? item.kind : typeof item.type === "string" ? item.type : "").trim().toLowerCase();
+    const sourceRaw = typeof item.source === "string" ? item.source : typeof item.sql === "string" ? item.sql : "";
+    const source = sourceRaw.trim().slice(0, MAX_CELL_SOURCE);
+    if (!source) continue;
+    if (kindRaw === "sql" || kindRaw === "query") cells.push({ kind: "sql", source });
+    else if (kindRaw === "markdown" || kindRaw === "md" || kindRaw === "text") cells.push({ kind: "markdown", source });
+    else if (kindRaw === "python" || kindRaw === "py") {
+      const code = source.replace(/^```(?:python|py)?\s*/i, "").replace(/```$/, "").trim();
+      if (code) cells.push({ kind: "markdown", source: `Python does not run in a QueryPad notebook. The code is kept here as text.\n\n\`\`\`python\n${code}\n\`\`\`` });
+    }
+  }
+  if (cells.length === 0) return null;
+  const name = (typeof raw.name === "string" ? raw.name.trim() : "").slice(0, 80) || "Notebook";
+  return { name, cells };
+}
+
+/** One short description of a step for prompts (the SQL, or the notebook it creates). */
+export function stepScript(step: { sql: string; notebook?: NotebookDraft | null }): string {
+  if (step.notebook) {
+    const sql = step.notebook.cells.filter((c) => c.kind === "sql").length;
+    const text = step.notebook.cells.length - sql;
+    return `notebook "${step.notebook.name}" (${sql} SQL, ${text} text)`;
+  }
+  return step.sql.replace(/\s+/g, " ");
+}
+
 /** A readable title when the model gave none: the statement's first words. */
 export function titleFromSql(sql: string): string {
   const flat = leading(sql).replace(/\s+/g, " ").trim();
@@ -87,10 +145,14 @@ export function parsePlan(text: string): PlanReply {
   const raw = found.json as { summary?: unknown; steps?: unknown };
   if (!Array.isArray(raw.steps)) return { prose: text.trim(), plan: null };
   const steps = raw.steps
-    .filter((s): s is { title?: unknown; sql?: unknown } => typeof s === "object" && s !== null)
-    .map((s) => ({ sql: typeof s.sql === "string" ? stripSemicolon(s.sql) : "", title: typeof s.title === "string" ? s.title.trim() : "" }))
-    .filter((s) => s.sql.length > 0)
-    .map((s) => ({ sql: s.sql, title: s.title || titleFromSql(s.sql) }));
+    .filter((s): s is { title?: unknown; sql?: unknown; notebook?: unknown } => typeof s === "object" && s !== null)
+    .map((s) => {
+      const notebook = parseNotebookDraft(s.notebook);
+      const sql = notebook ? "" : typeof s.sql === "string" ? stripSemicolon(s.sql) : "";
+      const title = typeof s.title === "string" ? s.title.trim() : "";
+      return { sql, notebook, title: title || (notebook ? `Create notebook ${notebook.name}` : titleFromSql(sql)) };
+    })
+    .filter((s) => s.notebook !== null || s.sql.length > 0);
   if (steps.length === 0) return { prose: text.trim(), plan: null };
   const summary = typeof raw.summary === "string" && raw.summary.trim() ? raw.summary.trim() : `${steps.length} ${steps.length === 1 ? "step" : "steps"}`;
   return { prose: found.rest, plan: { summary, steps } };
@@ -134,7 +196,24 @@ export function classifyStep(sql: string): StepKind {
 
 /** Plan steps ready to run, in order, each with an id and classification. */
 export function toPlanSteps(plan: ParsedPlan, newId: () => string): PlanStep[] {
-  return plan.steps.map((s) => ({ id: newId(), title: s.title, sql: s.sql, kind: classifyStep(s.sql), status: "pending" }));
+  return plan.steps.map((s) => ({
+    id: newId(),
+    title: s.title,
+    sql: s.sql,
+    notebook: s.notebook,
+    // A notebook changes the space's library, so it waits for approval like any other write.
+    kind: s.notebook ? "write" : classifyStep(s.sql),
+    status: "pending",
+  }));
+}
+
+/** Avoid clobbering a notebook the user already has. */
+export function nextNotebookName(name: string, existing: string[]): string {
+  const taken = new Set(existing);
+  if (!taken.has(name)) return name;
+  let n = 2;
+  while (taken.has(`${name} ${n}`)) n += 1;
+  return `${name} ${n}`;
 }
 
 /** The table a CREATE TABLE/VIEW step makes, lower-cased, so the session can track what it owns. */

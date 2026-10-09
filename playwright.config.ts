@@ -1,15 +1,21 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { existsSync } from "node:fs";
+
 // Dedicated ports so tests never attach to some other app's dev server.
 const APP_PORT = Number(process.env.E2E_PORT ?? 3217);
 const COLLAB_PORT = Number(process.env.E2E_COLLAB_PORT ?? 1999);
+const SYSTEM_CHROME = ["/usr/bin/google-chrome", "/snap/bin/chromium", "/usr/bin/chromium-browser"].find(
+  (p) => existsSync(p)
+);
+const CHROMIUM_PATH = process.env.PLAYWRIGHT_CHROMIUM_PATH || SYSTEM_CHROME || undefined;
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  timeout: 60_000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : (process.env.PLAYWRIGHT_WORKERS ? Number(process.env.PLAYWRIGHT_WORKERS) : 4),
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: `http://localhost:${APP_PORT}`,
@@ -21,7 +27,7 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         // Optional: reuse an already-installed Chromium instead of Playwright's pinned build.
-        launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined },
+        launchOptions: { executablePath: CHROMIUM_PATH },
       },
     },
   ],

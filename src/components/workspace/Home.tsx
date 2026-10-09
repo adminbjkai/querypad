@@ -63,7 +63,7 @@ export default function Home() {
         <section aria-label="Ask the assistant" className="mx-auto mt-8 max-w-[760px] text-center">
           <p className="text-[13px] font-medium text-muted">{greeting()}</p>
           <h1 className="mt-2 text-balance text-[28px] font-semibold leading-tight tracking-[-0.01em] text-ink sm:text-[30px]">
-            What do you want to know <span className="text-accent">about your data?</span>
+            What do you want to know about your data?
           </h1>
           <div className="mt-7 text-left">
             <Composer />

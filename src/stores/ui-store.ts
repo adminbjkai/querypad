@@ -81,6 +81,16 @@ interface UiState {
   /** Width of the Assistant panel in px (drag its left edge; remembered). */
   assistantWidth: number;
   setAssistantWidth: (width: number) => void;
+  /** Width of the explorer sidebar in px (drag its right edge; remembered). */
+  explorerWidth: number;
+  setExplorerWidth: (width: number) => void;
+  /** Visual query designer, in place of the SQL editor until it is closed. */
+  designerOpen: boolean;
+  setDesignerOpen: (open: boolean) => void;
+  toggleDesigner: () => void;
+  /** Database and schema the worksheet is writing into. The explorer lists this one. */
+  schemaContext: { db: string; schema: string };
+  setSchemaContext: (schemaContext: { db: string; schema: string }) => void;
 
   /** Editor share of the vertical split, 0.15–0.85. */
   editorFraction: number;
@@ -96,6 +106,11 @@ const SPLIT_KEY = "querypad:split";
 const NAV_KEY = "querypad:nav-collapsed";
 const ASSISTANT_KEY = "querypad:assistant-open";
 const ASSISTANT_WIDTH_KEY = "querypad:assistant-width";
+const EXPLORER_WIDTH_KEY = "querypad:explorer-width";
+/** Explorer column: wide enough for a name and a count, narrow enough to leave the editor room. */
+export const EXPLORER_MIN = 180;
+export const EXPLORER_MAX = 640;
+export const EXPLORER_DEFAULT = 264;
 const SAMPLE_HINT_KEY = "querypad:sample-hint-dismissed";
 
 function initialDismissedSampleHints(): string[] {
@@ -111,6 +126,12 @@ function initialAssistantWidth(): number {
   if (typeof window === "undefined") return 400;
   const saved = Number(readPreference(ASSISTANT_WIDTH_KEY));
   return saved >= 300 && saved <= 760 ? saved : 400;
+}
+
+function initialExplorerWidth(): number {
+  if (typeof window === "undefined") return EXPLORER_DEFAULT;
+  const saved = Number(readPreference(EXPLORER_WIDTH_KEY));
+  return saved >= EXPLORER_MIN && saved <= EXPLORER_MAX ? saved : EXPLORER_DEFAULT;
 }
 
 function initialTheme(): Theme {
@@ -204,6 +225,22 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAssistantWidth: (assistantWidth) => {
     writePreference(ASSISTANT_WIDTH_KEY, String(Math.round(assistantWidth)));
     set({ assistantWidth });
+  },
+  designerOpen: false,
+  setDesignerOpen: (designerOpen) => set({ designerOpen, ...(designerOpen ? { workspacePage: "workbench" as const } : {}) }),
+  toggleDesigner: () =>
+    set((s) => {
+      const next = !s.designerOpen;
+      return { designerOpen: next, ...(next ? { workspacePage: "workbench" as const } : {}) };
+    }),
+  schemaContext: { db: "memory", schema: "main" },
+  setSchemaContext: (schemaContext) => set({ schemaContext }),
+
+  explorerWidth: initialExplorerWidth(),
+  setExplorerWidth: (explorerWidth) => {
+    const width = Math.round(Math.min(EXPLORER_MAX, Math.max(EXPLORER_MIN, explorerWidth)));
+    writePreference(EXPLORER_WIDTH_KEY, String(width));
+    set({ explorerWidth: width });
   },
 
   editorFraction: initialSplit(),

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useUiStore } from "@/stores/ui-store";
 import { openTablePage, previewTable } from "@/lib/workspace-actions";
 import { Icon } from "@/components/ui/icons";
 import { SectionLabel, Select, btn, input } from "@/components/ui/primitives";
@@ -20,24 +21,30 @@ type Sort = (typeof SORTS)[number]["value"];
 export default function DatasetList({ fill = false }: { fill?: boolean }) {
   const tables = useWorkspaceStore((s) => s.tables);
   const views = useWorkspaceStore((s) => s.views);
+  const schemaContext = useUiStore((s) => s.schemaContext);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<Sort>("name");
+  const noun = fill ? "table" : "dataset";
+  const nouns = fill ? "tables" : "datasets";
   const catalog = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const inSchema = (t: { schema?: string; database?: string }) =>
+      (t.database ?? "memory") === schemaContext.db && (t.schema ?? "main") === schemaContext.schema;
     return [...tables.map((t) => ({ ...t, kind: "Table" })), ...views.map((t) => ({ ...t, kind: "View" }))]
+      .filter(inSchema)
       .filter((t) => !q || t.name.toLowerCase().includes(q) || t.columns.some((c) => c.name.toLowerCase().includes(q)))
       .sort((a, b) => (sort === "rows" ? b.rowCount - a.rowCount : sort === "columns" ? b.columns.length - a.columns.length : 0) || a.name.localeCompare(b.name));
-  }, [tables, views, search, sort]);
+  }, [tables, views, search, sort, schemaContext]);
 
   return (
     <section aria-label="Data catalog" className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
       <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
         <label className="relative min-w-40 flex-1">
           <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
-          <input className={`${input} pl-9`} aria-label="Search data catalog" placeholder="Search datasets or columns…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className={`${input} pl-9`} aria-label="Search data catalog" placeholder={`Search ${nouns} or columns…`} value={search} onChange={(e) => setSearch(e.target.value)} />
         </label>
         <Select value={sort} onChange={setSort} options={[...SORTS]} ariaLabel="Sort data catalog" size="sm" />
-        <span className="px-1 text-[12px] tabular-nums text-muted">{catalog.length} datasets</span>
+        <span className="px-1 text-[12px] tabular-nums text-muted">{catalog.length} {catalog.length === 1 ? noun : nouns}</span>
       </div>
       <div className={fill ? "min-h-0 flex-1 overflow-auto" : "max-h-[420px] overflow-auto"}>
         <table className="w-full table-fixed text-left text-[13px]">
@@ -49,7 +56,7 @@ export default function DatasetList({ fill = false }: { fill?: boolean }) {
           </colgroup>
           <thead className="sticky top-0 z-10 bg-surface">
             <tr className="h-8">
-              <th scope="col" className="px-4 font-medium"><SectionLabel as="div">Dataset</SectionLabel></th>
+              <th scope="col" className="px-4 font-medium"><SectionLabel as="div">{fill ? "Name" : "Dataset"}</SectionLabel></th>
               <th scope="col" className="px-3 font-medium"><SectionLabel as="div" className="justify-end">Rows</SectionLabel></th>
               <th scope="col" className="hidden px-3 font-medium sm:table-cell"><SectionLabel as="div" className="justify-end">Columns</SectionLabel></th>
               <th scope="col" className="px-3 font-medium"><span className="sr-only">Explore</span></th>
@@ -63,7 +70,10 @@ export default function DatasetList({ fill = false }: { fill?: boolean }) {
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent"><Icon name={t.kind === "View" ? "file" : "table"} size={14} /></span>
                     <span className="min-w-0">
                       <span className="block truncate leading-5" title={t.name}>{t.name}</span>
-                      <span className="block text-[11px] font-normal leading-4 text-muted">{t.kind}</span>
+                      <span className="block text-[11px] font-normal leading-4 text-muted">
+                        {t.kind}
+                        {t.database && t.database !== "memory" ? ` · ${t.database}.${t.schema ?? "main"}` : t.schema && t.schema !== "main" ? ` · ${t.schema}` : ""}
+                      </span>
                     </span>
                   </button>
                 </td>
@@ -84,8 +94,14 @@ export default function DatasetList({ fill = false }: { fill?: boolean }) {
         </table>
         {catalog.length === 0 && (
           <div className="p-8 text-center text-[13px] text-muted">
-            <p>No datasets match “{search}”.</p>
-            <button className={`${btn.ghost} mt-2`} onClick={() => setSearch("")}>Clear search</button>
+            {search.trim() ? (
+              <>
+                <p>No {nouns} match “{search}”.</p>
+                <button className={`${btn.ghost} mt-2`} onClick={() => setSearch("")}>Clear search</button>
+              </>
+            ) : (
+              <p>Nothing in {schemaContext.db}.{schemaContext.schema}.</p>
+            )}
           </div>
         )}
       </div>

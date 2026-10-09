@@ -11,8 +11,10 @@ const KEYBOARD: [string, string[]][] = [
   ["Format SQL", ["Shift", "Alt", "F"]],
   ["Save the query to the library", [MOD, "S"]],
   ["Save query or selection as a snippet", [MOD, "Shift", "S"]],
+  ["Toggle Visual Query Designer", [MOD, "Shift", "V"]],
   ["Copy selected cells", [MOD, "C"]],
   ["Resize focused editor divider", ["↑", "↓"]],
+  ["Resize the focused explorer edge", ["←", "→"]],
   ["Resize focused column handle", ["←", "→"]],
   ["This list", ["?"]],
 ];
@@ -38,6 +40,9 @@ const NOTEBOOK: [string, string[]][] = [
 ];
 
 const MOUSE: [string, string][] = [
+  ["Resize the explorer", "Drag its right edge"],
+  ["Reset the explorer width", "Double-click the edge"],
+  ["Collapse the explorer", "Drag the edge most of the way closed"],
   ["Rename a tab", "Double-click"],
   ["Sort a column", "Click header"],
   ["Inspect a column", "Click its header stats"],

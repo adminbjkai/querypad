@@ -93,7 +93,7 @@ WHERE FALSE;`
     await expect(page.getByRole("gridcell", { name: "foreign key" })).toBeVisible();
     // Internal tables never show up as user tables.
     await page.getByRole("button", { name: "Tables", exact: true }).click();
-    await expect(page.getByText("2 tables")).toBeVisible();
+    await expect(page.getByText("2 tables in this space")).toBeVisible();
   });
 });
 

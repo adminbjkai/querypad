@@ -4,6 +4,7 @@ const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
 async function openWithSamples(page: Page) {
   await page.goto("/");
+  await expect(page.locator("[data-hydrated='true']")).toBeAttached({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "employees", exact: true })).toBeVisible({ timeout: 30_000 });
 }
 

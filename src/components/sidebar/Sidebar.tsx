@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { toast, useUiStore, type SidebarPanel } from "@/stores/ui-store";
+import { EXPLORER_DEFAULT, EXPLORER_MAX, EXPLORER_MIN, toast, useUiStore, type SidebarPanel } from "@/stores/ui-store";
 import type { TableInfo } from "@/types";
 import { relationshipKey } from "@/lib/discovery/relationships";
 import { readPreference, writePreference } from "@/lib/preferences";
@@ -16,7 +16,7 @@ import SnippetsPanel from "./SnippetsPanel";
 import PanelHeader, { SearchBox } from "./PanelHeader";
 import { firstSeen } from "./TableHoverCard";
 import { Icon } from "@/components/ui/icons";
-import { Chip, Menu, Segmented, Spinner, btn } from "@/components/ui/primitives";
+import { Chip, Menu, MOD, Segmented, Spinner, btn } from "@/components/ui/primitives";
 import { formatBytes } from "@/lib/utils";
 
 const PANEL_LABEL: Record<SidebarPanel, string> = { tables: "Tables", joins: "Joins", history: "History", snippets: "Snippets" };
@@ -52,9 +52,98 @@ function readPins(spaceId: string | null): string[] {
   }
 }
 
+/** The seam between the explorer and the editor. It sits above the editor, like the assistant's handle. */
+function ExplorerEdge({ onDragging }: { onDragging: (dragging: boolean) => void }) {
+  const dragCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => dragCleanup.current?.(), []);
+
+  const startDrag = (e: ReactPointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragCleanup.current?.();
+    const startX = e.clientX;
+    const startWidth = useUiStore.getState().explorerWidth;
+    onDragging(true);
+    const move = (ev: PointerEvent) => {
+      const next = startWidth + (ev.clientX - startX);
+      useUiStore.getState().setExplorerWidth(next);
+    };
+    const end = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      dragCleanup.current = null;
+      onDragging(false);
+    };
+    dragCleanup.current = end;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  };
+
+  const nudge = (next: number) => {
+    const ui = useUiStore.getState();
+    if (next < EXPLORER_MIN) ui.setSidebarOpen(false);
+    else ui.setExplorerWidth(next);
+  };
+
+  return (
+    <div className="group/edge pointer-events-none absolute inset-y-0 right-0 z-30 w-3 max-md:hidden">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize explorer"
+        aria-controls="querypad-explorer"
+        aria-valuemin={EXPLORER_MIN}
+        aria-valuemax={EXPLORER_MAX}
+        aria-valuenow={useUiStore.getState().explorerWidth}
+        aria-valuetext={`Explorer ${useUiStore.getState().explorerWidth} pixels wide`}
+        title="Drag to resize · double-click to reset"
+        tabIndex={0}
+        onPointerDown={startDrag}
+        onDoubleClick={() => useUiStore.getState().setExplorerWidth(EXPLORER_DEFAULT)}
+        onKeyDown={(e) => {
+          const current = useUiStore.getState().explorerWidth;
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            nudge(current - 16);
+          } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            nudge(current + 16);
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            nudge(EXPLORER_MIN);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            nudge(EXPLORER_MAX);
+          }
+        }}
+        className="pointer-events-auto absolute inset-y-0 -right-1.5 z-30 hidden w-3 cursor-col-resize touch-none outline-none md:block"
+      >
+        <span className="pointer-events-none absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-line-strong transition-colors group-hover/edge:bg-accent group-focus-within/edge:bg-accent" />
+      </div>
+      <button
+        type="button"
+        onClick={() => useUiStore.getState().setSidebarOpen(false)}
+        className="pointer-events-auto absolute right-1 top-[calc(50%+28px)] flex size-5 items-center justify-center rounded-full border border-line bg-surface text-muted opacity-0 shadow-sm transition-[opacity,color,background-color] hover:text-ink focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent group-hover/edge:opacity-100"
+        aria-label="Collapse explorer"
+        title={`Collapse explorer (${MOD}+B)`}
+      >
+        <Icon name="chevronRight" size={12} className="rotate-180" />
+      </button>
+    </div>
+  );
+}
+
 export default function Sidebar() {
   const tables = useWorkspaceStore((s) => s.tables);
   const views = useWorkspaceStore((s) => s.views);
+  const schemaContext = useUiStore((s) => s.schemaContext);
   const spaceId = useWorkspaceStore((s) => s.spaceId);
   const spaceName = useWorkspaceStore((s) => s.spaces.find((sp) => sp.id === s.spaceId)?.name) ?? "Workspace";
   const fileEntries = useWorkspaceStore((s) => s.fileEntries);
@@ -65,8 +154,28 @@ export default function Sidebar() {
   const discovery = useWorkspaceStore((s) => s.discovery);
   const verdicts = useWorkspaceStore((s) => s.relationshipVerdicts);
   const open = useUiStore((s) => s.sidebarOpen);
+  const explorerWidth = useUiStore((s) => s.explorerWidth);
   const panel = useUiStore((s) => s.sidebarPanel);
   const setOpen = useUiStore((s) => s.setSidebarOpen);
+  const [dragging, setDragging] = useState(false);
+  // Stay mounted through the close animation so the width can ease shut. Phones skip it.
+  const [mounted, setMounted] = useState(open);
+  const [expanded, setExpanded] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const frame = requestAnimationFrame(() => setExpanded(true));
+      return () => cancelAnimationFrame(frame);
+    }
+    setExpanded(false);
+    const instant = window.matchMedia("(max-width: 767px), (prefers-reduced-motion: reduce)").matches;
+    if (instant) {
+      setMounted(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setMounted(false), 260);
+    return () => window.clearTimeout(timer);
+  }, [open]);
   const setDialog = useUiStore((s) => s.setDialog);
   const profileTable = useUiStore((s) => s.profileTable);
   const setProfileTable = useUiStore((s) => s.setProfileTable);
@@ -123,9 +232,22 @@ export default function Sidebar() {
   const [selected, setSelected] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const q = filter.trim().toLowerCase();
+  const inSchema = useCallback(
+    (t: TableInfo) => {
+      const currentDb = schemaContext?.db && schemaContext.db !== "…" ? schemaContext.db : "memory";
+      const currentSchema = schemaContext?.schema || "main";
+      const tableDb = t.database ?? "memory";
+      const tableSchema = t.schema ?? "main";
+      return tableDb === currentDb && tableSchema === currentSchema;
+    },
+    [schemaContext]
+  );
+  const scopedTables = useMemo(() => tables.filter(inSchema), [tables, inSchema]);
+  const scopedViews = useMemo(() => views.filter(inSchema), [views, inSchema]);
 
   const passes = useCallback(
     (t: TableInfo, isView: boolean) => {
+      if (!inSchema(t)) return false;
       if (!(!q || t.name.toLowerCase().includes(q) || t.columns.some((c) => c.name.toLowerCase().includes(q)))) return false;
       const typeKinds = kinds.filter((k) => k === "tables" || k === "views");
       if (typeKinds.length > 0 && !typeKinds.includes(isView ? "views" : "tables")) return false;
@@ -133,7 +255,7 @@ export default function Sidebar() {
       if (kinds.includes("profiled") && (isView || tableProfiles[t.name]?.status !== "ready")) return false;
       return true;
     },
-    [q, kinds, keyColumns, tableProfiles]
+    [q, kinds, keyColumns, tableProfiles, inSchema]
   );
   const visibleTables = useMemo(() => {
     const shown = tables.filter((t) => passes(t, false));
@@ -189,9 +311,24 @@ export default function Sidebar() {
   };
   const toggleKind = (kind: FilterKey) => setKinds((current) => (current.includes(kind) ? current.filter((k) => k !== kind) : [...current, kind]));
 
-  if (!open) return null;
+  const frameWidth = expanded ? explorerWidth : 0;
 
-  const total = tables.length + views.length;
+  if (!mounted) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Show explorer"
+        title={`Show explorer (${MOD}+B)`}
+        className="hidden h-full w-10 shrink-0 flex-col items-center gap-2 border-r border-line bg-chrome py-3 text-faint transition-colors hover:bg-sunken hover:text-ink focus-visible:text-ink md:flex"
+      >
+        <Icon name="chevronRight" size={14} className="text-accent" />
+        <span className="text-[12px] font-medium [writing-mode:vertical-rl]">{PANEL_LABEL[panel]}</span>
+      </button>
+    );
+  }
+
+  const total = scopedTables.length + scopedViews.length;
   const filtering = q !== "" || kinds.length > 0;
   const nothingShown = visibleTables.length === 0 && visibleViews.length === 0;
 
@@ -199,9 +336,18 @@ export default function Sidebar() {
     <>
       {/* Small screens: the panel floats over the work area, beside the icon rail. */}
       <div className="fixed inset-0 left-[52px] z-30 bg-scrim md:hidden" onClick={() => setOpen(false)} />
-      <div className="fixed bottom-6 left-[52px] top-0 z-30 flex md:static md:z-auto">
-        <aside className="qp-slide-in flex h-full border-r border-line bg-chrome" aria-label={`${PANEL_LABEL[panel]} panel`}>
-          <div className="flex w-[264px] min-w-0 flex-col bg-chrome">
+      <div className="fixed bottom-6 left-[52px] top-0 z-30 flex md:static md:z-20 md:h-full">
+        <div
+          className="qp-explorer-frame relative h-full min-w-0 max-md:!w-[min(100vw-52px,20rem)]"
+          style={{ width: frameWidth }}
+          data-dragging={dragging ? "true" : "false"}
+        >
+        <aside
+          id="querypad-explorer"
+          className="qp-slide-in flex h-full w-full min-w-0 flex-col overflow-hidden border-r border-line bg-chrome"
+          aria-label={`${PANEL_LABEL[panel]} panel`}
+        >
+          <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-chrome">
             {panel === "tables" && (
               <div className="flex min-h-0 flex-1 flex-col">
                 <PanelHeader
@@ -279,7 +425,14 @@ export default function Sidebar() {
                             </span>
                             <p className="mt-3 text-[14px] font-medium text-ink">No tables yet</p>
                             <p className="mt-1 text-[13px] leading-5 text-muted">
-                              Add files or create one with <code className="font-mono text-[12px]">CREATE TABLE</code>.
+                              {schemaContext.db === "memory" && schemaContext.schema === "main" ? (
+                                <>Add files or create one with <code className="font-mono text-[12px]">CREATE TABLE</code>.</>
+                              ) : (
+                                <>
+                                  Nothing in <span className="font-mono text-ink">{schemaContext.db}.{schemaContext.schema}</span> yet.
+                                  Create a table here, or switch schema from the SQL worksheet.
+                                </>
+                              )}
                             </p>
                             <button onClick={() => setDialog("addFiles")} className={`${btn.primary} mt-4`}>
                               <Icon name="upload" size={16} />
@@ -399,6 +552,8 @@ export default function Sidebar() {
             {panel === "snippets" && <SnippetsPanel />}
           </div>
         </aside>
+        <ExplorerEdge onDragging={setDragging} />
+        </div>
         {visibleProfile && <ProfileDrawer tableName={visibleProfile} onClose={() => setProfileTable(null)} />}
       </div>
     </>

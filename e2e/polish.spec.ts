@@ -78,4 +78,14 @@ test.describe("Workspace polish regressions", () => {
     await latest.click();
     await expect.poll(() => feed.evaluate((el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1)).toBe(true);
   });
+
+  test("visual query designer toggles, adds tables, and transfers SQL to editor", async ({ page }) => {
+    await openWithSamples(page);
+    await page.getByRole("button", { name: "Switch to Visual Query Designer" }).click();
+    await expect(page.getByText("Query designer")).toBeVisible();
+    await page.getByLabel("Add a table").selectOption("departments");
+    await page.getByLabel("Add a table").selectOption("employees");
+    await page.getByRole("button", { name: "Use in editor" }).click();
+    await expect(page.getByText("Query updated from the designer.")).toBeVisible();
+  });
 });

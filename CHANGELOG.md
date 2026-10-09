@@ -5,7 +5,13 @@ milestones and public product updates.
 
 ## Unreleased
 
-Nothing yet.
+- **Visual Query Designer**: an interactive visual builder directly integrated into the SQL worksheet (accessible via `Mod+Shift+V`, the worksheet toolbar toggle, Command Palette, or NavRail "Visual query"). Drag or select tables, pick columns, automatically infer joins based on QueryPad's discovered relationships, customize JOIN types (`INNER`, `LEFT`, `RIGHT`) and WHERE conditions, and push the resolved SQL straight into the query editor with one click.
+- **Worksheet context & Database/Schema control**: under the SQL tabs, a context header names the open space, active database (`memory`), schema (`main`), and row limit (10,000). The schema selector provides immediate database and schema awareness with engine readiness guards.
+- **Explorer columns & deep hierarchy**: each table and view expands inline to its columns with semantic type glyphs (`text-k-num`, `text-k-text`, `text-k-date`, `text-k-bool`) and key indicators; clicking inserts the column name directly into the editor; Right/Left arrow expands and collapses smoothly.
+- **DuckDB internal schema race immunity**: the `querypad` metadata schema (`querypad.relationships` and `querypad.keys`) is proactively initialized upon DuckDB connection creation, ensuring AI validations and queries never encounter binder errors even before initial relationship scans finish.
+- **Rock-solid persistence & hydration**: added `hasPendingWrites()` flushing to workspace saves and `data-hydrated` state tracking on the root container, eliminating race conditions during fast reloads and multi-tab sync.
+- **UI design system & aesthetic refinement**: enhanced design tokens in `globals.css` with subtle glassmorphic backdrops, smooth card transitions, refined column kind palettes, and streamlined toolbars.
+- **Tables catalog polish**: counts tables accurately, searches tables in catalog view, and standardizes DuckDB uppercase type naming across all profile cards, column drawers, and result headers.
 
 ## v0.16.1 — No loading splash, and a Database Explorer for tables
 

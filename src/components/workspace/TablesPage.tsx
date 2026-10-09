@@ -8,12 +8,15 @@ import { btn } from "@/components/ui/primitives";
 
 /** The Data › Tables page: the space's catalog (Snowsight "Databases"-style), one row per dataset. */
 export default function TablesPage() {
-  const tableCount = useWorkspaceStore((s) => s.tables.length);
-  const viewCount = useWorkspaceStore((s) => s.views.length);
+  const schemaContext = useUiStore((s) => s.schemaContext);
+  const inSchema = (t: { schema?: string; database?: string }) =>
+    (t.database ?? "memory") === schemaContext.db && (t.schema ?? "main") === schemaContext.schema;
+  const tableCount = useWorkspaceStore((s) => s.tables.filter(inSchema).length);
+  const viewCount = useWorkspaceStore((s) => s.views.filter(inSchema).length);
   const setDialog = useUiStore((s) => s.setDialog);
   const count =
     tableCount + viewCount === 0
-      ? "No datasets yet"
+      ? "No tables yet"
       : `${tableCount} ${tableCount === 1 ? "table" : "tables"}${viewCount ? `, ${viewCount} ${viewCount === 1 ? "view" : "views"}` : ""}`;
 
   return (
@@ -24,7 +27,13 @@ export default function TablesPage() {
           <Icon name="table" size={20} className="text-accent" />
           Tables
         </h1>
-        <p className="mt-1 text-[13px] text-muted">{count} in this space. Open one for its columns, rows and profile.</p>
+        <p className="mt-1 text-[13px] text-muted">
+          {count}
+          {schemaContext.db === "memory" && schemaContext.schema === "main"
+            ? " in this space."
+            : <> in <span className="font-mono text-ink">{schemaContext.db}.{schemaContext.schema}</span>.</>}
+          {" "}Open one for its columns, rows and profile.
+        </p>
       </div>
       {tableCount + viewCount === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6 pb-16 text-center">

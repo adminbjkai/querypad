@@ -32,8 +32,8 @@ test.describe("Notebooks", () => {
     await openNotebooksList(page);
     await expect(page.getByText("No notebooks yet")).toBeVisible();
 
-    // New notebook opens the notebook page with its name in the breadcrumb and heading.
-    await page.getByRole("main").getByRole("button", { name: "New notebook" }).click();
+    // New notebook (the header action) opens the notebook page with its name in the breadcrumb and heading.
+    await page.getByRole("banner").getByRole("button", { name: "New notebook" }).click();
     await expect(breadcrumb(page)).toContainText("Untitled notebook");
     await expect(page.getByRole("heading", { name: "Untitled notebook", level: 1 })).toBeVisible();
     await expect(page.getByText("1 cell", { exact: true })).toBeVisible();

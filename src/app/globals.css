@@ -184,17 +184,35 @@
   animation: qp-shimmer 1.2s linear infinite;
 }
 
-/* Side panels slide in from the navigation. */
+/* Side panels slide in from the navigation (phones, where the explorer is an overlay). */
 @keyframes qp-slide-in {
   from { opacity: 0; transform: translateX(-6px); }
   to { opacity: 1; transform: none; }
 }
-.qp-slide-in {
-  animation: qp-slide-in 160ms var(--ease-out);
+@media (max-width: 767px) {
+  .qp-slide-in {
+    animation: qp-slide-in 160ms var(--ease-out);
+  }
+}
+
+/* Explorer width eases like a layout spring: fast start, soft settle. Dragging turns it off.
+   Phones keep the overlay at a fixed width; only the desktop column animates. */
+.qp-explorer-frame {
+  transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.qp-explorer-frame[data-dragging="true"] {
+  transition: none;
+}
+@media (max-width: 767px) {
+  .qp-explorer-frame {
+    width: min(100vw - 52px, 20rem) !important;
+    transition: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .qp-scan, .qp-pop, .qp-skeleton, .qp-slide-in { animation: none; }
+  .qp-explorer-frame, .qp-nav { transition: none; }
 }
 
 /* Tab strips scroll sideways without a visible scrollbar; the wheel scrolls them horizontally (TabBar). */

@@ -186,6 +186,7 @@ falls back to keeping everything in the browser.
   per-signal "why"; Accept / Reject / Edit them, or insert the `JOIN … ON …` clause directly
 - **SQL with a real editor** — Monaco with table/column autocomplete; Ctrl/⌘+Enter runs the
   query, or only the selected part
+- **Visual Query Designer** — an interactive visual builder right in your worksheet (Ctrl/⌘+Shift+V or "Visual Builder" in the toolbar): select tables, choose columns, leverage automatically inferred foreign-key relationships to link tables, configure join types (INNER, LEFT, RIGHT) and WHERE criteria, and transfer the generated SQL directly into the editor
 - **Tables you create with SQL are first-class** — `CREATE TABLE`, `CREATE VIEW`, `INSERT`,
   `ALTER`, `DROP`… the sidebar follows DuckDB's catalog, and new or changed tables are saved
   (as Parquet snapshots) so they survive reloads, travel in share links and sync to rooms
@@ -249,10 +250,12 @@ falls back to keeping everything in the browser.
   pie, scorecard; date buckets, aggregations, group-by, stacking, PNG download) and a stats
   pane listing every column with its distribution
 - **Explorer, history and status bar** — a searchable Tables panel for tables, views and columns
-  that opens beside SQL and Notebooks: hover or focus a row for a summary card (shape, source,
-  keys, Open / Preview), pin tables to the top (remembered per space), and while searching every
-  match stays expanded with "n of m columns" counts, highlights and an "Ask the Assistant about …"
-  row; history search with a succeeded/failed filter and a Run again action; a status bar with
+  that opens beside SQL and Notebooks: expand a table to list its columns (type and key marks; click
+  to insert), hover or focus a row for a summary card (shape, source, keys, Open / Preview), pin
+  tables to the top (remembered per space), and while searching every match stays expanded with
+  "n of m columns" counts, highlights and an "Ask the Assistant about …" row. The SQL worksheet
+  shows the open space, the `main` schema and the 10,000-row grid limit under the tabs. History
+  search has a succeeded/failed filter and a Run again action; a status bar shows
   the engine and its DuckDB version, space, storage location, cursor line/column and selection
   size, the last result (click an error to jump to it) and the active AI model; Format SQL
   (Shift+Alt+F)

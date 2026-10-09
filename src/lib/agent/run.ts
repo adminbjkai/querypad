@@ -1,5 +1,6 @@
-import { useWorkspaceStore, type HistoryEntry } from "@/stores/workspace-store";
-import type { CatalogSnapshot, StepResult } from "./plan";
+import { flushWorkspaceSave, useWorkspaceStore, type HistoryEntry } from "@/stores/workspace-store";
+import { newCell } from "../notebook/cells";
+import { nextNotebookName, type CatalogSnapshot, type NotebookDraft, type StepResult } from "./plan";
 
 /**
  * Runs one Agent step through the same engine path as the workbench: `executeQuery`, then —
@@ -50,6 +51,47 @@ export async function runStep(sql: string): Promise<StepResult> {
     rowCount: result.rowCount,
     ms: result.executionTimeMs,
     ...(affected !== undefined && Number.isFinite(affected) ? { affected } : {}),
+  };
+}
+
+/**
+ * Create a notebook in the open space from an agent step and return a one-row result.
+ * Does not run the cells — the notebook is there for the user to run, top to bottom.
+ */
+function whenHydrated(): Promise<void> {
+  // Node tests have no space load to wait for. In the app, creating during load is overwritten.
+  if (useWorkspaceStore.getState()._hydrated || typeof window === "undefined") return Promise.resolve();
+  return new Promise((resolve) => {
+    const unsub = useWorkspaceStore.subscribe((state) => {
+      if (!state._hydrated) return;
+      unsub();
+      resolve();
+    });
+  });
+}
+
+export async function runNotebookStep(draft: NotebookDraft): Promise<StepResult> {
+  const started = performance.now();
+  // A notebook created before the space finishes loading is replaced by the loaded record.
+  await whenHydrated();
+  const ws = useWorkspaceStore.getState();
+  const name = nextNotebookName(draft.name, ws.notebooks.map((n) => n.name));
+  const notebook = ws.createNotebook(name);
+  useWorkspaceStore.getState().updateNotebookCells(
+    notebook.id,
+    draft.cells.map((cell) => newCell(cell.kind, cell.source))
+  );
+  // The space save is debounced. Flush it so a sync poll cannot reload the space without this notebook.
+  await flushWorkspaceSave();
+  const sql = draft.cells.filter((c) => c.kind === "sql").length;
+  const text = draft.cells.length - sql;
+  return {
+    columns: ["notebook", "cells"],
+    columnTypes: ["VARCHAR", "VARCHAR"],
+    rows: [{ notebook: name, cells: `${sql} SQL, ${text} text` }],
+    rowCount: 1,
+    ms: Math.round(performance.now() - started),
+    notebookId: notebook.id,
   };
 }
 

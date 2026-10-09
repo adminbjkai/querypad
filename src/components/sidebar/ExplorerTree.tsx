@@ -38,6 +38,34 @@ export function insertColumnName(name: string): void {
   if (!insertAtCursor(text)) toast("Open the SQL editor to insert names.", "info");
 }
 
+/** Chevron for a table or view. Search opens matches itself, so the control is only a button when the user can toggle it. */
+function ExpandControl({ expanded, canToggle, name, onToggle }: { expanded: boolean; canToggle: boolean; name: string; onToggle: () => void }) {
+  const icon = <Icon name="chevronRight" size={14} className={`shrink-0 text-faint transition-transform ${expanded ? "rotate-90" : ""}`} />;
+  if (!canToggle) {
+    return (
+      <span className="inline-flex size-5 shrink-0 items-center justify-center" aria-hidden="true">
+        {expanded ? icon : null}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={`${expanded ? "Collapse" : "Expand"} ${name}`}
+      title={expanded ? "Hide columns" : "Show columns"}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className="inline-flex size-5 shrink-0 items-center justify-center rounded text-faint hover:bg-sunken hover:text-ink"
+    >
+      {icon}
+    </button>
+  );
+}
+
 const indent = (level: number) => ({ paddingLeft: `${(level - 1) * 14 + 6}px` });
 const ROW = "group relative flex h-7 items-center rounded-md transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
@@ -53,6 +81,9 @@ interface ObjectRowProps {
   pinned: boolean;
   profileActive: boolean;
   keyColumns: Map<string, "key" | "ref">;
+  /** A chevron the user can click. Search expands matches on its own, so it stays visual then. */
+  canToggle: boolean;
+  onToggleExpand: () => void;
   onSelect: () => void;
   onOpen: () => void;
   onProfile: () => void;
@@ -72,6 +103,8 @@ function ObjectRow({
   pinned,
   profileActive,
   keyColumns,
+  canToggle,
+  onToggleExpand,
   onSelect,
   onOpen,
   onProfile,
@@ -144,6 +177,7 @@ function ObjectRow({
         style={indent(level)}
         className={`${ROW} ${selected ? "bg-accent-soft ring-1 ring-accent hover:bg-accent-soft" : ""}`}
       >
+        <ExpandControl expanded={expanded === true} canToggle={canToggle} name={table.name} onToggle={onToggleExpand} />
         <button
           data-main
           tabIndex={-1}
@@ -154,6 +188,11 @@ function ObjectRow({
         >
           <Icon name={isView ? "code" : "table"} size={14} className={`shrink-0 ${selected ? "text-accent" : "text-muted"}`} />
           <span className="truncate font-mono text-[12px] font-medium text-ink">
+            {table.database && table.database !== "memory" ? (
+              <span className="text-faint">{table.database}.{table.schema ?? "main"}.</span>
+            ) : table.schema && table.schema !== "main" ? (
+              <span className="text-faint">{table.schema}.</span>
+            ) : null}
             <Highlight text={table.name} query={query} />
           </span>
           {pinned && <PinIcon size={12} className="text-accent" aria-label="pinned" />}
@@ -248,7 +287,7 @@ interface ExplorerTreeProps {
   onTogglePin: (name: string) => void;
 }
 
-/** The explorer: space → Tables / Views groups → objects (→ matching columns while searching). */
+/** The explorer: space → Tables / Views groups → objects → columns (expand a table, or search). */
 export default function ExplorerTree({
   spaceName,
   tables,
@@ -268,7 +307,16 @@ export default function ExplorerTree({
 }: ExplorerTreeProps) {
   const treeRef = useRef<HTMLDivElement>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
   const searching = query !== "";
+  const toggleObject = (id: string) => {
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const nodes: Node[] = [{ id: "root", kind: "root", level: 1, parent: null }];
   if (!collapsed.has("root")) {
@@ -285,8 +333,11 @@ export default function ExplorerTree({
       for (const table of g.items) {
         const matches = searching ? table.columns.filter((c) => c.name.toLowerCase().includes(query)) : [];
         const objectId = `obj:${g.key === "views" ? "view" : "table"}:${table.name}`;
-        nodes.push({ id: objectId, kind: "object", level: 3, parent: id, table, isView: g.key === "views", matched: matches.length, expanded: matches.length > 0 ? true : undefined });
-        for (const column of matches) nodes.push({ id: `${objectId}:${column.name}`, kind: "column", level: 4, parent: objectId, table: table.name, column });
+        const userOpen = !searching && openIds.has(objectId) && table.columns.length > 0;
+        const listed = searching ? matches : userOpen ? table.columns : [];
+        const expanded = searching ? (matches.length > 0 ? true : undefined) : table.columns.length > 0 ? userOpen : undefined;
+        nodes.push({ id: objectId, kind: "object", level: 3, parent: id, table, isView: g.key === "views", matched: matches.length, expanded });
+        for (const column of listed) nodes.push({ id: `${objectId}:${column.name}`, kind: "column", level: 4, parent: objectId, table: table.name, column });
       }
     }
   }
@@ -321,10 +372,12 @@ export default function ExplorerTree({
         if (kind === "root" || kind === "group") {
           if (expanded === "false") onToggleNode(id);
           else focusAt(index + 1);
-        } else if (kind === "object" && expanded === "true") focusAt(index + 1);
+        } else if (kind === "object" && expanded === "false") toggleObject(id);
+        else if (kind === "object" && expanded === "true") focusAt(index + 1);
         break;
       case "ArrowLeft":
         if ((kind === "root" || kind === "group") && expanded === "true" && !(kind === "group" && searching)) onToggleNode(id);
+        else if (kind === "object" && expanded === "true" && !searching) toggleObject(id);
         else if (item.dataset.parent) focusAt(items.findIndex((el) => el.dataset.id === item.dataset.parent));
         break;
       case "Enter":
@@ -413,6 +466,8 @@ export default function ExplorerTree({
               pinned={!node.isView && pins.includes(name)}
               profileActive={profileTable === name}
               keyColumns={keyColumns}
+              canToggle={!searching && node.table.columns.length > 0}
+              onToggleExpand={() => toggleObject(node.id)}
               onSelect={() => onSelect(name)}
               onOpen={() => openTablePage(name)}
               onProfile={() => onProfile(name)}

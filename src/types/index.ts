@@ -7,6 +7,10 @@ export interface TableInfo {
   name: string;
   columns: ColumnInfo[];
   rowCount: number;
+  /** Schema this object was read from. Missing means `main` (saved before schemas were tracked). */
+  schema?: string;
+  /** Database this object was read from. Missing means `memory`. */
+  database?: string;
 }
 
 export type ProfileColumnKind = "numeric" | "date" | "text" | "boolean" | "other";

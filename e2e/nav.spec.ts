@@ -37,7 +37,7 @@ test.describe("Navigation", () => {
     await expect(page.getByRole("heading", { name: "Tables", level: 1 })).toBeVisible();
     await expect(nav(page).getByRole("button", { name: "Tables", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(breadcrumb(page)).toContainText("Tables");
-    await expect(page.getByText("2 tables")).toBeVisible();
+    await expect(page.getByText("2 tables in this space")).toBeVisible();
     const catalog = page.getByRole("region", { name: "Data catalog" });
     await expect(catalog.getByRole("row", { name: /employees/ })).toBeVisible();
     await expect(catalog.getByRole("row", { name: /departments/ })).toBeVisible();
