@@ -51,7 +51,7 @@ function rememberSpaces(spaces: SpaceMeta[]) {
 }
 
 function serverStorage(): Promise<boolean> {
-  backend ??= fetch("/api/store", { cache: "no-store" })
+  backend ??= fetch("/api/store", { cache: "no-cache" })
     .then((r) => (r.ok ? "server" : "browser"))
     .catch(() => "browser" as const);
   return backend.then((b) => b === "server");
@@ -66,6 +66,22 @@ export function hasPendingWrites(): boolean {
   return inFlight > 0;
 }
 
+let settleWaiters: (() => void)[] = [];
+
+/** Resolves once no write is on its way (at once when none is), or after `timeoutMs`. */
+export function whenWritesSettle(timeoutMs = 5000): Promise<void> {
+  if (inFlight === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, timeoutMs);
+    function done() {
+      clearTimeout(timer);
+      settleWaiters = settleWaiters.filter((w) => w !== done);
+      resolve();
+    }
+    settleWaiters.push(done);
+  });
+}
+
 /** Transient failures: the server restarting (502–504) or a route still warming up (404). */
 const RETRYABLE = new Set([404, 502, 503, 504]);
 const RETRY_DELAYS_MS = [300, 1200];
@@ -77,7 +93,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       let res: Response | null = null;
       try {
-        res = await fetch(url, { cache: "no-store", ...init });
+        // `no-cache` revalidates every time: an unchanged poll costs an empty 304 instead of the body.
+        res = await fetch(url, { cache: "no-cache", ...init });
       } catch (err) {
         if (attempt >= RETRY_DELAYS_MS.length) throw err;
       }
@@ -90,6 +107,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     }
   } finally {
     inFlight -= writing ? 1 : 0;
+    if (inFlight === 0) for (const done of [...settleWaiters]) done();
   }
 }
 
@@ -174,7 +192,8 @@ export async function saveSpaceFile(spaceId: string, entry: FileEntry): Promise<
   const { rev, version } = await request<{ rev: number; version: string }>(fileUrl(spaceId, entry.name), {
     method: "PUT",
     headers: { "Content-Type": "application/octet-stream" },
-    body: new Uint8Array(entry.data),
+    // Sent as is: fetch copies the bytes when called, and they never live in shared memory.
+    body: entry.data as Uint8Array<ArrayBuffer>,
   });
   versionsOf(spaceId).set(entry.name, version);
   recordSpaceWrite(spaceId, rev);
@@ -212,7 +231,8 @@ export async function loadSpace(spaceId: string, onEntry?: FileEntryHandler): Pr
       .map(async ({ name, fileName }): Promise<FileEntry | null> => {
         let res: Response;
         try {
-          res = await fetch(fileUrl(spaceId, name), { cache: "no-store" });
+          // Revalidated with the file's ETag: unchanged bytes come from the browser cache (304).
+          res = await fetch(fileUrl(spaceId, name), { cache: "no-cache" });
         } catch {
           return null; // reported as an unrestored file, like a non-OK response
         }

@@ -9,7 +9,6 @@ e2e
 test
 Dockerfile
 docker-compose.yml
-aiprompt.md
 PROGRESS.md
 .env*
 *.png

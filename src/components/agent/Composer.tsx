@@ -54,7 +54,7 @@ export default function Composer({
   return (
     <div className="shrink-0 px-5 pb-3 pt-1 sm:px-8">
       <div className="mx-auto w-full max-w-[880px]">
-        <div className="rounded-2xl border border-line bg-surface shadow-sm transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
+        <div className="rounded-lg border border-line-strong bg-surface transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
           <textarea
             ref={inputRef}
             value={text}

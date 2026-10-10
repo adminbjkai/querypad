@@ -1,5 +1,5 @@
 import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
-import { getDB } from "./instance";
+import { getConnection, getDB } from "./instance";
 import { splitStatements } from "./queries";
 import { isReadOnlyStatement, leading } from "./catalog-sql";
 
@@ -34,7 +34,11 @@ async function runCheck(sql: string): Promise<SqlCheck> {
     return { status: "skipped", reason: "contains statements that can't be test-run safely" };
   }
 
-  checkConnection ??= await (await getDB()).connect();
+  if (!checkConnection) {
+    // The main connection creates the internal `querypad` schema; checks may reference it.
+    await getConnection();
+    checkConnection = await (await getDB()).connect();
+  }
   const conn = checkConnection;
   await conn.query("BEGIN TRANSACTION");
   try {

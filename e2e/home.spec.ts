@@ -10,7 +10,7 @@ async function openWithSamples(page: Page) {
 
 async function openHome(page: Page) {
   await page.getByRole("button", { name: "Home", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /What do you want to know/, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What do you want to know/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
 }
 
@@ -49,6 +49,25 @@ test.describe("Home", () => {
     await page.getByRole("button", { name: "Inspect dataset employees" }).click();
     await expect(page.getByRole("button", { name: "Tables", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("complementary", { name: /employees/ })).toBeVisible();
+  });
+
+  test("the schema map opens a table and queries a join", async ({ page }) => {
+    await openWithSamples(page);
+    await openHome(page);
+    const map = page.getByRole("figure", { name: "Schema map" });
+    await expect(map.getByRole("button", { name: "Open table departments" })).toBeVisible();
+    // The join between the two sample tables is drawn once discovery has run.
+    const join = map.getByRole("button", { name: /^Query (employees joined to departments|departments joined to employees)$/ });
+    await expect(join).toBeVisible({ timeout: 20_000 });
+    await join.click();
+    await expect(page.getByRole("button", { name: "SQL", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".monaco-editor")).toContainText("JOIN");
+    await expect(page.getByRole("columnheader", { name: /dept_name/ })).toBeVisible({ timeout: 15_000 });
+
+    await openHome(page);
+    await page.getByRole("figure", { name: "Schema map" }).getByRole("button", { name: "Open table employees" }).click();
+    await expect(page.getByRole("button", { name: "Tables", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "employees", level: 1 })).toBeVisible();
   });
 
   test("preview opens a runnable SQL tab and New query returns to the workbench", async ({ page }) => {

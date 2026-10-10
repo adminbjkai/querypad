@@ -60,8 +60,6 @@ interface AssistantState {
   newChat: () => void;
   switchChat: (id: string) => void;
   deleteChat: (id: string) => void;
-  /** Same as newChat (kept for existing callers). */
-  reset: () => void;
 }
 
 const MAX_ROUNDS = 3;
@@ -331,7 +329,6 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     persist(get().spaceId, get().activeId, conversations);
   },
 
-  reset: () => get().newChat(),
 }));
 
 // Follow the open space even while the panel is closed: stop an answer in progress (later

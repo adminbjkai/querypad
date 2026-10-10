@@ -60,7 +60,7 @@ test.describe("Agent", () => {
   test("plans, waits for each write, runs the read, summarizes and keeps the session", async ({ page }) => {
     const bodies = await mockModel(page, [PLAN, SUMMARY]);
     await openAgent(page);
-    await expect(page.getByText("Hi — what should we build?")).toBeVisible();
+    await expect(page.getByText("What should we build?")).toBeVisible();
 
     await composer(page).fill("Create a customers table with two rows");
     await composer(page).press("Enter");

@@ -7,10 +7,6 @@ export interface TableInfo {
   name: string;
   columns: ColumnInfo[];
   rowCount: number;
-  /** Schema this object was read from. Missing means `main` (saved before schemas were tracked). */
-  schema?: string;
-  /** Database this object was read from. Missing means `memory`. */
-  database?: string;
 }
 
 export type ProfileColumnKind = "numeric" | "date" | "text" | "boolean" | "other";
@@ -98,4 +94,4 @@ export interface EditorTab {
   createdAt: number;
 }
 
-export type { Folder, SavedQuery, Notebook, NotebookCell, NotebookCellKind } from "./library";
+export type { Folder, SavedQuery, Notebook } from "./library";

@@ -11,18 +11,60 @@ import {
   type DateBucket,
 } from "@/lib/charts/detect";
 import { AGG_LABELS, MAX_SERIES } from "@/lib/charts/aggregate";
-import { Icon } from "@/components/ui/icons";
+import { Icon, type IconName } from "@/components/ui/icons";
 import { KindGlyph, SectionLabel, Select, btn } from "@/components/ui/primitives";
 
-const TYPES: { value: ChartType; label: string }[] = [
-  { value: "bar", label: "Bar" },
-  { value: "hbar", label: "Horizontal bar" },
-  { value: "line", label: "Line" },
-  { value: "area", label: "Area" },
-  { value: "scatter", label: "Scatter" },
-  { value: "pie", label: "Pie / donut" },
-  { value: "scorecard", label: "Scorecard" },
+const TYPES: { value: ChartType; label: string; icon: IconName }[] = [
+  { value: "bar", label: "Bar", icon: "chart" },
+  { value: "hbar", label: "Horizontal bar", icon: "chartHBar" },
+  { value: "line", label: "Line", icon: "chartLine" },
+  { value: "area", label: "Area", icon: "chartArea" },
+  { value: "scatter", label: "Scatter", icon: "chartScatter" },
+  { value: "pie", label: "Pie / donut", icon: "chartPie" },
+  { value: "scorecard", label: "Scorecard", icon: "chartScorecard" },
 ];
+
+/** Chart types as a row of pictograms (a radiogroup: arrow keys move the choice). */
+function ChartTypePicker({ value, onChange }: { value: ChartType; onChange: (type: ChartType) => void }) {
+  const step = (from: number, by: number) => {
+    const next = TYPES[(from + by + TYPES.length) % TYPES.length];
+    onChange(next.value);
+    requestAnimationFrame(() => document.getElementById(`qp-chart-type-${next.value}`)?.focus());
+  };
+  return (
+    <div role="radiogroup" aria-label="Chart type" className="grid grid-cols-7 gap-1">
+      {TYPES.map((t, i) => {
+        const on = t.value === value;
+        return (
+          <button
+            key={t.value}
+            id={`qp-chart-type-${t.value}`}
+            role="radio"
+            aria-checked={on}
+            aria-label={t.label}
+            title={t.label}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onChange(t.value)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                e.preventDefault();
+                step(i, 1);
+              } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                e.preventDefault();
+                step(i, -1);
+              }
+            }}
+            className={`flex h-8 items-center justify-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+              on ? "border-accent bg-accent-soft text-accent" : "border-line text-muted hover:border-line-strong hover:text-ink"
+            }`}
+          >
+            <Icon name={t.icon} size={16} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 const BUCKETS: { value: DateBucket; label: string }[] = (["none", "day", "week", "month", "quarter", "year"] as DateBucket[]).map((b) => ({
   value: b,
   label: b === "none" ? "None" : b[0].toUpperCase() + b.slice(1),
@@ -113,7 +155,7 @@ export default function ChartSettings({
       <div className="flex h-9 shrink-0 items-center border-b border-line bg-chrome px-3 text-[13px] font-semibold text-ink">Chart settings</div>
       <div className="min-h-0 flex-1 overflow-auto">
         <Section title="Chart type">
-          <Select value={type} onChange={setType} options={TYPES} ariaLabel="Chart type" size="sm" className="w-full" />
+          <ChartTypePicker value={type} onChange={setType} />
         </Section>
 
         {type !== "scorecard" && (

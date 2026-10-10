@@ -3,15 +3,60 @@
 QueryPad is a web app, not an npm package. Version numbers mark GitHub release
 milestones and public product updates.
 
-## Unreleased
+## v0.17.0 — The engineering pad: a design of its own, a schema map, a lighter engine path
 
-- **Visual Query Designer**: an interactive visual builder directly integrated into the SQL worksheet (accessible via `Mod+Shift+V`, the worksheet toolbar toggle, Command Palette, or NavRail "Visual query"). Drag or select tables, pick columns, automatically infer joins based on QueryPad's discovered relationships, customize JOIN types (`INNER`, `LEFT`, `RIGHT`) and WHERE conditions, and push the resolved SQL straight into the query editor with one click.
-- **Worksheet context & Database/Schema control**: under the SQL tabs, a context header names the open space, active database (`memory`), schema (`main`), and row limit (10,000). The schema selector provides immediate database and schema awareness with engine readiness guards.
-- **Explorer columns & deep hierarchy**: each table and view expands inline to its columns with semantic type glyphs (`text-k-num`, `text-k-text`, `text-k-date`, `text-k-bool`) and key indicators; clicking inserts the column name directly into the editor; Right/Left arrow expands and collapses smoothly.
-- **DuckDB internal schema race immunity**: the `querypad` metadata schema (`querypad.relationships` and `querypad.keys`) is proactively initialized upon DuckDB connection creation, ensuring AI validations and queries never encounter binder errors even before initial relationship scans finish.
-- **Rock-solid persistence & hydration**: added `hasPendingWrites()` flushing to workspace saves and `data-hydrated` state tracking on the root container, eliminating race conditions during fast reloads and multi-tab sync.
-- **UI design system & aesthetic refinement**: enhanced design tokens in `globals.css` with subtle glassmorphic backdrops, smooth card transitions, refined column kind palettes, and streamlined toolbars.
-- **Tables catalog polish**: counts tables accurately, searches tables in catalog view, and standardizes DuckDB uppercase type naming across all profile cards, column drawers, and result headers.
+- **A new look**: QueryPad drops the generic SaaS styling for "the engineering pad" — sage
+  graph-paper surfaces, graphite ink, one teal-ink accent and a highlighter for selections, in
+  matching light and dark themes. Instrument Sans (with a narrowed display cut for page and space
+  titles) and IBM Plex Mono replace Inter and JetBrains Mono; section labels are sentence case;
+  buttons and inputs are flat; header actions are quiet until hovered; the SQL editor's colors
+  follow the same palette. Column kinds keep their own inks (numbers blue, text plum, dates rust,
+  booleans olive)
+- **Home is the space at a glance**: the space name and live counts (tables, rows, joins still to
+  review, profiled), then a **schema map** of every table and view on graph paper, laid out left
+  to right by what references what and joined by the relationships QueryPad found — solid once
+  accepted, dashed while unreviewed. Click a table to open its page, a join to open (and run) a
+  query joining the two tables, or "Review N joins" for the Joins panel. The Assistant box,
+  suggestions, quick actions, Recent and the business entities follow. An empty space leads with
+  the drop zone
+- **Run the statement at the cursor**: Ctrl/⌘+Shift+Enter runs only the statement under the
+  cursor (split on `;`, ignoring semicolons in strings, quoted names and comments); Ctrl/⌘+Enter
+  still runs the whole tab or the selection
+- **Chart types as pictograms**: the chart builder picks bar, horizontal bar, line, area, scatter,
+  pie or scorecard from a row of icons (arrow keys move the choice)
+- **Navigation**: a full-width Search box and "New query ▾" control (nothing truncates any more);
+  the current page is a teal-tinted row. Panel links from Home, the command palette and onboarding
+  (Joins, Snippets, History) now open the workbench with that panel instead of doing nothing
+- **Agent, Notebooks, Folders**: the Agent's empty state explains the Plan → Approve → Review
+  sequence and lists prompts to try; empty Notebooks and Folders pages offer "Create a notebook" /
+  "Create a folder"
+- **Visual Query Designer** (new since v0.16.1): a table-and-join builder in place of the SQL
+  editor (Ctrl/⌘+Shift+V, the "Visual query designer" toggle in the editor toolbar, the command
+  palette, or New ▾ › Visual query). Add tables from a menu and check columns; each table joins on
+  a discovered relationship or a shared key-like column (`*_id`, `*_key`, `*_code`) —
+  never on a guess — and otherwise waits for you to pick the join columns. Join types (INNER,
+  LEFT, RIGHT) and a WHERE condition are editable; a column name picked from two tables gets a
+  `<table>_<column>` alias; "Use in editor" fills an empty tab or opens a new one rather than
+  overwriting your SQL. Ctrl/⌘+Shift+V no longer swallows paste in text fields
+- **Explorer**: tables and views expand inline to their columns (kind glyph, type, key mark;
+  click to insert; Right/Left to expand and collapse)
+- **Lighter on memory and network**:
+  - Query results stream out of DuckDB batch by batch: only the 10,000 rows the grid shows are
+    kept (the total row count stays exact), instead of copying the whole result into the page
+  - Table files and the live-sync poll answer with ETags, so reloads and other devices' edits
+    revalidate instead of downloading every table again
+  - DuckDB no longer echoes every statement to the browser console
+  - The share-link encoder (and its compression library) loads when you share, not with the page
+  - The tab bar and status bar no longer re-render on every keystroke or cursor move
+- **Fixes**: removed the database/schema switcher added after v0.16.1 (it was not saved, went stale
+  after switching spaces and could carry tables into another space); the internal `querypad`
+  schema exists before the first query and after clearing a space; SQL checks wait for it; an
+  Agent notebook step can no longer wait forever for a space that never finishes loading; flushing
+  a save waits for saves already in flight without polling; type names are shown as DuckDB
+  reports them (no forced uppercase); file sizes read "100 MB", not "100.0 MB"
+- **Cleanup**: unused icons, exports and store actions removed; duplicate helpers merged (SQL
+  literal stripping, number and relative-time formatting, identifier and string quoting); local
+  scratch folders removed
 
 ## v0.16.1 — No loading splash, and a Database Explorer for tables
 

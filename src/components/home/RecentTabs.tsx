@@ -164,7 +164,7 @@ export default function RecentTabs() {
   return (
     <section aria-label="Recent" className="mt-8">
       <h2 className="mb-2 text-[14px] font-semibold leading-5 text-ink">Recent</h2>
-      <div className="overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="overflow-hidden rounded-lg border border-line bg-surface">
         <Tabs value={tab} onChange={(v) => setTab(v as Tab)} ariaLabel="Recent" className="px-3" tabs={TABS.map((t) => ({ value: t, label: t }))} />
         <div role="tabpanel" aria-label={tab}>
           {tab === "Datasets" ? (

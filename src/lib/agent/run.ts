@@ -54,22 +54,30 @@ export async function runStep(sql: string): Promise<StepResult> {
   };
 }
 
-/**
- * Create a notebook in the open space from an agent step and return a one-row result.
- * Does not run the cells — the notebook is there for the user to run, top to bottom.
- */
+const HYDRATE_TIMEOUT_MS = 15_000;
+
+/** Resolves once the open space has loaded; rejects if it hasn't within 15 s. */
 function whenHydrated(): Promise<void> {
   // Node tests have no space load to wait for. In the app, creating during load is overwritten.
   if (useWorkspaceStore.getState()._hydrated || typeof window === "undefined") return Promise.resolve();
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      unsub();
+      reject(new Error("The space is still loading, so the notebook was not created. Try again once it has loaded."));
+    }, HYDRATE_TIMEOUT_MS);
     const unsub = useWorkspaceStore.subscribe((state) => {
       if (!state._hydrated) return;
+      clearTimeout(timer);
       unsub();
       resolve();
     });
   });
 }
 
+/**
+ * Create a notebook in the open space from an agent step and return a one-row result.
+ * Does not run the cells — the notebook is there for the user to run, top to bottom.
+ */
 export async function runNotebookStep(draft: NotebookDraft): Promise<StepResult> {
   const started = performance.now();
   // A notebook created before the space finishes loading is replaced by the loaded record.

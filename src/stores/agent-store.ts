@@ -120,7 +120,6 @@ interface AgentState {
   retryStep: (id: string) => Promise<void>;
   setApprovals: (approvals: Approvals) => void;
   setPlanOnly: (planOnly: boolean) => void;
-  setModel: (provider: AiProvider) => void;
 }
 
 const MAX_SESSIONS = 30;
@@ -470,7 +469,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     if (id) patchSession(id, get().spaceId, () => ({ planOnly }), false);
   },
 
-  setModel: (provider) => useAiStore.getState().setProvider(provider),
 }));
 
 function catalogNow(): CatalogSnapshot {

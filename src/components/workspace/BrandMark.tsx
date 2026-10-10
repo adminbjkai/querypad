@@ -1,7 +1,7 @@
 /** QueryPad mark: two tables joined by a key — the thing the app is about. */
 export function BrandMark({ size = 22 }: { size?: number }) {
   return (
-    <svg className="qp-brand-mark" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
       <rect x="2.5" y="5" width="11" height="15" rx="2.5" fill="none" stroke="var(--brand-ink, var(--ink))" strokeWidth="2" />
       <rect x="18.5" y="12" width="11" height="15" rx="2.5" fill="none" stroke="var(--brand-ink, var(--ink))" strokeWidth="2" />
       <path d="M2.5 10h11M18.5 17h11" stroke="var(--brand-ink, var(--ink))" strokeWidth="2" />

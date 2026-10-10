@@ -35,7 +35,7 @@ export default function Composer() {
   }
 
   return (
-    <div className="qp-home-composer rounded-2xl border border-line bg-surface p-3 shadow-sm">
+    <div className="qp-home-composer rounded-lg border border-line-strong bg-surface p-2.5">
       <textarea
         ref={ref}
         rows={2}
@@ -52,7 +52,7 @@ export default function Composer() {
         className="block max-h-28 w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 text-ink outline-none placeholder:text-faint"
       />
       <div className="mt-1 flex items-center justify-between gap-3">
-        <span className="hidden pl-1.5 text-[11px] text-faint sm:inline">Enter to send · Shift+Enter for a new line</span>
+        <span className="hidden pl-1.5 text-[12px] text-faint sm:inline">Enter sends, Shift+Enter adds a line</span>
         <div className="ml-auto flex items-center gap-2">
           <ModelPicker compact />
           <button
@@ -60,7 +60,7 @@ export default function Composer() {
             onClick={submit}
             disabled={!text.trim() || busy}
             aria-label="Ask the assistant"
-            className="inline-flex size-8 items-center justify-center rounded-full bg-accent text-on-accent shadow-sm transition-[background-color,transform] hover:bg-accent-hover active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:opacity-45"
+            className="inline-flex size-8 items-center justify-center rounded-md bg-accent text-on-accent transition-[background-color,transform] hover:bg-accent-hover active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:opacity-45"
           >
             <Icon name="arrowUp" size={16} />
           </button>

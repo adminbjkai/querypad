@@ -6,6 +6,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env.server
+    environment:
+      # Keep the Node heap well inside the container limit so it collects instead of growing.
+      - NODE_OPTIONS=--max-old-space-size=256
     ports:
       - "127.0.0.1:8059:3000"
     volumes:

@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { useWorkspaceStore } from "@/stores/workspace-store";
+import { selectEngineReady, useWorkspaceStore } from "@/stores/workspace-store";
 import { saveCurrentAsSnippet } from "@/stores/snippet-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useCollaborationStore } from "@/stores/collaboration-store";
 import { registerEditor } from "@/lib/editor-bridge";
 import { runActive, saveActiveQuery } from "@/lib/workspace-actions";
 import { formatSql } from "./format-sql";
+import { statementAt } from "@/lib/editor/statement-at";
 import { defineQueryPadThemes, codeFontFamily } from "@/lib/monaco-theme";
 // Importing monaco-setup also points the Monaco loader at the same-origin runtime.
 import { monacoThemeName, registerSqlCompletion } from "@/lib/editor/monaco-setup";
@@ -113,6 +114,20 @@ export default function QueryEditor() {
       run: () => {
         hideHover(editor);
         runActive();
+      },
+    });
+    editor.addAction({
+      id: "querypad.runStatement",
+      label: "Run the statement at the cursor",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
+      run: () => {
+        hideHover(editor);
+        const model = editor.getModel();
+        const position = editor.getPosition();
+        const ws = useWorkspaceStore.getState();
+        if (!model || !position || !selectEngineReady(ws)) return;
+        const statement = statementAt(model.getValue(), model.getOffsetAt(position));
+        if (statement) void ws.runQuery(undefined, statement);
       },
     });
     editor.addAction({

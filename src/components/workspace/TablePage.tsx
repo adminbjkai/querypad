@@ -45,7 +45,7 @@ function StatTile({ label, value }: { label: string; value: string }) {
 function SortHeader({ label, active, dir, onClick, className = "" }: { label: string; active: boolean; dir: "asc" | "desc"; onClick: () => void; className?: string }) {
   return (
     <th scope="col" aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"} className={`h-8 px-3 font-medium ${className}`}>
-      <button onClick={onClick} className="inline-flex items-center gap-1 rounded text-[11px] uppercase tracking-wide text-faint hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+      <button onClick={onClick} className="inline-flex items-center gap-1 rounded text-[12px] font-medium text-faint hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
         {label}
         <Icon name={active ? (dir === "asc" ? "sortAsc" : "sortDesc") : "sort"} size={12} className={active ? "text-accent" : "opacity-60"} />
       </button>
@@ -195,13 +195,10 @@ export default function TablePage() {
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
                 <Icon name={isView ? "file" : "table"} size={16} />
               </span>
-              <h1 className="min-w-0 truncate font-mono text-[22px] font-semibold leading-7 tracking-[-0.01em] text-ink" title={name}>{name}</h1>
+              <h1 className="min-w-0 truncate font-mono text-[24px] font-semibold leading-8 tracking-[-0.02em] text-ink" title={name}>{name}</h1>
             </div>
             <p className="mt-1.5 text-[13px] text-muted">
               {isView ? "View" : "Table"}
-              {(info.schema && info.schema !== "main") || (info.database && info.database !== "memory") ? (
-                <> · <span className="font-mono text-[12px] text-ink">{info.database ?? "memory"}.{info.schema ?? "main"}</span></>
-              ) : null}
               {fileEntry && <> · from <span className="font-mono text-[12px] text-ink">{fileEntry.fileName}</span></>}
               {!isView && <> · {info.rowCount.toLocaleString()} rows · {info.columns.length} columns</>}
             </p>
@@ -268,7 +265,7 @@ export default function TablePage() {
                         <SortHeader label="#" active={sort.key === "index"} dir={sort.dir} onClick={() => toggleSort("index")} className="w-14" />
                         <SortHeader label="Column name" active={sort.key === "name"} dir={sort.dir} onClick={() => toggleSort("name")} />
                         <SortHeader label="Type" active={sort.key === "type"} dir={sort.dir} onClick={() => toggleSort("type")} className="w-40" />
-                        <th scope="col" className="h-8 w-52 px-3 text-[11px] font-medium uppercase tracking-wide text-faint max-sm:hidden">Keys</th>
+                        <th scope="col" className="h-8 w-52 px-3 text-[12px] font-medium text-faint max-sm:hidden">Keys</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line border-t border-line">
@@ -283,7 +280,7 @@ export default function TablePage() {
                                 <span className="truncate font-mono text-[12px] font-medium text-ink">{c.name}</span>
                               </span>
                             </td>
-                            <td className="truncate px-3 font-mono text-[12px] uppercase text-muted" title={c.type}>{c.type}</td>
+                            <td className="truncate px-3 font-mono text-[12px] text-muted" title={c.type}>{c.type}</td>
                             <td className="px-3 max-sm:hidden">
                               <span className="flex items-center gap-1.5">
                                 {mark && (
@@ -335,8 +332,7 @@ export default function TablePage() {
                         <li key={key}>
                           <button
                             onClick={() => {
-                              useUiStore.getState().setWorkspacePage("workbench");
-                              useUiStore.getState().showPanel("joins");
+                              useUiStore.getState().openPanel("joins");
                             }}
                             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
                             title="Review in the Joins panel"

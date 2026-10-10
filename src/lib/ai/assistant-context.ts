@@ -1,4 +1,5 @@
 import type { QueryResult } from "../../types";
+import { stripSqlLiterals } from "../duckdb/sql-utils";
 import { buildWorkspaceContext, type WorkspaceContextInput } from "./workspace-context";
 
 /**
@@ -107,15 +108,6 @@ const AUTO_DENY =
 /** Table functions that read files or URLs, or run SQL given as a string. */
 const AUTO_DENY_FUNCTIONS = /\b(read_\w+|\w+_scan|glob|sniff_csv|query|query_table|parquet_metadata|parquet_schema)\s*\(/i;
 
-/** Replace comments and string literals with spaces so keyword checks see only SQL. */
-function stripLiterals(sql: string): string {
-  return sql
-    .replace(/--[^\n]*/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/'(?:[^']|'')*'/g, "''")
-    .replace(/"(?:[^"]|"")*"/g, '""');
-}
-
 /**
  * Whether a statement the assistant asked for may run automatically (no click). Stricter than
  * "read-only": one plain query over tables already loaded — no writes, no settings, no file or
@@ -124,7 +116,7 @@ function stripLiterals(sql: string): string {
  */
 export function autoRunRejection(statement: string): string | null {
   if (/:\/\//.test(statement)) return "it reaches outside the workspace (a URL)";
-  const code = stripLiterals(statement);
+  const code = stripSqlLiterals(statement);
   const first = code.trim().match(/^[(\s]*([a-z_]+)/i)?.[1]?.toLowerCase() ?? "";
   if (!AUTO_FIRST_WORDS.has(first)) return "it isn't a plain query";
   if (AUTO_DENY.test(code)) return "it could change data or settings";

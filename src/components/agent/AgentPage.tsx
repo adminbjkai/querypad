@@ -61,7 +61,7 @@ const Turn = memo(function Turn({
   if (message.role === "user") {
     return (
       <li className="flex justify-end" data-testid="agent-user">
-        <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-[13px] leading-5 text-ink">{message.content}</p>
+        <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-lg rounded-br-sm bg-accent-soft px-3.5 py-2 text-[13px] leading-5 text-ink">{message.content}</p>
       </li>
     );
   }
@@ -163,31 +163,43 @@ export default function AgentPage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 sm:px-8" aria-live="polite">
           <div className="mx-auto w-full max-w-[880px] pb-6 pt-5">
-            <h1 className="flex items-center gap-2 text-[22px] font-semibold leading-7 tracking-[-0.01em] text-ink">
-              <Icon name="agent" size={20} className="text-accent" />
-              Agent
-            </h1>
+            <h1 className="qp-display text-[30px] leading-9 text-ink">Agent</h1>
             {messages.length === 0 && !busy ? (
-              <div className="pt-16 text-center">
-                <span className="mx-auto flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
-                  <Icon name="agent" size={18} />
-                </span>
-                <p className="mt-3 text-[18px] font-semibold tracking-[-0.01em] text-ink">Hi — what should we build?</p>
-                <p className="mt-1 text-[13px] text-muted">
-                  I plan the SQL, you approve each change. I can see your {tableCount} {tableCount === 1 ? "table" : "tables"}, their columns and joins.
+              <div className="pt-8">
+                <p className="text-[18px] font-semibold tracking-[-0.01em] text-ink">What should we build?</p>
+                <p className="mt-1 max-w-[62ch] text-[13px] leading-5 text-muted">
+                  Describe a change to this space. The agent sees your {tableCount} {tableCount === 1 ? "table" : "tables"}, their columns and joins, and
+                  answers with a plan you can check before anything runs.
                 </p>
-                <div className="mx-auto mt-5 grid max-w-[640px] gap-2 sm:grid-cols-2" aria-label="Suggestions">
-                  {SUGGESTIONS.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => send(s)}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-[13px] text-ink transition-colors hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                      {s}
-                      <Icon name="chevronRight" size={14} className="shrink-0 text-faint" />
-                    </button>
+                <ol className="mt-5 grid gap-3 border-y border-line py-4 sm:grid-cols-3" aria-label="How a plan runs">
+                  {[
+                    ["Plan", "A numbered list of single SQL steps, each marked Read, Write or Danger."],
+                    ["Approve", "Reads run on their own. Writes wait for Run, unless approvals are set to Auto."],
+                    ["Review", "New tables land in the space; a summary shows what changed."],
+                  ].map(([title, body], i) => (
+                    <li key={title} className="flex gap-2.5">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-line-strong text-[11px] font-semibold tabular-nums text-muted">{i + 1}</span>
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-medium text-ink">{title}</span>
+                        <span className="block text-[12px] leading-4 text-muted">{body}</span>
+                      </span>
+                    </li>
                   ))}
-                </div>
+                </ol>
+                <p className="mt-6 text-[12px] font-semibold text-muted">Try one</p>
+                <ul className="mt-1.5 divide-y divide-line-soft" aria-label="Suggestions">
+                  {SUGGESTIONS.map((s) => (
+                    <li key={s}>
+                      <button
+                        onClick={() => send(s)}
+                        className="group flex w-full items-center gap-2 rounded-md px-1 py-2 text-left text-[13px] text-ink transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        <Icon name="arrowUp" size={14} className="shrink-0 rotate-45 text-faint group-hover:text-accent" />
+                        {s}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : (
               <ol className="mt-5 space-y-5">

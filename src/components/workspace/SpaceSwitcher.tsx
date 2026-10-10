@@ -3,17 +3,9 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useWorkspaceStore, PLAYGROUND_NAME, type SpaceTemplate } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
+import { relativeTime } from "@/components/home/format";
 import { Icon } from "@/components/ui/icons";
 import { Dialog, Spinner, btn, input } from "@/components/ui/primitives";
-
-function relative(at: number): string {
-  const minutes = Math.round((Date.now() - at) / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return new Date(at).toLocaleDateString();
-}
 
 const CREATE_OPTIONS: { template: SpaceTemplate; label: string; detail: string; icon: "copy" | "table" | "plus" }[] = [
   { template: "current", label: "Save as new space", detail: "Copy these tables, tabs and history", icon: "copy" },
@@ -161,7 +153,7 @@ export default function SpaceSwitcher({ compact = false }: { compact?: boolean }
                         <span className="min-w-0 flex-1">
                           <span className={`block truncate text-[13px] ${active ? "font-medium text-ink" : "text-ink"}`}>{space.name}</span>
                           <span className="block text-[11px] text-faint">
-                            {space.tableCount} {space.tableCount === 1 ? "table" : "tables"}, saved {relative(space.updatedAt)}
+                            {space.tableCount} {space.tableCount === 1 ? "table" : "tables"}, saved {relativeTime(space.updatedAt)}
                           </span>
                         </span>
                       </button>

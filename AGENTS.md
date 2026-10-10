@@ -53,7 +53,9 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
   (read / write / danger) and runs only through `runStep` — `executeQuery`, then `syncCatalog`
   with the statement's targets — behind the approval gate (reads run, writes wait unless
   approvals are Auto, danger steps always confirm, Plan mode never runs). Keep writes on that path
-  so agent-made tables are persisted like the user's own; the Assistant stays answer-only.
+  so agent-made tables are persisted like the user's own; the Assistant stays answer-only. The one
+  other write a step can make is a notebook step (`runNotebookStep` in `run.ts`), behind the
+  same approval gate; it creates the notebook through the workspace store and never runs its cells.
 - **Library** (`folders`, `savedQueries`, `notebooks` in the workspace store, types in
   `src/types/library.ts`): saved in the space's state record with everything else, so it syncs
   across devices through `/api/store`; it is never shared through collaboration rooms (rooms sync
@@ -71,8 +73,10 @@ semantic models) before generating SQL. See `ROADMAP.md` for the layered plan.
 
 ## UI conventions
 
-- Colors come from semantic tokens in `src/app/globals.css` (light + `[data-theme="dark"]`);
-  never hardcode palette colors in components. Column kinds use `text-k-num/k-text/k-date/
+- Colors come from semantic tokens in `src/app/globals.css` (light + `[data-theme="dark"]`;
+  "the engineering pad": sage paper, graphite ink, teal-ink accent, `mark` highlighter, `grid`
+  graph-paper rule); never hardcode palette colors in components. `src/lib/monaco-theme.ts`
+  mirrors the tokens as literals for Monaco — keep the two in step. Column kinds use `text-k-num/k-text/k-date/
   k-bool`, joins use `text-join`.
 - Shared building blocks live in `src/components/ui` (`btn`, `input`, `Dialog`, `Menu`,
   `KindGlyph`, `SectionLabel`, `Icon`). Toasts: `toast()` from `src/stores/ui-store.ts`.

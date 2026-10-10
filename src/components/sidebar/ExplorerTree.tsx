@@ -5,6 +5,7 @@ import type { TableInfo } from "@/types";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { toast } from "@/stores/ui-store";
 import { insertAtCursor } from "@/lib/editor-bridge";
+import { quoteIdent } from "@/lib/duckdb/sql-utils";
 import { openTablePage, previewTable } from "@/lib/workspace-actions";
 import { Icon } from "@/components/ui/icons";
 import { Chip, HoverTray, btn } from "@/components/ui/primitives";
@@ -22,7 +23,7 @@ export function Highlight({ text, query }: { text: string; query: string }): Rea
   for (let at = lower.indexOf(query); at !== -1; at = lower.indexOf(query, from)) {
     if (at > from) parts.push(text.slice(from, at));
     parts.push(
-      <mark key={at} className="rounded-sm bg-accent-soft text-ink">
+      <mark key={at} className="rounded-sm">
         {text.slice(at, at + query.length)}
       </mark>
     );
@@ -34,7 +35,7 @@ export function Highlight({ text, query }: { text: string; query: string }): Rea
 
 /** Insert a column name at the editor cursor (quoted when SQL needs it). */
 export function insertColumnName(name: string): void {
-  const text = /^[a-z_][a-z0-9_]*$/.test(name) ? name : `"${name.replaceAll('"', '""')}"`;
+  const text = /^[a-z_][a-z0-9_]*$/.test(name) ? name : quoteIdent(name);
   if (!insertAtCursor(text)) toast("Open the SQL editor to insert names.", "info");
 }
 
@@ -188,11 +189,6 @@ function ObjectRow({
         >
           <Icon name={isView ? "code" : "table"} size={14} className={`shrink-0 ${selected ? "text-accent" : "text-muted"}`} />
           <span className="truncate font-mono text-[12px] font-medium text-ink">
-            {table.database && table.database !== "memory" ? (
-              <span className="text-faint">{table.database}.{table.schema ?? "main"}.</span>
-            ) : table.schema && table.schema !== "main" ? (
-              <span className="text-faint">{table.schema}.</span>
-            ) : null}
             <Highlight text={table.name} query={query} />
           </span>
           {pinned && <PinIcon size={12} className="text-accent" aria-label="pinned" />}
@@ -505,7 +501,7 @@ export default function ExplorerTree({
               {mark && (
                 <Icon name={mark === "key" ? "key" : "join"} size={14} className="shrink-0 text-join" aria-label={mark === "key" ? "join key" : "references another table"} />
               )}
-              <span className="ml-auto shrink-0 pl-2 font-mono text-[11px] uppercase text-faint">{node.column.type}</span>
+              <span className="ml-auto shrink-0 pl-2 font-mono text-[11px] text-faint">{node.column.type}</span>
             </button>
           </div>
         );

@@ -136,7 +136,7 @@ export default memo(function NotebookCell({
           {isSql ? (
             <>
               <div className="flex h-8 items-center gap-2 border-b border-line bg-chrome px-2">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-faint">SQL</span>
+                <span className="font-mono text-[11px] font-medium text-faint">SQL</span>
                 <span className="ml-auto hidden items-center gap-1.5 text-[11px] text-faint sm:flex">
                   <Kbd combo={["⇧", "↵"]} /> run & next
                 </span>

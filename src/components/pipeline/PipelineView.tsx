@@ -135,7 +135,7 @@ export default function PipelineView() {
         </div>
       ) : pipeline.steps.length === 0 ? (
         // One empty state for the whole canvas; the steps / graph / results panes appear with the first step.
-        <div className="qp-dotgrid flex flex-1 flex-col items-center justify-center gap-1.5 bg-surface p-6 text-center">
+        <div className="qp-graph flex flex-1 flex-col items-center justify-center gap-1.5 bg-surface p-6 text-center">
           <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
             <Icon name="flow" size={18} />
           </span>

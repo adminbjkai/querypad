@@ -81,11 +81,22 @@ test.describe("Workspace polish regressions", () => {
 
   test("visual query designer toggles, adds tables, and transfers SQL to editor", async ({ page }) => {
     await openWithSamples(page);
-    await page.getByRole("button", { name: "Switch to Visual Query Designer" }).click();
+    const toggle = page.getByRole("button", { name: "Visual query designer" });
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText("Query designer")).toBeVisible();
-    await page.getByLabel("Add a table").selectOption("departments");
-    await page.getByLabel("Add a table").selectOption("employees");
+    for (const table of ["departments", "employees"]) {
+      await page.getByRole("button", { name: "Add table" }).click();
+      await page.getByRole("menuitem", { name: table, exact: true }).click();
+    }
+    await expect(page.getByLabel("Resolved SQL")).toContainText('JOIN "employees" ON "departments"."dept_id" = "employees"."dept_id"');
+    // The sample query is still in the tab, so the designer's SQL opens in a new tab instead of replacing it.
+    const tabs = page.getByRole("tab");
+    const before = await tabs.count();
     await page.getByRole("button", { name: "Use in editor" }).click();
-    await expect(page.getByText("Query updated from the designer.")).toBeVisible();
+    await expect(page.getByText("Opened the designer's SQL in a new tab. Your query is unchanged.")).toBeVisible();
+    await expect(tabs).toHaveCount(before + 1);
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
   });
 });

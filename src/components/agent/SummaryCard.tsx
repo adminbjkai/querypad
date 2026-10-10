@@ -30,7 +30,7 @@ export default memo(function SummaryCard({ turn, onFollowUp }: { turn: SummaryTu
   const { diff } = turn;
   const hasObjects = diff.tablesAdded.length + diff.rowDeltas.length + diff.viewsAdded.length + diff.tablesRemoved.length + diff.viewsRemoved.length > 0;
   return (
-    <div className="rounded-xl border border-line bg-surface p-4" role="region" aria-label="Summary">
+    <div className="rounded-lg border border-line bg-surface p-4" role="region" aria-label="Summary">
       <div className="flex items-center gap-2">
         <Icon name="approve" size={16} className="text-ok" />
         <SectionLabel as="div">Summary</SectionLabel>

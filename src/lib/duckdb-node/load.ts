@@ -3,7 +3,7 @@ import path from "node:path";
 import type { ColumnInfo, TableInfo } from "../../types";
 import type { QueryRunner } from "../discovery/relationships";
 import { fileExtension, sanitizeTableName } from "../utils";
-import { quoteIdent } from "../duckdb/sql-utils";
+import { quoteIdent, sqlString } from "../duckdb/sql-utils";
 
 /** File types DuckDB can read directly from disk in Node. */
 const SUPPORTED_EXTENSIONS = new Set(["parquet", "csv", "tsv", "json", "jsonl", "ndjson"]);
@@ -14,12 +14,8 @@ export interface LoadFolderResult {
   skipped: string[];
 }
 
-function escapeLiteral(value: string): string {
-  return value.replaceAll("'", "''");
-}
-
 function readFunction(ext: string, absolutePath: string): string | null {
-  const literal = `'${escapeLiteral(absolutePath)}'`;
+  const literal = sqlString(absolutePath);
   switch (ext) {
     case "parquet":
       return `read_parquet(${literal})`;

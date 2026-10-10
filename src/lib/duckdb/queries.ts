@@ -1,17 +1,12 @@
-import { getConnection } from "./instance";
+import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
+import { exclusive, getConnection } from "./instance";
+import { isReadOnlyStatement } from "./catalog-sql";
+import { statementRanges } from "./sql-utils";
 import type { QueryResult } from "@/types";
-import { DataType, Decimal } from "apache-arrow";
+import { DataType, Decimal, type RecordBatch, type Schema, type Vector } from "apache-arrow";
 
 /** Rows materialized into JS for display; the full count is still reported. */
 export const MAX_RESULT_ROWS = 10_000;
-
-function isDateType(type: DataType): boolean {
-  return DataType.isDate(type);
-}
-
-function isTimestampType(type: DataType): boolean {
-  return DataType.isTimestamp(type);
-}
 
 function formatDateValue(val: unknown): string | unknown {
   if (val === null || val === undefined) return val;
@@ -27,77 +22,77 @@ function formatTimestampValue(val: unknown): string | unknown {
   return new Date(num).toISOString();
 }
 
+interface ColumnKind {
+  date: boolean;
+  timestamp: boolean;
+  /** Decimal scale, or -1 for non-decimal columns. */
+  scale: number;
+}
+
+/** One Arrow value as the results grid shows it: plain numbers, ISO dates and timestamps, scaled decimals. */
+function convertValue(raw: unknown, kind: ColumnKind): unknown {
+  let val = raw;
+  // Extract primitive from Arrow wrapper objects
+  if (val !== null && val !== undefined && typeof val === "object" && "valueOf" in val) {
+    val = (val as { valueOf(): unknown }).valueOf();
+  }
+  if (typeof val === "bigint") {
+    val = Number(val);
+  }
+  if (kind.date) return formatDateValue(val);
+  if (kind.timestamp) return formatTimestampValue(val);
+  if (kind.scale >= 0 && typeof val === "number") return val / Math.pow(10, kind.scale);
+  return val;
+}
+
 /**
- * Split SQL text into individual statements, respecting string literals and comments.
+ * Collects a result arriving as Arrow record batches: the first `maxRows` rows become plain row
+ * objects (read column by column), later batches are only counted, so `rowCount` stays exact
+ * without keeping the whole result in memory.
  */
-export function splitStatements(sql: string): string[] {
-  const statements: string[] = [];
-  let current = "";
-  let i = 0;
+export class ResultCollector {
+  readonly columns: string[];
+  readonly columnTypes: string[];
+  readonly rows: Record<string, unknown>[] = [];
+  rowCount = 0;
+  private readonly kinds: ColumnKind[];
+  /** Rows are keyed by name, so a repeated column name reads the first column with that name. */
+  private readonly sources: number[];
 
-  while (i < sql.length) {
-    const ch = sql[i];
-
-    // Single-quoted string literal
-    if (ch === "'") {
-      current += ch;
-      i++;
-      while (i < sql.length) {
-        current += sql[i];
-        if (sql[i] === "'" && sql[i + 1] !== "'") { i++; break; }
-        if (sql[i] === "'" && sql[i + 1] === "'") { current += sql[++i]; } // escaped quote
-        i++;
-      }
-      continue;
-    }
-
-    // Double-quoted identifier
-    if (ch === '"') {
-      current += ch;
-      i++;
-      while (i < sql.length) {
-        current += sql[i];
-        if (sql[i] === '"') { i++; break; }
-        i++;
-      }
-      continue;
-    }
-
-    // Line comment
-    if (ch === "-" && sql[i + 1] === "-") {
-      while (i < sql.length && sql[i] !== "\n") { current += sql[i]; i++; }
-      continue;
-    }
-
-    // Block comment
-    if (ch === "/" && sql[i + 1] === "*") {
-      current += "/*";
-      i += 2;
-      while (i < sql.length) {
-        if (sql[i] === "*" && sql[i + 1] === "/") { current += "*/"; i += 2; break; }
-        current += sql[i];
-        i++;
-      }
-      continue;
-    }
-
-    // Semicolon — statement separator
-    if (ch === ";") {
-      const trimmed = current.trim();
-      if (trimmed) statements.push(trimmed);
-      current = "";
-      i++;
-      continue;
-    }
-
-    current += ch;
-    i++;
+  constructor(schema: Schema, private readonly maxRows = MAX_RESULT_ROWS) {
+    this.columns = schema.fields.map((f) => f.name);
+    this.columnTypes = schema.fields.map((f) => String(f.type));
+    this.kinds = schema.fields.map((f) => ({
+      date: DataType.isDate(f.type),
+      timestamp: DataType.isTimestamp(f.type),
+      scale: DataType.isDecimal(f.type) ? (f.type as Decimal).scale : -1,
+    }));
+    this.sources = this.columns.map((name) => this.columns.indexOf(name));
   }
 
-  const trimmed = current.trim();
-  if (trimmed) statements.push(trimmed);
+  add(batch: RecordBatch): void {
+    const take = Math.min(batch.numRows, this.maxRows - this.rows.length);
+    if (take > 0) {
+      const { columns, kinds } = this;
+      const vectors = this.sources.map((c) => batch.getChildAt(c) as Vector);
+      for (let r = 0; r < take; r++) {
+        const obj: Record<string, unknown> = {};
+        for (let i = 0; i < columns.length; i++) obj[columns[i]] = convertValue(vectors[i].get(r), kinds[i]);
+        this.rows.push(obj);
+      }
+    }
+    this.rowCount += batch.numRows;
+  }
+}
 
-  return statements;
+/**
+ * Split SQL text into its statements (trimmed, without the `;`), respecting string literals,
+ * quoted identifiers, dollar quotes and comments (see `statementRanges`).
+ */
+export function splitStatements(sql: string): string[] {
+  return statementRanges(sql)
+    .map(([start, end]) => sql.slice(start, end).trim().replace(/;$/, "").trim())
+    .filter((statement) => statement.length > 0);
 }
 
 export async function executeQuery(sql: string): Promise<QueryResult> {
@@ -120,64 +115,43 @@ export async function executeQuery(sql: string): Promise<QueryResult> {
     }
   }
 
-  // Execute last statement and return its result
-  let result;
+  let collected: ResultCollector;
   try {
-    result = await conn.query(statements[statements.length - 1]);
+    collected = await exclusive((raw) => collectResult(raw, statements[statements.length - 1]));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(statements.length > 1 ? `Statement ${statements.length}: ${msg}` : msg);
   }
 
   const executionTimeMs = Math.round(performance.now() - start);
+  const { columns, columnTypes, rows, rowCount } = collected;
+  return { columns, columnTypes, rows, rowCount, executionTimeMs };
+}
 
-  const schema = result.schema;
-  const columns = schema.fields.map((f) => f.name);
-  const columnTypes = schema.fields.map((f) => String(f.type));
+/** DuckDB-Wasm's streamed batches carry no dictionaries, so ENUM values (dictionary-encoded) would read as null. */
+function hasDictionary(type: DataType): boolean {
+  return DataType.isDictionary(type) || (type.children ?? []).some((child) => hasDictionary(child.type));
+}
 
-  // Build per-column type flags for fast lookup
-  const dateFlags = schema.fields.map((f) => isDateType(f.type));
-  const tsFlags = schema.fields.map((f) => isTimestampType(f.type));
-  const decimalScales = schema.fields.map((f) =>
-    DataType.isDecimal(f.type) ? (f.type as Decimal).scale : -1
-  );
-
-  // Only convert the displayed slice to JS objects; large results stay in Arrow memory.
-  const rowCount = result.numRows;
-  const visible = rowCount > MAX_RESULT_ROWS ? result.slice(0, MAX_RESULT_ROWS) : result;
-  const rows = visible.toArray().map((row: Record<string, unknown>) => {
-    const obj: Record<string, unknown> = {};
-    for (let i = 0; i < columns.length; i++) {
-      const col = columns[i];
-      let val = row[col];
-
-      // Extract primitive from Arrow wrapper objects
-      if (val !== null && val !== undefined && typeof val === "object" && "valueOf" in val) {
-        val = (val as { valueOf(): unknown }).valueOf();
-      }
-      if (typeof val === "bigint") {
-        val = Number(val);
-      }
-
-      // Format date/timestamp types as ISO strings, apply decimal scale
-      if (dateFlags[i]) {
-        obj[col] = formatDateValue(val);
-      } else if (tsFlags[i]) {
-        obj[col] = formatTimestampValue(val);
-      } else if (decimalScales[i] >= 0 && typeof val === "number") {
-        obj[col] = val / Math.pow(10, decimalScales[i]);
-      } else {
-        obj[col] = val;
-      }
+/**
+ * Run one statement and collect its result. Reads are streamed batch by batch, so a large result
+ * is never copied out of the engine as a whole; writes (small results, must run exactly once) use a
+ * plain `query`. A read whose result has ENUM columns is cancelled and read again with `query`
+ * (streamed batches carry no dictionaries), so such a read runs twice.
+ */
+export async function collectResult(conn: AsyncDuckDBConnection, statement: string): Promise<ResultCollector> {
+  if (isReadOnlyStatement(statement)) {
+    const reader = await conn.send(statement);
+    await reader.open();
+    if (!reader.schema.fields.some((f) => hasDictionary(f.type))) {
+      const collector = new ResultCollector(reader.schema);
+      for await (const batch of reader) collector.add(batch);
+      return collector;
     }
-    return obj;
-  });
-
-  return {
-    columns,
-    columnTypes,
-    rows,
-    rowCount,
-    executionTimeMs,
-  };
+    await reader.cancel();
+  }
+  const table = await conn.query(statement);
+  const collector = new ResultCollector(table.schema);
+  for (const batch of table.batches) collector.add(batch);
+  return collector;
 }

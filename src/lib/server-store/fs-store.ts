@@ -1,4 +1,4 @@
-import { createReadStream, createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream, type Stats } from "node:fs";
 import { mkdir, readFile, rename, rm, stat, writeFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -71,6 +71,9 @@ const spaceDir = (ns: string, id: string) => dataPath(ns, "spaces", id);
 const filesDir = (ns: string, id: string) => dataPath(ns, "spaces", id, "files");
 const stateFile = (ns: string, id: string) => dataPath(ns, "spaces", id, "state.json");
 const dataFile = (ns: string, id: string, encoded: string) => dataPath(ns, "spaces", id, "files", encoded);
+/** A saved file's version tag: changes whenever its bytes are replaced. */
+// Writes are atomic renames, so the inode changes with every write as well as size and mtime.
+const versionOf = (info: Stats) => `${info.size}:${info.mtimeMs}:${info.ino}`;
 const encodeName = (name: string) => Buffer.from(name, "utf8").toString("base64url");
 const decodeName = (encoded: string) => Buffer.from(encoded, "base64url").toString("utf8");
 
@@ -179,7 +182,7 @@ async function readFileVersions(ns: string, id: string): Promise<Record<string, 
   for (const encoded of names) {
     if (encoded.endsWith(".tmp")) continue;
     const info = await stat(dataFile(ns, id, encoded));
-    versions[decodeName(encoded)] = `${info.size}:${info.mtimeMs}`;
+    versions[decodeName(encoded)] = versionOf(info);
   }
   return versions;
 }
@@ -229,8 +232,17 @@ export async function writeSpaceFile(
   return withLock(ns, async () => {
     await rename(tmp, target);
     const info = await stat(target);
-    return { ...(await bump(ns, id)), version: `${info.size}:${info.mtimeMs}` };
+    return { ...(await bump(ns, id)), version: versionOf(info) };
   });
+}
+
+/** The version tag of a saved file (as listed in `StoredSpace.files`), or null if there is none. */
+export async function spaceFileVersion(ns: string, id: string, name: string): Promise<string | null> {
+  try {
+    return versionOf(await stat(dataFile(ns, id, encodeName(name))));
+  } catch {
+    return null;
+  }
 }
 
 export async function openSpaceFile(ns: string, id: string, name: string): Promise<ReadableStream | null> {

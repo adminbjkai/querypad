@@ -51,7 +51,7 @@ export function SearchBox({
         onKeyDown={(e) => e.key === "Escape" && value && onChange("")}
         placeholder={placeholder}
         aria-label={label}
-        className="h-8 w-full rounded-md border border-line bg-surface pl-7 pr-2.5 text-[13px] text-ink shadow-sm outline-none transition-[border-color,box-shadow] placeholder:text-faint hover:border-line-strong focus:border-accent focus:ring-2 focus:ring-accent-soft"
+        className="h-8 w-full rounded-md border border-line bg-surface pl-7 pr-2.5 text-[13px] text-ink outline-none transition-[border-color,box-shadow] placeholder:text-faint hover:border-line-strong focus:border-accent focus:ring-2 focus:ring-accent-soft"
       />
     </div>
   );

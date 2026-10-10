@@ -143,7 +143,6 @@ function ExplorerEdge({ onDragging }: { onDragging: (dragging: boolean) => void 
 export default function Sidebar() {
   const tables = useWorkspaceStore((s) => s.tables);
   const views = useWorkspaceStore((s) => s.views);
-  const schemaContext = useUiStore((s) => s.schemaContext);
   const spaceId = useWorkspaceStore((s) => s.spaceId);
   const spaceName = useWorkspaceStore((s) => s.spaces.find((sp) => sp.id === s.spaceId)?.name) ?? "Workspace";
   const fileEntries = useWorkspaceStore((s) => s.fileEntries);
@@ -232,22 +231,9 @@ export default function Sidebar() {
   const [selected, setSelected] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const q = filter.trim().toLowerCase();
-  const inSchema = useCallback(
-    (t: TableInfo) => {
-      const currentDb = schemaContext?.db && schemaContext.db !== "…" ? schemaContext.db : "memory";
-      const currentSchema = schemaContext?.schema || "main";
-      const tableDb = t.database ?? "memory";
-      const tableSchema = t.schema ?? "main";
-      return tableDb === currentDb && tableSchema === currentSchema;
-    },
-    [schemaContext]
-  );
-  const scopedTables = useMemo(() => tables.filter(inSchema), [tables, inSchema]);
-  const scopedViews = useMemo(() => views.filter(inSchema), [views, inSchema]);
 
   const passes = useCallback(
     (t: TableInfo, isView: boolean) => {
-      if (!inSchema(t)) return false;
       if (!(!q || t.name.toLowerCase().includes(q) || t.columns.some((c) => c.name.toLowerCase().includes(q)))) return false;
       const typeKinds = kinds.filter((k) => k === "tables" || k === "views");
       if (typeKinds.length > 0 && !typeKinds.includes(isView ? "views" : "tables")) return false;
@@ -255,7 +241,7 @@ export default function Sidebar() {
       if (kinds.includes("profiled") && (isView || tableProfiles[t.name]?.status !== "ready")) return false;
       return true;
     },
-    [q, kinds, keyColumns, tableProfiles, inSchema]
+    [q, kinds, keyColumns, tableProfiles]
   );
   const visibleTables = useMemo(() => {
     const shown = tables.filter((t) => passes(t, false));
@@ -328,7 +314,7 @@ export default function Sidebar() {
     );
   }
 
-  const total = scopedTables.length + scopedViews.length;
+  const total = tables.length + views.length;
   const filtering = q !== "" || kinds.length > 0;
   const nothingShown = visibleTables.length === 0 && visibleViews.length === 0;
 
@@ -425,14 +411,7 @@ export default function Sidebar() {
                             </span>
                             <p className="mt-3 text-[14px] font-medium text-ink">No tables yet</p>
                             <p className="mt-1 text-[13px] leading-5 text-muted">
-                              {schemaContext.db === "memory" && schemaContext.schema === "main" ? (
-                                <>Add files or create one with <code className="font-mono text-[12px]">CREATE TABLE</code>.</>
-                              ) : (
-                                <>
-                                  Nothing in <span className="font-mono text-ink">{schemaContext.db}.{schemaContext.schema}</span> yet.
-                                  Create a table here, or switch schema from the SQL worksheet.
-                                </>
-                              )}
+                              Add files or create one with <code className="font-mono text-[12px]">CREATE TABLE</code>.
                             </p>
                             <button onClick={() => setDialog("addFiles")} className={`${btn.primary} mt-4`}>
                               <Icon name="upload" size={16} />

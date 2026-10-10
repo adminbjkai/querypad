@@ -4,9 +4,9 @@ import { useId, useMemo, useState } from "react";
 import { MAX_SNIPPET_SQL, useSnippetStore, type SnippetDraft } from "@/stores/snippet-store";
 import { useUiStore, toast } from "@/stores/ui-store";
 import { Dialog, Select, btn, input } from "@/components/ui/primitives";
+import { NEW_FOLDER } from "@/components/library/FolderPicker";
 
 const UNFILED = "";
-const NEW_FOLDER = "\u0000new";
 
 /** Create or edit a snippet: name, folder, description and the SQL itself. */
 export default function SnippetDialog({ draft }: { draft: SnippetDraft }) {

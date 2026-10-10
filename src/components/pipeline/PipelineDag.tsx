@@ -111,7 +111,7 @@ export default function PipelineDag({
 
   if (steps.length === 0) {
     return (
-      <div className="qp-dotgrid flex h-full flex-col items-center justify-center gap-2 bg-surface text-center">
+      <div className="qp-graph flex h-full flex-col items-center justify-center gap-2 bg-surface text-center">
         <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
           <Icon name="flow" size={18} />
         </span>
@@ -122,7 +122,7 @@ export default function PipelineDag({
   }
 
   return (
-    <div className="qp-dotgrid h-full w-full bg-surface">
+    <div className="qp-graph h-full w-full bg-surface">
       <ReactFlow
         nodes={nodes}
         edges={edges}

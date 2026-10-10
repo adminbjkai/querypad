@@ -21,6 +21,7 @@ import {
   checkRemote,
   pullSpaceState,
   hasPendingWrites,
+  whenWritesSettle,
   type FileEntry,
   type PersistedState,
   type SpaceMeta,
@@ -38,9 +39,6 @@ import {
 } from "@/lib/constants";
 import { fileExtension } from "@/lib/utils";
 import { toast } from "@/stores/ui-store";
-
-/** Same-name objects in two schemas: warn once per session, keep the one already open. */
-const schemaNameWarned = new Set<string>();
 
 export interface HistoryEntry {
   id: string;
@@ -385,24 +383,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     })),
 
   removeTable: async (name) => {
-    const table = get().tables.find((t) => t.name === name);
-    const qualified = table?.schema ? `${quoteIdent(table.schema)}.${quoteIdent(name)}` : quoteIdent(name);
     set((state) => withoutTables(state, [name]));
     try {
       const conn = await getConnection();
-      await conn.query(`DROP TABLE IF EXISTS ${qualified}`);
+      await conn.query(`DROP TABLE IF EXISTS ${quoteIdent(name)}`);
     } catch (err) {
       console.error("Failed to drop table:", err);
     }
   },
 
   dropView: async (name) => {
-    const view = get().views.find((v) => v.name === name);
-    const qualified = view?.schema ? `${quoteIdent(view.schema)}.${quoteIdent(name)}` : quoteIdent(name);
     set((state) => ({ views: state.views.filter((v) => v.name !== name) }));
     try {
       const conn = await getConnection();
-      await conn.query(`DROP VIEW IF EXISTS ${qualified}`);
+      await conn.query(`DROP VIEW IF EXISTS ${quoteIdent(name)}`);
     } catch (err) {
       console.error("Failed to drop view:", err);
     }
@@ -468,34 +462,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // `null` = a write we couldn't attribute (MERGE, EXECUTE …): check every table exactly.
     const trusted = touched !== null;
     const hit = touched ?? new Set<string>();
-    const { readCatalog, readCatalogSignatures, describeRelation, snapshotTable, listUserRelationNames } = await import(
-      "@/lib/duckdb/catalog"
-    );
-    const [catalog, signatures, live] = await Promise.all([
-      readCatalog("current"),
-      readCatalogSignatures(),
-      listUserRelationNames(),
-    ]);
-    // A table leaves the space only when it is gone from this database. Switching schema
-    // hides the others; it does not delete their saved files.
-    const gone = get()
-      .tables.filter((t) => (t.database ?? "memory") === catalog.database && !live.tables.has(t.name))
-      .map((t) => t.name);
+    const { readCatalog, readCatalogSignatures, describeRelation, snapshotTable } = await import("@/lib/duckdb/catalog");
+    const [catalog, signatures] = await Promise.all([readCatalog(), readCatalogSignatures()]);
+    const present = new Set(catalog.tables);
+    const gone = get().tables.filter((t) => !present.has(t.name)).map((t) => t.name);
     if (gone.length > 0) set((state) => withoutTables(state, gone));
 
     for (const name of catalog.tables) {
       const known = get().tables.find((t) => t.name === name);
-      if (known && (known.schema ?? "main") !== catalog.schema) {
-        const key = `${catalog.database}.${catalog.schema}.${name}`;
-        if (!schemaNameWarned.has(key)) {
-          schemaNameWarned.add(key);
-          toast(
-            `“${name}” is already open from ${known.schema ?? "main"}, so ${catalog.schema}.${name} stays available in SQL only.`,
-            "warning"
-          );
-        }
-        continue;
-      }
       // One catalog query answers "untouched, same columns, same size" for most tables;
       // only the rest pay for a DESCRIBE and an exact COUNT(*).
       const quick = signatures.get(name);
@@ -507,21 +481,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         quick.signature !== columnSignature(known) ||
         quick.estimatedRows !== known.rowCount;
       if (!maybeChanged) continue;
-      const info = {
-        ...(await describeRelation(name, true, catalog.schema)),
-        schema: catalog.schema,
-        database: catalog.database,
-      };
+      const info = await describeRelation(name);
       const changed =
         !known ||
         hit.has(name.toLowerCase()) ||
         known.rowCount !== info.rowCount ||
-        columnSignature(known) !== columnSignature(info) ||
-        (known.schema ?? "main") !== catalog.schema ||
-        (known.database ?? "memory") !== catalog.database;
+        columnSignature(known) !== columnSignature(info);
       if (!changed) continue;
       try {
-        get().addTable(info, `${name}.parquet`, await snapshotTable(name, info.columns, catalog.schema));
+        get().addTable(info, `${name}.parquet`, await snapshotTable(name, info.columns));
       } catch (err) {
         console.error(`Could not save a snapshot of ${name}:`, err);
         set((state) => ({ tables: [...state.tables.filter((t) => t.name !== name), info] }));
@@ -531,32 +499,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const views: ViewInfo[] = [];
     const broken: { name: string; sql: string }[] = [];
     for (const view of catalog.views) {
-      const known = get().views.find((v) => v.name === view.name);
-      if (known && (known.schema ?? "main") !== catalog.schema) continue;
       try {
-        views.push({
-          ...(await describeRelation(view.name, false, catalog.schema)),
-          sql: view.sql,
-          schema: catalog.schema,
-          database: catalog.database,
-        });
+        views.push({ ...(await describeRelation(view.name, false)), sql: view.sql });
       } catch (err) {
         // e.g. its base table was dropped; keep the definition so it isn't lost on save.
         console.error(`Could not describe view ${view.name}:`, err);
         broken.push(view);
       }
     }
-    const describedNames = new Set(views.map((v) => v.name));
     const inEngine = new Set(catalog.views.map((v) => v.name));
     set((state) => ({
-      views: [
-        ...state.views.filter((v) => {
-          if (describedNames.has(v.name)) return false;
-          if ((v.database ?? "memory") !== catalog.database) return true;
-          return live.views.has(v.name);
-        }),
-        ...views,
-      ],
+      views,
       unrestoredViews: [...state.unrestoredViews.filter((v) => !inEngine.has(v.name)), ...broken],
     }));
   },
@@ -1119,12 +1072,7 @@ async function openSpace(spaceId: string): Promise<void> {
         continue;
       }
       try {
-        views.push({
-          ...(await describeRelation(view.name, false, "main")),
-          sql: view.sql,
-          schema: "main",
-          database: "memory",
-        });
+        views.push({ ...(await describeRelation(view.name, false)), sql: view.sql });
       } catch {
         // dropped by a later restore step; ignore
       }
@@ -1219,6 +1167,8 @@ let localEdits = 0;
 let pendingSave: (() => Promise<void>) | null = null;
 /** A save is on the network. Polling must not reload the space with the copy from before that write. */
 let saveInFlight = 0;
+/** Debounced saves a flush has started and not yet finished. */
+const savesRunning = new Set<Promise<void>>();
 
 /** The state record a save sends (exported for tests). */
 export function snapshotState(): PersistedState {
@@ -1311,18 +1261,16 @@ export async function flushWorkspaceSave(): Promise<void> {
     // Count the save before dropping `pendingSave`, so a poll cannot start in the gap.
     saveInFlight += 1;
     pendingSave = null;
-    try {
-      await run();
-    } finally {
+    const saving: Promise<void> = run().finally(() => {
       saveInFlight -= 1;
-    }
+      savesRunning.delete(saving);
+    });
+    savesRunning.add(saving);
   }
-  const { hasPendingWrites } = await import("@/lib/persistence");
-  let waited = 0;
-  while (hasPendingWrites() && waited < 2000) {
-    await new Promise((r) => setTimeout(r, 20));
-    waited += 20;
-  }
+  // Also wait for a save an earlier flush (e.g. the debounce timer) already started, and for
+  // table-file uploads still on their way, so a switch, clear or delete never races them.
+  await Promise.all(savesRunning);
+  await whenWritesSettle();
 }
 
 /** Persist a shared link's data as a brand-new space and make it active. */

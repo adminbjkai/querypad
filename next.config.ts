@@ -29,7 +29,6 @@ const nextConfig: NextConfig = {
       "docs/**",
       "fixtures/**",
       "sample/**",
-      "snowflake_screenahots/**",
       ".querypad-data/**",
     ],
   },

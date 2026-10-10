@@ -59,18 +59,16 @@ export default function QuickActions() {
 
   return (
     <section aria-label="Quick actions" className="mt-8">
-      <SectionLabel className="px-1 pb-2">Quick actions</SectionLabel>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <SectionLabel className="pb-2">Start something</SectionLabel>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {actions.map((a) => (
           <button
             key={a.title}
             onClick={a.run}
             aria-label={a.label}
-            className="flex min-w-0 items-start gap-3 rounded-xl border border-line bg-surface p-4 text-left transition-colors hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            className="group flex min-w-0 items-start gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-accent/50 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-raised text-accent">
-              <Icon name={a.icon} size={16} />
-            </span>
+            <Icon name={a.icon} size={16} className="mt-0.5 shrink-0 text-faint transition-colors group-hover:text-accent" />
             <span className="min-w-0">
               <span className="block text-[13px] font-medium leading-5 text-ink">{a.title}</span>
               <span className="mt-0.5 block text-[12px] leading-4 text-muted max-sm:hidden">{a.body}</span>

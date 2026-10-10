@@ -71,21 +71,17 @@ export function mutationTargets(statements: string[]): Set<string> | null {
 /**
  * The SELECT used to snapshot a table to Parquet. Parquet has no 128-bit integers or
  * unions, so HUGEINT/UHUGEINT (e.g. SUM of integers) become DECIMAL(38,0) — exact — and
- * UNION columns become text instead of an unreadable file. Reads `schema.table`
+ * UNION columns become text instead of an unreadable file. Always reads `main.<table>`
  * so a temporary table with the same name can't shadow it.
  */
-export function snapshotSelectSql(
-  table: string,
-  columns: { name: string; type: string }[],
-  schema = "main"
-): string {
+export function snapshotSelectSql(table: string, columns: { name: string; type: string }[]): string {
   const list = columns.map(({ name, type }) => {
     const column = quoteIdent(name);
     if (/^U?HUGEINT$/i.test(type)) return `CAST(${column} AS DECIMAL(38,0)) AS ${column}`;
     if (/^UNION\(/i.test(type)) return `CAST(${column} AS VARCHAR) AS ${column}`;
     return column;
   });
-  return `SELECT ${list.length > 0 ? list.join(", ") : "*"} FROM ${quoteIdent(schema)}.${quoteIdent(table)}`;
+  return `SELECT ${list.length > 0 ? list.join(", ") : "*"} FROM main.${quoteIdent(table)}`;
 }
 
 type RelationshipStatus = "accepted" | "inferred" | "rejected";

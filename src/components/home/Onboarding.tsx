@@ -18,7 +18,7 @@ const STEPS: [IconName, string, string][] = [
 
 function IconTile({ name }: { name: IconName }) {
   return (
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-line bg-raised text-accent">
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-raised text-accent">
       <Icon name={name} size={18} />
     </span>
   );
@@ -34,7 +34,7 @@ export default function Onboarding() {
   const spaceId = useWorkspaceStore((s) => s.spaceId);
   const switchSpace = useWorkspaceStore((s) => s.switchSpace);
   const snippets = useSnippetStore((s) => s.snippets);
-  const showPanel = useUiStore((s) => s.showPanel);
+  const openPanel = useUiStore((s) => s.openPanel);
   const [loading, setLoading] = useState(false);
 
   const recent = [...spaces]
@@ -44,13 +44,13 @@ export default function Onboarding() {
   const topSnippets = snippets.slice(0, 5);
 
   return (
-    <div className="mt-12">
+    <div className="mt-6">
       <div className="qp-welcome-drop">
         <DropTarget tall title="Drop in your data files." />
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 transition-colors hover:border-line-strong">
+        <div className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-5 transition-colors hover:border-line-strong">
           <div className="flex items-start gap-3">
             <IconTile name="table" />
             <div className="min-w-0">
@@ -70,7 +70,7 @@ export default function Onboarding() {
             Try sample data
           </button>
         </div>
-        <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 transition-colors hover:border-line-strong">
+        <div className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-5 transition-colors hover:border-line-strong">
           <div className="flex items-start gap-3">
             <IconTile name="link" />
             <div className="min-w-0">
@@ -109,7 +109,7 @@ export default function Onboarding() {
               <ul className="overflow-hidden rounded-lg border border-line">
                 {topSnippets.map((sn) => (
                   <li key={sn.id} className="border-b border-line last:border-b-0">
-                    <button onClick={() => showPanel("snippets")} title="Open the Snippets panel" className={rowBtn}>
+                    <button onClick={() => openPanel("snippets")} title="Open the Snippets panel" className={rowBtn}>
                       <Icon name="bookmark" size={14} className="text-faint" />
                       <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{sn.name}</span>
                       {sn.folder && <span className="shrink-0 truncate text-[11px] text-faint">{sn.folder}</span>}

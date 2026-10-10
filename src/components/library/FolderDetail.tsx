@@ -54,11 +54,11 @@ export default function FolderDetail({ folder }: { folder: Folder }) {
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
           <Icon name="folder" size={24} />
         </span>
-        <h1 className="min-w-0 flex-1 truncate text-[22px] font-semibold leading-7 tracking-[-0.01em] text-ink">{folder.name}</h1>
+        <h1 className="qp-display min-w-0 flex-1 truncate text-[30px] leading-9 text-ink">{folder.name}</h1>
         {newMenu}
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="mt-6 overflow-hidden rounded-lg border border-line bg-surface">
         <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
           <label className="relative min-w-40 flex-1">
             <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />

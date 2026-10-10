@@ -20,6 +20,8 @@ export function formatValue(val: unknown): string {
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  // One decimal, dropped when it is zero ("100 MB", "1.5 KB").
+  const one = (n: number) => n.toFixed(1).replace(/\.0$/, "");
+  if (bytes < 1024 * 1024) return `${one(bytes / 1024)} KB`;
+  return `${one(bytes / (1024 * 1024))} MB`;
 }

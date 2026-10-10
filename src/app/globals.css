@@ -1,82 +1,88 @@
 @import "tailwindcss";
 
 /*
- * QueryPad design tokens.
- * Two themes share one vocabulary; components only ever use the semantic names.
- * Column kinds (num/text/date/bool) and joins carry their own colors — that
- * color coding is information, used consistently everywhere a column appears.
+ * QueryPad design tokens — "the engineering pad".
+ * Sage graph-paper surfaces, graphite ink, one teal-ink accent and a highlighter for
+ * selections. Two themes share one vocabulary; components only ever use the semantic names.
+ * Column kinds (num/text/date/bool) and joins carry their own colors — that color coding is
+ * information, used consistently everywhere a column appears.
  */
 :root {
   color-scheme: light;
-  /* Neutrals follow a role-per-step scale: page, chrome (panels), surface (editor/grid),
-     raised (subtle fills), sunken (hover/pressed); hairline borders, no decorative chrome. */
-  --paper: #f3f5f8;
-  --chrome: #f7f8fa;
-  --surface: #ffffff;
-  --raised: #f6f8fa;
-  --sunken: #eceff3;
-  --line: #e2e6eb;
-  --line-soft: #eef1f4;
-  --line-strong: #cbd2db;
-  --ink: #0f172a;
-  --muted: #4f5b6c;
-  --faint: #7c8796;
-  --accent: #1d5fdb;
-  --accent-hover: #174ec0;
-  --accent-soft: #e8effc;
+  /* Role-per-step neutrals: page, chrome (panels), surface (editor/grid), raised (subtle fills),
+     sunken (hover/pressed); hairline borders, no decorative chrome. */
+  --paper: #e9eee8;
+  --chrome: #f2f5f0;
+  --surface: #fbfcfa;
+  --raised: #f2f5f0;
+  --sunken: #e4e9e2;
+  --line: #d5dcd3;
+  --line-soft: #e5eae3;
+  --line-strong: #b3beb1;
+  /* The graph-paper rule used by canvases and the Home schema map. */
+  --grid: #dde4db;
+  --ink: #16201a;
+  --muted: #47544c;
+  --faint: #66736a;
+  --accent: #0e6b5f;
+  --accent-hover: #0a594f;
+  --accent-soft: #d8ebe5;
   --on-accent: #ffffff;
-  --join: #b25e00;
-  --join-soft: #fdf0dc;
-  --ok: #067647;
-  --ok-soft: #e3f4ea;
-  --danger: #b42318;
-  --danger-soft: #fdecea;
-  --warn: #b54708;
-  --warn-soft: #fef0e1;
-  --k-num: #0e7490;
-  --k-text: #6d4fd0;
-  --k-date: #c2410c;
-  --k-bool: #4d7c0f;
-  --k-other: #64748b;
+  /* Highlighter: text selection and matched search terms. */
+  --mark: #eaf28f;
+  --join: #8f5e00;
+  --join-soft: #f5ead0;
+  --ok: #2b762e;
+  --ok-soft: #e0efdb;
+  --danger: #b3261e;
+  --danger-soft: #fae6e2;
+  --warn: #a8500c;
+  --warn-soft: #fbecdc;
+  --k-num: #2a5bb0;
+  --k-text: #8a3a85;
+  --k-date: #b04d1a;
+  --k-bool: #577510;
+  --k-other: #66726a;
   /* Elevation only for floating layers; everything docked uses a hairline. */
-  --shadow: 0 0 0 1px rgb(15 23 42 / 0.06), 0 4px 12px rgb(15 23 42 / 0.08), 0 12px 32px -8px rgb(15 23 42 / 0.14);
-  --shadow-dialog: 0 0 0 1px rgb(15 23 42 / 0.06), 0 16px 48px rgb(15 23 42 / 0.18);
-  --scrim: rgb(15 23 42 / 0.32);
+  --shadow: 0 0 0 1px rgb(22 32 26 / 0.07), 0 4px 12px rgb(22 32 26 / 0.07), 0 14px 32px -10px rgb(22 32 26 / 0.16);
+  --shadow-dialog: 0 0 0 1px rgb(22 32 26 / 0.07), 0 18px 48px rgb(22 32 26 / 0.2);
+  --scrim: rgb(16 24 20 / 0.34);
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  /* Dark keeps the same role-per-step order, but content (surface/raised) sits one visible
-     step above chrome so the editor, grid, cards and the active nav card read as cards. */
-  --paper: #0b0e13;
-  --chrome: #10141a;
-  --surface: #161b23;
-  --raised: #1d232d;
-  --sunken: #252c38;
-  --line: #2a3240;
-  --line-soft: #202733;
-  --line-strong: #414b5b;
-  --ink: #eceef2;
-  --muted: #a7aebb;
-  --faint: #828b9a;
-  --accent: #5b9dff;
-  --accent-hover: #7db1ff;
-  --accent-soft: #1f3252;
-  --on-accent: #071226;
-  --join: #f5b041;
-  --join-soft: #33240b;
-  --ok: #47cd89;
-  --ok-soft: #0f2e1f;
-  --danger: #f97066;
-  --danger-soft: #3a1513;
-  --warn: #fdb022;
-  --warn-soft: #33240b;
-  --k-num: #4fc7d6;
-  --k-text: #b09cff;
-  --k-date: #ff9a6b;
-  --k-bool: #9fd356;
-  --k-other: #8c96a5;
+  /* The night pad: same role order, content one visible step above chrome. */
+  --paper: #0c110e;
+  --chrome: #111814;
+  --surface: #161e1a;
+  --raised: #1c2520;
+  --sunken: #243029;
+  --line: #29342e;
+  --line-soft: #1e2823;
+  --line-strong: #435148;
+  --grid: #25322b;
+  --ink: #e5ebe6;
+  --muted: #a3b0a8;
+  --faint: #7f8c84;
+  --accent: #5ac6b2;
+  --accent-hover: #7dd6c6;
+  --accent-soft: #163a33;
+  --on-accent: #04231d;
+  --mark: #4b5216;
+  --join: #e2b443;
+  --join-soft: #33280f;
+  --ok: #6fcf74;
+  --ok-soft: #13301a;
+  --danger: #f2776b;
+  --danger-soft: #3b1714;
+  --warn: #f0a04b;
+  --warn-soft: #36240f;
+  --k-num: #7ea9f4;
+  --k-text: #d59ce0;
+  --k-date: #f09a6b;
+  --k-bool: #b5d662;
+  --k-other: #8e9a92;
   --shadow: 0 0 0 1px rgb(255 255 255 / 0.06), 0 8px 24px rgb(0 0 0 / 0.5);
   --shadow-dialog: 0 0 0 1px rgb(255 255 255 / 0.07), 0 24px 64px rgb(0 0 0 / 0.6);
   --scrim: rgb(0 0 0 / 0.55);
@@ -91,6 +97,8 @@
   --color-line: var(--line);
   --color-line-soft: var(--line-soft);
   --color-line-strong: var(--line-strong);
+  --color-grid: var(--grid);
+  --color-mark: var(--mark);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
@@ -129,12 +137,19 @@
     background: var(--paper);
     color: var(--ink);
     font-family: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
-    font-feature-settings: "cv11", "ss01";
+    font-feature-settings: "ss01";
     -webkit-font-smoothing: antialiased;
   }
 
   ::selection {
-    background: var(--accent-soft);
+    background: var(--mark);
+    color: var(--ink);
+  }
+
+  mark {
+    background: var(--mark);
+    color: inherit;
+    border-radius: 2px;
   }
 
   :focus-visible {
@@ -253,10 +268,18 @@
   outline: none;
 }
 
-/* Subtle dot grid for canvases (pipeline graph). */
-.qp-dotgrid {
-  background-image: radial-gradient(var(--line) 1px, transparent 1px);
-  background-size: 16px 16px;
+/* Engineering-pad graph paper for canvases (Home schema map, pipeline graph): a fine 12px rule
+   with a stronger line every fifth square. The empty-space drop zone uses it too. */
+.qp-graph,
+.qp-welcome-drop > div {
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--line-soft) 70%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line-soft) 70%, transparent) 1px, transparent 1px);
+  background-size: 60px 60px, 60px 60px, 12px 12px, 12px 12px;
+  background-position: -1px -1px;
 }
 
 /* The welcome drop area is the primary first-run action. */
@@ -264,7 +287,6 @@
   min-height: 248px;
   border-color: var(--line-strong);
   border-radius: 12px;
-  background: var(--raised);
 }
 .qp-welcome-drop > div > span {
   width: 44px;
@@ -287,17 +309,18 @@
   }
 }
 
-/* Home: a restrained sky wash behind the hero. */
-.qp-home-wash {
-  background-image: radial-gradient(70% 320px at 50% 0%, var(--accent-soft), transparent 100%);
-  background-repeat: no-repeat;
+/* Display cut for page and space titles: Instrument Sans narrowed on its width axis. */
+.qp-display {
+  font-weight: 600;
+  font-variation-settings: "wdth" 80;
+  letter-spacing: -0.015em;
 }
 .qp-home-composer {
   transition: border-color 120ms, box-shadow 160ms var(--ease-out);
 }
 .qp-home-composer:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft), 0 8px 24px -12px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 @media (prefers-reduced-motion: reduce) {
   .qp-home-composer {

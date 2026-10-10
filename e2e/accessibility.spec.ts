@@ -43,7 +43,7 @@ test("menus and command palette support keyboard navigation", async ({ page }) =
   await expect(option).toHaveAttribute("aria-selected", "true");
   await expect(search).toHaveAttribute("aria-activedescendant", await option.getAttribute("id") ?? "");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: /What do you want to know/, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What do you want to know/ })).toBeVisible();
 });
 
 test("editor and result columns resize with the keyboard", async ({ page }) => {

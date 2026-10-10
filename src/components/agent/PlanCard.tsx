@@ -255,7 +255,7 @@ export default memo(function PlanCard({ turn, status, latest }: { turn: PlanTurn
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-surface" role="region" aria-label="Plan">
+    <div className="overflow-hidden rounded-lg border border-line bg-surface" role="region" aria-label="Plan">
       {turn.prose && (
         <div className="px-4 pt-3 text-[14px] leading-6 text-ink">
           <Markdown text={turn.prose} renderCode={(_, code) => <pre className="overflow-auto rounded-lg bg-raised px-3 py-2 font-mono text-[12px]">{code}</pre>} />

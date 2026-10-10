@@ -1,6 +1,5 @@
 import { selectEngineReady, useWorkspaceStore } from "@/stores/workspace-store";
 import { toast, useUiStore } from "@/stores/ui-store";
-import { buildShareUrl } from "@/lib/sharing/encode";
 import { buildAgentContext } from "@/lib/agent/context";
 import { quoteIdent } from "@/lib/duckdb/sql-utils";
 import { getSelectedText, insertAtCursor } from "@/lib/editor-bridge";
@@ -73,6 +72,8 @@ export async function shareWorkspace(): Promise<void> {
     toast("Nothing to share yet — load a file or write a query first.", "warning");
     return;
   }
+  // The encoder (and pako) loads on first share instead of with the page.
+  const { buildShareUrl } = await import("@/lib/sharing/encode");
   const { url, totalSize } = buildShareUrl(query, fileEntries);
   try {
     await copyText(url);

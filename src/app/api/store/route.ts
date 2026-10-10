@@ -1,14 +1,22 @@
 import { isSafeId, patchIndex, readIndex, readSnippets, readSpaceRevs, type IndexPatch } from "@/lib/server-store/fs-store";
 import { crossSiteError, json, namespaceOf } from "@/lib/server-store/http";
+import { createHash } from "node:crypto";
+import { REVALIDATE_HEADERS, etag, isFresh, notModified } from "./conditional";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** The space list, each space's rev and the snippet library's rev — polled by open clients to pick up remote changes. */
+/**
+ * The space list, each space's rev and the snippet library's rev — polled by open clients to pick up
+ * remote changes. Tagged with a hash of the body, so an unchanged poll is answered with an empty 304.
+ */
 export async function GET(req: Request) {
   const ns = namespaceOf(req);
   const [index, revs, snippets] = await Promise.all([readIndex(ns), readSpaceRevs(ns), readSnippets(ns)]);
-  return json({ index: { rev: index.rev, activeId: index.activeId, spaces: index.spaces }, revs, snippetsRev: snippets.rev });
+  const body = JSON.stringify({ index: { rev: index.rev, activeId: index.activeId, spaces: index.spaces }, revs, snippetsRev: snippets.rev });
+  const tag = etag(ns, createHash("sha1").update(body).digest("base64url"));
+  if (isFresh(req, tag)) return notModified(tag);
+  return new Response(body, { headers: { "Content-Type": "application/json", ...REVALIDATE_HEADERS, ETag: tag } });
 }
 
 /** Apply one device's changes to the space list: { activeId?, upsert?: SpaceMeta[], remove?: id[] }. */

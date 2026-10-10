@@ -79,24 +79,23 @@ function NavItem({
       aria-current={current ? "page" : undefined}
       aria-label={label}
       title={hint ? `${label} (${hint})` : collapsed ? label : undefined}
-      className={`qp-nav-item group relative flex h-8 w-full items-center gap-2.5 rounded-md text-[13px] transition-colors ${
+      className={`group relative flex h-8 w-full items-center gap-2.5 rounded-md text-[13px] transition-colors ${
         collapsed ? "justify-center" : "px-2.5"
       } ${
         current
-          ? "bg-surface font-medium text-ink shadow-sm ring-1 ring-line"
+          ? "bg-accent-soft font-medium text-ink"
           : pressed
             ? "bg-sunken font-medium text-ink"
             : "text-muted hover:bg-sunken hover:text-ink"
       }`}
     >
-      {current && <span className="absolute -left-2 top-1.5 h-5 w-[3px] rounded-r bg-accent" aria-hidden="true" />}
       <Icon name={icon} size={16} className={lit ? "text-accent" : ""} />
       {!collapsed && <span className="min-w-0 flex-1 truncate text-left">{label}</span>}
       {badge != null &&
         (collapsed ? (
           <span className="absolute right-2 top-1 size-1.5 rounded-full bg-accent" aria-hidden="true" />
         ) : (
-          <span className="rounded-full bg-sunken px-1.5 text-[11px] font-medium leading-4 tabular-nums text-faint group-hover:bg-raised" aria-hidden="true">
+          <span className={`min-w-5 rounded px-1 text-center text-[11px] font-medium leading-4 tabular-nums ${current ? "text-accent" : "text-faint"}`} aria-hidden="true">
             {badge}
           </span>
         ))}
@@ -215,7 +214,7 @@ export default function NavRail() {
         {!collapsed && (
           <Link href="/" className="flex min-w-0 items-center gap-2 rounded-md py-1 pr-1" aria-label="QueryPad home">
             <BrandMark size={20} />
-            <span className="text-[15px] font-semibold tracking-tight text-ink">QueryPad</span>
+            <span className="qp-display text-[17px] leading-5 text-ink">QueryPad</span>
           </Link>
         )}
         {!narrow && (
@@ -237,11 +236,11 @@ export default function NavRail() {
         </div>
       )}
 
-      <div className={`mt-2 flex shrink-0 gap-1 ${collapsed ? "flex-col items-center" : "px-2"}`}>
+      <div className={`mt-2 flex shrink-0 gap-1.5 ${collapsed ? "flex-col items-center" : "flex-col px-2"}`}>
         <button
           onClick={() => useUiStore.getState().setPaletteOpen(true)}
-          className={`flex h-8 items-center gap-2 rounded-md border border-line bg-surface text-[13px] text-faint shadow-sm transition-colors hover:border-line-strong hover:text-ink ${
-            collapsed ? "w-9 justify-center" : "@container min-w-0 flex-1 px-2.5"
+          className={`flex h-8 items-center gap-2 rounded-md border border-line bg-surface text-[13px] text-faint transition-colors hover:border-line-strong hover:text-ink ${
+            collapsed ? "w-9 justify-center" : "w-full px-2.5"
           }`}
           aria-label="Open command palette"
           title={`Search (${MOD}+P)`}
@@ -250,7 +249,7 @@ export default function NavRail() {
           {!collapsed && (
             <>
               <span className="min-w-0 flex-1 truncate text-left">Search</span>
-              <Kbd combo={[MOD, "P"]} className="hidden @min-[170px]:inline-flex" />
+              <Kbd combo={[MOD, "P"]} />
             </>
           )}
         </button>
@@ -266,15 +265,15 @@ export default function NavRail() {
             items={startItems}
           />
         ) : (
-          <div className="flex shrink-0">
+          <div className="flex w-full shrink-0">
             <button
               onClick={newQuery}
-              className="inline-flex h-8 items-center gap-1.5 rounded-l-md bg-accent pl-2.5 pr-2 text-[13px] font-medium text-on-accent shadow-sm transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-chrome"
+              className="inline-flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-l-md bg-accent pl-2.5 pr-2 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-chrome"
               aria-label="New query"
               title="New query"
             >
               <Icon name="plus" size={16} />
-              New
+              New query
             </button>
             <Menu
               label="Start"
@@ -282,7 +281,7 @@ export default function NavRail() {
               trigger={({ toggle, open }) => (
                 <button
                   onClick={toggle}
-                  className={`inline-flex h-8 w-6 items-center justify-center rounded-r-md border-l border-on-accent/25 bg-accent text-on-accent shadow-sm transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-chrome ${
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-r-md border-l border-on-accent/25 bg-accent text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-chrome ${
                     open ? "bg-accent-hover" : ""
                   }`}
                   aria-label="Other ways to start"

@@ -8,7 +8,7 @@ async function openWithSamples(page: Page) {
 
 async function openHome(page: Page) {
   await page.getByRole("button", { name: "Home", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /What do you want to know/, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /What do you want to know/ })).toBeVisible();
 }
 
 async function openEmployeesPage(page: Page) {
@@ -106,7 +106,7 @@ test.describe("Table page", () => {
   test("sample banner sits inline, dismisses per space, and Home shows quick actions", async ({ page }) => {
     await openWithSamples(page);
     const note = page.getByRole("note");
-    await expect(note).toContainText("You're exploring two sample tables.");
+    await expect(note).toContainText("These are two sample tables.");
     await expect(note.getByRole("button", { name: "Use my own data" })).toBeVisible();
     await expect(note).toHaveCSS("position", "static");
 

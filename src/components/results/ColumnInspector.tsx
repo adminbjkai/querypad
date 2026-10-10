@@ -2,9 +2,8 @@
 
 import { SectionLabel } from "@/components/ui/primitives";
 import { pct, type ColumnStats } from "./column-stats";
+import { formatNumber as num } from "./range-stats";
 
-const num = (n: number) =>
-  Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 function Stat({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1 text-[12px]">

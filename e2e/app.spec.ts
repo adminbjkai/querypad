@@ -17,7 +17,7 @@ test.describe("QueryPad", () => {
   test("loads sample data and shows the welcome note", async ({ page }) => {
     await openWithSamples(page);
     await expect(page.getByRole("button", { name: "departments", exact: true })).toBeVisible();
-    await expect(page.getByText("You're exploring two sample tables.")).toBeVisible();
+    await expect(page.getByText("These are two sample tables.")).toBeVisible();
   });
 
   test("runs the sample query and records it in history", async ({ page }) => {
@@ -163,6 +163,8 @@ test.describe("QueryPad", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await openWithSamples(page);
     await page.getByRole("button", { name: /^Share/ }).click();
+    // The share encoder loads on first use; the toast says when the link is on the clipboard.
+    await expect(page.getByText(/Share link copied/)).toBeVisible({ timeout: 15_000 });
     const url = await page.evaluate(() => navigator.clipboard.readText());
     expect(url).toContain("/shared?s=");
 

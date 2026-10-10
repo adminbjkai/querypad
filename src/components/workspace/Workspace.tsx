@@ -225,7 +225,7 @@ export default function Workspace() {
       } else if (mod && e.shiftKey && key === "s") {
         e.preventDefault();
         void saveCurrentAsSnippet();
-      } else if (mod && e.shiftKey && key === "v") {
+      } else if (mod && e.shiftKey && key === "v" && !(isTypingTarget(e.target) && !(e.target as HTMLElement).closest(".monaco-editor"))) {
         e.preventDefault();
         ui.setWorkspacePage("workbench");
         ui.toggleDesigner();
@@ -268,12 +268,12 @@ export default function Workspace() {
         <div className="relative flex min-w-0 flex-1 flex-col md:min-w-[320px]">
           <PageHeader />
           {onlySampleTables && !sampleHintDismissed && !isSharedPage && (
-            <div role="note" className="flex h-9 shrink-0 items-center gap-2 border-b border-line bg-accent-soft px-3 text-[13px] text-ink sm:px-4">
-              <Icon name="sparkle" size={14} className="shrink-0 text-accent" />
+            <div role="note" className="flex h-9 shrink-0 items-center gap-2 border-b border-line bg-raised px-3 text-[13px] text-muted sm:px-4">
+              <Icon name="table" size={14} className="shrink-0 text-accent" />
               <span className="min-w-0 flex-1 truncate">
-                You&apos;re exploring two sample tables. Drop your own files anywhere and they&apos;ll replace them.
+                These are two sample tables. Drop your own files anywhere to replace them.
               </span>
-              <button onClick={() => setDialog("addFiles")} className={`${btn.ghost} h-7 shrink-0 text-accent hover:bg-surface`}>
+              <button onClick={() => setDialog("addFiles")} className={`${btn.ghost} h-7 shrink-0 font-medium text-accent hover:bg-sunken hover:text-accent`}>
                 Use my own data
               </button>
               <button
@@ -310,7 +310,7 @@ export default function Workspace() {
       <StatusBar />
 
       {dragging && (
-        <div className="pointer-events-none fixed inset-2 z-50 flex items-center justify-center rounded-2xl border-2 border-dashed border-accent bg-accent-soft/50">
+        <div className="qp-graph pointer-events-none fixed inset-2 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-accent opacity-95">
           <p className="rounded-lg bg-surface px-4 py-2 text-[14px] font-medium text-ink shadow-pop">
             Drop to add as tables
           </p>

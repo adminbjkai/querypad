@@ -36,13 +36,13 @@ export default function SemanticModel() {
             )}
           </p>
         </div>
-        <button className={btn.secondary} onClick={() => useUiStore.getState().showPanel("joins")}>
+        <button className={btn.secondary} onClick={() => useUiStore.getState().openPanel("joins")}>
           Review joins<Icon name="chevronRight" size={14} />
         </button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {model.entities.map((entity) => (
-          <div key={entity.table} className="rounded-xl border border-line bg-surface p-4 transition-colors hover:border-line-strong">
+          <div key={entity.table} className="rounded-lg border border-line bg-surface p-4 transition-colors hover:border-line-strong">
             <div className="flex items-center gap-2">
               <Icon name="table" size={16} className="text-accent" />
               <h3 className="truncate text-[14px] font-semibold leading-5 text-ink" title={entity.name}>{entity.name}</h3>

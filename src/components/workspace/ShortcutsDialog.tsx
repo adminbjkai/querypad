@@ -4,6 +4,7 @@ import { Dialog, Kbd, MOD, SectionLabel } from "@/components/ui/primitives";
 
 const KEYBOARD: [string, string[]][] = [
   ["Run query (or the selected part)", [MOD, "Enter"]],
+  ["Run only the statement at the cursor", [MOD, "Shift", "Enter"]],
   ["Ask AI to write SQL", [MOD, "K"]],
   ["Open the Assistant chat", [MOD, "I"]],
   ["Show or hide the Tables panel (SQL, Notebooks)", [MOD, "B"]],

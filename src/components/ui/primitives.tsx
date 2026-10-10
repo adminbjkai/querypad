@@ -10,13 +10,16 @@ import { Icon, type IconName } from "./icons";
 /** Shared button looks. Hierarchy: one primary action per area, quiet everything else. */
 export const btn = {
   primary:
-    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md bg-accent text-on-accent text-[13px] font-medium shadow-sm hover:bg-accent-hover active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[background-color,transform,box-shadow]",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md bg-accent text-on-accent text-[13px] font-medium hover:bg-accent-hover active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[background-color,transform,box-shadow]",
   danger:
-    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md bg-danger text-on-accent text-[13px] font-medium shadow-sm hover:brightness-95 active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[filter,transform]",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md bg-danger text-on-accent text-[13px] font-medium hover:brightness-95 active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[filter,transform]",
   secondary:
-    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md border border-line bg-surface text-ink text-[13px] shadow-sm hover:border-line-strong hover:bg-raised active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[background-color,border-color,transform]",
+    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-3 rounded-md border border-line bg-surface text-ink text-[13px] hover:border-line-strong hover:bg-raised active:translate-y-px disabled:opacity-45 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-[background-color,border-color,transform]",
   ghost:
     "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-7 px-2 rounded-md text-muted text-[13px] hover:text-ink hover:bg-sunken disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-colors",
+  /** Borderless 32px header/toolbar action: quiet until hovered; pair `aria-pressed` with `pressedTone`. */
+  bar:
+    "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap h-8 px-2.5 rounded-md text-muted text-[13px] hover:text-ink hover:bg-sunken disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-chrome transition-colors",
   icon:
     "inline-flex items-center justify-center size-7 rounded-md text-muted hover:text-ink hover:bg-sunken disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-colors",
   /** 24px icon button (14px icon) for `HoverTray`s inside 28px rows. */
@@ -24,8 +27,11 @@ export const btn = {
     "inline-flex items-center justify-center size-6 rounded-md text-muted hover:text-ink hover:bg-sunken disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface transition-colors",
 };
 
+/** Classes for a toggled-on `btn.bar` (Assistant, Tables panel). */
+export const pressedTone = "bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent";
+
 export const input =
-  "h-8 w-full rounded-md border border-line bg-surface px-2.5 text-[13px] text-ink shadow-sm placeholder:text-faint outline-none hover:border-line-strong focus:border-accent focus:ring-2 focus:ring-accent-soft transition-[border-color,box-shadow]";
+  "h-8 w-full rounded-md border border-line bg-surface px-2.5 text-[13px] text-ink placeholder:text-faint outline-none hover:border-line-strong focus:border-accent focus:ring-2 focus:ring-accent-soft transition-[border-color,box-shadow]";
 
 /**
  * Shortcut chip. A whole combination renders as ONE chip: `<Kbd combo={[MOD, "P"]} />` → "⌘ P"
@@ -72,7 +78,7 @@ export function KindGlyph({ type, kind }: { type?: string; kind?: ProfileColumnK
   );
 }
 
-/** Uppercase label over a group of items (DESIGN.md: 11px, medium, wide tracking, faint), with an optional count pill. */
+/** Sentence-case label over a group of items (DESIGN.md: 12px, semibold, muted), with an optional count pill. */
 export function SectionLabel({
   children,
   count,
@@ -85,9 +91,9 @@ export function SectionLabel({
   className?: string;
 }) {
   return (
-    <Tag className={`flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-faint ${className}`}>
+    <Tag className={`flex items-center gap-2 text-[12px] font-semibold leading-4 text-muted ${className}`}>
       <span>{children}</span>
-      {count !== undefined && <span className="rounded-full bg-sunken px-1.5 py-0.5 leading-none tabular-nums">{count}</span>}
+      {count !== undefined && <span className="rounded-full bg-sunken px-1.5 py-0.5 text-[11px] font-medium leading-none tabular-nums text-faint">{count}</span>}
     </Tag>
   );
 }
@@ -307,7 +313,7 @@ export function Menu({
               item === "divider" ? (
                 <div key={`d${i}`} className="my-1 h-px bg-line" />
               ) : "heading" in item ? (
-                <div key={`h${i}`} role="presentation" className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-faint">
+                <div key={`h${i}`} role="presentation" className="px-2 pb-0.5 pt-1.5 text-[12px] font-semibold text-faint">
                   {item.heading}
                 </div>
               ) : (

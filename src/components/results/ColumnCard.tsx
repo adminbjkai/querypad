@@ -8,8 +8,8 @@ import { Icon } from "@/components/ui/icons";
 import { KindGlyph, SectionLabel, btn } from "@/components/ui/primitives";
 import { compactDate, compactNumber, getColumnStats, pct } from "./column-stats";
 import Popover from "./Popover";
+import { formatNumber as num } from "./range-stats";
 
-const num = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 4 }));
 
 function Row({ label, value, tone = "text-ink" }: { label: string; value: string; tone?: string }) {
   return (
@@ -85,7 +85,7 @@ export default function ColumnCard({
         <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-medium text-ink" title={column}>
           {column}
         </span>
-        <span className="shrink-0 font-mono text-[11px] uppercase text-faint" title={type}>
+        <span className="shrink-0 font-mono text-[11px] text-faint" title={type}>
           {type}
         </span>
         <button onClick={onClose} className={btn.iconSm} aria-label="Close column card" title="Close">

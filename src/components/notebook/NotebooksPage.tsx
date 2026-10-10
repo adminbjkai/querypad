@@ -8,6 +8,7 @@ import { relativeTime } from "@/components/home/format";
 import { Icon } from "@/components/ui/icons";
 import { Chip, Dialog, HoverTray, btn, input } from "@/components/ui/primitives";
 import NotebookView from "./NotebookView";
+import { startNotebook } from "@/components/workspace/NavRail";
 
 const cellsLabel = (n: number) => `${n} ${n === 1 ? "cell" : "cells"}`;
 
@@ -117,10 +118,10 @@ function NotebookList() {
   }, [notebooks, search]);
 
   return (
-    <div className="h-full min-h-0 flex-1 overflow-y-auto bg-paper">
+    <div className="h-full min-h-0 flex-1 overflow-y-auto bg-surface">
       <div className="mx-auto w-full max-w-[1100px] px-5 pb-16 pt-6 sm:px-8">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-[22px] font-semibold leading-8 tracking-[-0.01em] text-ink">Notebooks</h1>
+          <h1 className="qp-display text-[30px] leading-9 text-ink">Notebooks</h1>
           <span className="text-[12px] tabular-nums text-muted">{notebooks.length === 1 ? "1 notebook" : `${notebooks.length} notebooks`}</span>
           <div className="ml-auto flex items-center gap-2">
             {notebooks.length > 0 && (
@@ -144,7 +145,11 @@ function NotebookList() {
               <Icon name="notebook" size={18} />
             </span>
             <p className="text-[14px] font-medium text-ink">No notebooks yet</p>
-            <p className="max-w-sm text-[13px] text-muted">Mix SQL cells and notes into a document you can run top to bottom. Use New notebook above to start one.</p>
+            <p className="max-w-sm text-[13px] text-muted">Mix SQL cells and notes into a document you can run top to bottom.</p>
+            <button className={`${btn.primary} mt-3`} onClick={() => startNotebook(null)}>
+              <Icon name="plus" size={16} />
+              Create a notebook
+            </button>
           </div>
         ) : visible.length === 0 ? (
           <p className="mt-10 text-center text-[13px] text-muted">No notebooks match “{search.trim()}”.</p>

@@ -91,7 +91,7 @@ export default function ObjectDetails({
                     aria-label={mark === "key" ? "join key" : "references another table"}
                   />
                 )}
-                <span className="ml-auto shrink-0 truncate pl-2 text-right font-mono text-[11px] uppercase text-faint">{col.type}</span>
+                <span className="ml-auto shrink-0 truncate pl-2 text-right font-mono text-[11px] text-faint">{col.type}</span>
               </button>
             </li>
           );

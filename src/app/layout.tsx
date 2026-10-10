@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 
-const ui = Inter({ variable: "--font-ui", subsets: ["latin"] });
-const code = JetBrains_Mono({ variable: "--font-code", subsets: ["latin"] });
+// Instrument Sans for the interface (its width axis gives page titles a drafted, condensed cut);
+// IBM Plex Mono for SQL and data cells.
+const ui = Instrument_Sans({ variable: "--font-ui", subsets: ["latin"], axes: ["wdth"] });
+const code = IBM_Plex_Mono({ variable: "--font-code", subsets: ["latin"], weight: ["400", "500", "600"] });
 
 export const metadata: Metadata = {
   title: "QueryPad — understand your data files",
@@ -25,8 +27,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#eef1f4" },
-    { media: "(prefers-color-scheme: dark)", color: "#0d131a" },
+    { media: "(prefers-color-scheme: light)", color: "#e9eee8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c110e" },
   ],
 };
 

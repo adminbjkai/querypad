@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useUiStore } from "@/stores/ui-store";
 import { openTablePage, previewTable } from "@/lib/workspace-actions";
 import { Icon } from "@/components/ui/icons";
 import { SectionLabel, Select, btn, input } from "@/components/ui/primitives";
@@ -21,20 +20,16 @@ type Sort = (typeof SORTS)[number]["value"];
 export default function DatasetList({ fill = false }: { fill?: boolean }) {
   const tables = useWorkspaceStore((s) => s.tables);
   const views = useWorkspaceStore((s) => s.views);
-  const schemaContext = useUiStore((s) => s.schemaContext);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<Sort>("name");
   const noun = fill ? "table" : "dataset";
   const nouns = fill ? "tables" : "datasets";
   const catalog = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const inSchema = (t: { schema?: string; database?: string }) =>
-      (t.database ?? "memory") === schemaContext.db && (t.schema ?? "main") === schemaContext.schema;
     return [...tables.map((t) => ({ ...t, kind: "Table" })), ...views.map((t) => ({ ...t, kind: "View" }))]
-      .filter(inSchema)
       .filter((t) => !q || t.name.toLowerCase().includes(q) || t.columns.some((c) => c.name.toLowerCase().includes(q)))
       .sort((a, b) => (sort === "rows" ? b.rowCount - a.rowCount : sort === "columns" ? b.columns.length - a.columns.length : 0) || a.name.localeCompare(b.name));
-  }, [tables, views, search, sort, schemaContext]);
+  }, [tables, views, search, sort]);
 
   return (
     <section aria-label="Data catalog" className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
@@ -70,10 +65,7 @@ export default function DatasetList({ fill = false }: { fill?: boolean }) {
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent"><Icon name={t.kind === "View" ? "file" : "table"} size={14} /></span>
                     <span className="min-w-0">
                       <span className="block truncate leading-5" title={t.name}>{t.name}</span>
-                      <span className="block text-[11px] font-normal leading-4 text-muted">
-                        {t.kind}
-                        {t.database && t.database !== "memory" ? ` · ${t.database}.${t.schema ?? "main"}` : t.schema && t.schema !== "main" ? ` · ${t.schema}` : ""}
-                      </span>
+                      <span className="block text-[11px] font-normal leading-4 text-muted">{t.kind}</span>
                     </span>
                   </button>
                 </td>
@@ -100,7 +92,7 @@ export default function DatasetList({ fill = false }: { fill?: boolean }) {
                 <button className={`${btn.ghost} mt-2`} onClick={() => setSearch("")}>Clear search</button>
               </>
             ) : (
-              <p>Nothing in {schemaContext.db}.{schemaContext.schema}.</p>
+              <p>No {nouns} yet.</p>
             )}
           </div>
         )}

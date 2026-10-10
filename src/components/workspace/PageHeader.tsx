@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useWorkspaceStore, saveSharedAsSpace } from "@/stores/workspace-store";
 import { PANEL_PAGES, useUiStore } from "@/stores/ui-store";
@@ -7,10 +8,10 @@ import { useCollaborationStore } from "@/stores/collaboration-store";
 import { shareWorkspace } from "@/lib/workspace-actions";
 import RoomBar from "@/components/collaboration/RoomBar";
 import { Icon } from "@/components/ui/icons";
-import { MOD, btn } from "@/components/ui/primitives";
+import { MOD, btn, pressedTone } from "@/components/ui/primitives";
 import { startFolder, startNotebook } from "./NavRail";
 
-const crumb = "truncate rounded font-medium text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+const crumb = "truncate rounded text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
 /** The light bar above the work area: where you are, and the space-wide actions. */
 export default function PageHeader() {
@@ -32,6 +33,14 @@ export default function PageHeader() {
   const tablesPanelOpen = useUiStore((s) => s.sidebarOpen && s.sidebarPanel === "tables");
   const setDialog = useUiStore((s) => s.setDialog);
   const toast = useUiStore((s) => s.toast);
+
+  // The share encoder stays out of page load, but is fetched once the page is idle so Share can
+  // write the link to the clipboard straight from the click (Safari drops a slow gesture).
+  useEffect(() => {
+    if (!hasTables) return;
+    const timer = setTimeout(() => void import("@/lib/sharing/encode"), 4000);
+    return () => clearTimeout(timer);
+  }, [hasTables]);
 
   const space = isSharedPage ? "Shared link" : (spaceName ?? "Space");
   // Pages with a parent list show it as a crumb; the last crumb is the page itself.
@@ -70,7 +79,7 @@ export default function PageHeader() {
             <button onClick={parent.onClick} className={crumb} aria-label={parent.aria} title={`Open ${parent.label}`}>{parent.label}</button>
           </>
         ) : (
-          <span className="truncate font-medium text-muted" title={space}>{space}</span>
+          <span className="truncate text-muted" title={space}>{space}</span>
         )}
         <Icon name="chevronRight" size={14} className="text-faint" />
         <span className={`font-semibold text-ink ${page === "table" ? "min-w-0 truncate font-mono" : "min-w-0 truncate"}`} aria-current="page">{title}</span>
@@ -95,7 +104,7 @@ export default function PageHeader() {
         {PANEL_PAGES.has(page) && (
           <button
             onClick={() => useUiStore.getState().togglePanel("tables")}
-            className={`${btn.secondary} ${tablesPanelOpen ? "bg-accent-soft text-accent hover:bg-accent-soft" : ""}`}
+            className={`${btn.bar} ${tablesPanelOpen ? pressedTone : ""}`}
             aria-pressed={tablesPanelOpen}
             aria-label="Tables panel"
             title={`Tables panel (${MOD}+B)`}
@@ -126,13 +135,13 @@ export default function PageHeader() {
           <RoomBar />
         ) : (
           !isSharedPage && (
-            <button onClick={() => setDialog("collaborate")} className={`${btn.secondary} max-md:hidden`} aria-label="Collaborate" title="Collaborate">
+            <button onClick={() => setDialog("collaborate")} className={`${btn.bar} max-md:hidden`} aria-label="Collaborate" title="Collaborate">
               <Icon name="users" size={16} />
               Collaborate
             </button>
           )
         )}
-        <button onClick={() => void shareWorkspace()} className={btn.secondary} disabled={!hasTables} aria-label="Share" title="Share">
+        <button onClick={() => void shareWorkspace()} onPointerEnter={() => void import("@/lib/sharing/encode")} className={btn.bar} disabled={!hasTables} aria-label="Share" title="Share">
           <Icon name="link" size={16} />
           <span className="max-sm:hidden">Share</span>
         </button>
@@ -144,7 +153,7 @@ export default function PageHeader() {
               if (!assistantOpen && ui.sidebarOpen && window.innerWidth < 768) ui.setSidebarOpen(false);
               ui.setAssistantOpen(!assistantOpen);
             }}
-            className={`${btn.secondary} ${assistantOpen ? "bg-accent-soft text-accent hover:bg-accent-soft" : ""}`}
+            className={`${btn.bar} ${assistantOpen ? pressedTone : ""}`}
             aria-pressed={assistantOpen}
             aria-label="Assistant"
             title={`Assistant (${MOD}+I)`}

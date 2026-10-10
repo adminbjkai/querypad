@@ -16,6 +16,24 @@ async function runSql(page: Page, sql: string) {
   await page.getByRole("button", { name: /^Run/ }).click();
 }
 
+test.describe("Run the statement at the cursor", () => {
+  test("Ctrl/⌘+Shift+Enter runs only the statement under the cursor", async ({ page }) => {
+    await openWithSamples(page);
+    await page.locator(".monaco-editor").first().click();
+    await page.keyboard.press(`${MOD}+a`);
+    await page.keyboard.press("Delete");
+    await page.keyboard.insertText("SELECT 'x;y' AS first_col;\nSELECT 2 AS second_col");
+    // Cursor on the first line: only the first statement runs (the ; in the string doesn't split it).
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press(`${MOD}+Shift+Enter`);
+    await expect(page.getByRole("columnheader", { name: /first_col/ })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("columnheader", { name: /second_col/ })).toHaveCount(0);
+    // Ctrl/⌘+Enter still runs the whole tab (the last statement's result shows).
+    await page.keyboard.press(`${MOD}+Enter`);
+    await expect(page.getByRole("columnheader", { name: /second_col/ })).toBeVisible({ timeout: 15_000 });
+  });
+});
+
 test.describe("SQL-created tables and views", () => {
   test("CREATE TABLE shows in the sidebar, persists, and DROP removes it", async ({ page }) => {
     await openWithSamples(page);
@@ -412,18 +430,19 @@ test.describe("Charts", () => {
     await page.getByRole("tab", { name: "Chart" }).click();
     const settings = page.getByRole("complementary", { name: "Chart settings" });
     await expect(settings).toBeVisible();
-    // Chart settings use the styled Select: a labeled trigger opening a menu of menuitemradio rows.
+    // Chart type is a radiogroup of pictograms; the other settings use the styled Select (a labeled
+    // trigger opening a menu of menuitemradio rows).
     const pick = async (label: string, option: string) => {
       await settings.getByRole("button", { name: label, exact: true }).click();
       await page.getByRole("menuitemradio", { name: option, exact: true }).click();
     };
-    await pick("Chart type", "Bar");
+    await settings.getByRole("radio", { name: "Bar", exact: true }).click();
     await pick("X axis column", "dept_name");
     await pick("Series 1 column", "salary");
     await pick("Series 1 aggregation", "Average");
     await expect(page.locator(".recharts-bar-rectangle").first()).toBeVisible();
     await expect(page.locator(".recharts-bar-rectangle")).toHaveCount(4);
-    await pick("Chart type", "Scorecard");
+    await settings.getByRole("radio", { name: "Scorecard", exact: true }).click();
     await expect(page.locator(".recharts-bar-rectangle")).toHaveCount(0);
   });
 });

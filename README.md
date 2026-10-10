@@ -160,15 +160,18 @@ use, so every device you open it on sees the same workspace — and open tabs pi
 made elsewhere within a few seconds. Served without its storage API (static hosting), it
 falls back to keeping everything in the browser.
 
-- **Start from Home** — an AI-first start page: ask a question about your data in one box
-  (it goes to the Assistant), pick a suggestion, use a quick action (Add data, New query,
-  Inspect a dataset, Open Assistant), or pick up where you left off in the Recent tabs
-  (datasets with search and sorting, queries, folders, notebooks, snippets, spaces), with live
-  catalog counts and the semantic model below
-- **Snowsight-style navigation** — a labeled rail on the left in three groups: Workspace (Home,
+- **Start from Home** — the space at a glance: its name and live counts (tables, rows, joins
+  waiting for review, profiled tables), then a **schema map** of every table and view on graph
+  paper, joined by the relationships QueryPad found (solid once accepted, dashed while
+  unreviewed). Click a table to open its page, or a join to open a query of the two tables
+  joined. Below it, ask a question in one box (it goes to the Assistant), pick a suggestion, use
+  a quick action (Add data, New query, Inspect a dataset, Open Assistant), or pick up where you
+  left off in the Recent tabs (datasets with search and sorting, queries, folders, notebooks,
+  snippets, spaces), with the business entities below. An empty space opens on a drop zone
+- **Labeled navigation** — a rail on the left in three groups: Workspace (Home,
   Agent, SQL, Notebooks, Pipelines), Data (Tables, Joins) and Library (Folders, Snippets,
-  History), with Search and a New ▾ control (query, notebook, folder, pipeline, add data) above
-  them. Press `g` then a letter to jump: `g h` Home, `g a` Agent, `g s` SQL, `g n` Notebooks,
+  History), with Search and a "New query ▾" control (query, visual query, notebook, folder,
+  pipeline, add data) above them. Press `g` then a letter to jump: `g h` Home, `g a` Agent, `g s` SQL, `g n` Notebooks,
   `g p` Pipelines, `g t` Tables, `g f` Folders. It collapses to icons (remembered) and shows the
   chord in each tooltip; the Tables panel stays available beside SQL and Notebooks (Ctrl/⌘+B)
 - **Drop anything** — CSV, TSV, Parquet, JSON/NDJSON, Excel; several at once, then JOIN them.
@@ -185,8 +188,9 @@ falls back to keeping everything in the browser.
 - **Verify the joins** — the Joins panel lists inferred relationships with confidence and a
   per-signal "why"; Accept / Reject / Edit them, or insert the `JOIN … ON …` clause directly
 - **SQL with a real editor** — Monaco with table/column autocomplete; Ctrl/⌘+Enter runs the
-  query, or only the selected part
-- **Visual Query Designer** — an interactive visual builder right in your worksheet (Ctrl/⌘+Shift+V or "Visual Builder" in the toolbar): select tables, choose columns, leverage automatically inferred foreign-key relationships to link tables, configure join types (INNER, LEFT, RIGHT) and WHERE criteria, and transfer the generated SQL directly into the editor
+  query, or only the selected part; Ctrl/⌘+Shift+Enter runs just the statement under the cursor
+  (statements split on `;`, ignoring semicolons inside strings, quoted names and comments)
+- **Visual Query Designer** — a table-and-join builder in place of the editor (Ctrl/⌘+Shift+V or the "Visual query designer" toggle in the editor toolbar): add tables, check columns, and each table joins on a discovered relationship or a shared column name (a `*_id`, `*_key` or `*_code` name; or you pick the join columns); set the join type (INNER, LEFT, RIGHT) and a WHERE condition, then open the SQL in the editor (a new tab if the current one already holds other SQL)
 - **Tables you create with SQL are first-class** — `CREATE TABLE`, `CREATE VIEW`, `INSERT`,
   `ALTER`, `DROP`… the sidebar follows DuckDB's catalog, and new or changed tables are saved
   (as Parquet snapshots) so they survive reloads, travel in share links and sync to rooms
@@ -246,15 +250,14 @@ falls back to keeping everything in the browser.
   table on the discovered key, group and count, profile the source table), a Details view with
   Rows, Columns, Duration and Last run tiles plus the SQL, and an export menu (Copy / Download /
   Plugins) for CSV / JSON / Markdown / HTML / Excel / Parquet / clipboard
-- **Charts and column stats like Snowsight** — a chart builder (bar, line, area, scatter,
-  pie, scorecard; date buckets, aggregations, group-by, stacking, PNG download) and a stats
-  pane listing every column with its distribution
+- **Charts and column stats** — a chart builder (pick bar, horizontal bar, line, area,
+  scatter, pie or scorecard from a row of pictograms; date buckets, aggregations, group-by,
+  stacking, PNG download) and a stats pane listing every column with its distribution
 - **Explorer, history and status bar** — a searchable Tables panel for tables, views and columns
   that opens beside SQL and Notebooks: expand a table to list its columns (type and key marks; click
   to insert), hover or focus a row for a summary card (shape, source, keys, Open / Preview), pin
   tables to the top (remembered per space), and while searching every match stays expanded with
-  "n of m columns" counts, highlights and an "Ask the Assistant about …" row. The SQL worksheet
-  shows the open space, the `main` schema and the 10,000-row grid limit under the tabs. History
+  "n of m columns" counts, highlights and an "Ask the Assistant about …" row. History
   search has a succeeded/failed filter and a Run again action; a status bar shows
   the engine and its DuckDB version, space, storage location, cursor line/column and selection
   size, the last result (click an error to jump to it) and the active AI model; Format SQL
@@ -269,10 +272,11 @@ falls back to keeping everything in the browser.
   never touches your spaces ("Save as a new space" keeps a copy)
 - **Agent context** — copy schema, profiles, the current SQL and its results for Claude Code,
   Codex or any agent
-- **A considered design system** ([`docs/DESIGN.md`](docs/DESIGN.md)): a light, Snowsight-like
-  frame (labeled navigation, page header with breadcrumb), shared primitives (chips, segmented
-  controls, tabs, styled selects, menus, dialogs with sticky footers), semantic surface colors,
-  Inter + JetBrains Mono, matching light and dark themes and skeleton loading
+- **A design of its own** ([`docs/DESIGN.md`](docs/DESIGN.md)): "the engineering pad" — sage
+  graph-paper surfaces, graphite ink, a teal-ink accent and a highlighter for selections;
+  Instrument Sans (with a narrowed display cut for titles) and IBM Plex Mono; shared primitives
+  (chips, segmented controls, tabs, styled selects, menus, dialogs with sticky footers); matching
+  light and dark themes and skeleton loading
 - **Light and dark themes**, keyboard-first (press `?` for shortcuts), works on phones
 
 <details>
@@ -307,6 +311,7 @@ falls back to keeping everything in the browser.
 | Action | Keys |
 |--------|------|
 | Run query (or the selected part) | Ctrl/⌘ + Enter |
+| Run only the statement at the cursor | Ctrl/⌘ + Shift + Enter |
 | Ask AI to write SQL | Ctrl/⌘ + K |
 | Open the Assistant chat | Ctrl/⌘ + I |
 | Show or hide the Tables panel (SQL, Notebooks) | Ctrl/⌘ + B |
@@ -314,9 +319,10 @@ falls back to keeping everything in the browser.
 | Format SQL | Shift + Alt + F |
 | Save query to a folder | Ctrl/⌘ + S |
 | Save query or selection as a snippet | Ctrl/⌘ + Shift + S |
+| Visual Query Designer | Ctrl/⌘ + Shift + V |
 | Copy selected cells | Ctrl/⌘ + C |
 | Resize focused editor divider | ↑ / ↓ |
-| Resize focused column handle | ← / → |
+| Resize focused column handle or explorer edge | ← / → |
 | Go to Home / Agent / SQL / Notebooks / Pipelines / Tables / Folders | G then H / A / S / N / P / T / F |
 | Notebook: run cell · run and move on · run all | Ctrl/⌘ + Enter · Shift + Enter · Ctrl/⌘ + Shift + Enter |
 | Rename a tab | Double-click it |

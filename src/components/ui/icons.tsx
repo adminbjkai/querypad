@@ -27,7 +27,6 @@ const PATHS = {
   chart: "M4 20h16M7 16v-5M12 16V7M17 16v-8",
   profile: "M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6",
   trash: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13",
-  command: "M9 6a3 3 0 10-3 3h12a3 3 0 10-3-3v12a3 3 0 103-3H6a3 3 0 103 3V6z",
   alert: "M12 9v4M12 17h.01M10.3 4.3L2.6 18a2 2 0 001.7 3h15.4a2 2 0 001.7-3L13.7 4.3a2 2 0 00-3.4 0z",
   sidebar: "M4 5h16v14H4zM9 5v14",
   flow: "M6 4h5v5H6zM13 15h5v5h-5zM8.5 9v3.5a2 2 0 002 2H15",
@@ -38,7 +37,6 @@ const PATHS = {
   filter: "M4 5h16l-6 8v5l-4 2v-7L4 5z",
   wand: "M4 20L14 10M15 4v2M19 8h-2M18.5 4.5l-1.4 1.4M12.5 4.5l1.4 1.4M18.5 11.5l-1.4-1.4",
   file: "M14 3H6v18h12V7l-4-4zM14 3v4h4",
-  eraser: "M8 20h12M5 15l9-9 5 5-8 8H8l-3-3z",
   keyboard: "M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8",
   bookmark: "M7 4h10v16l-5-3.5L7 20V4z",
   save: "M4 6h6l2 2h8v10H4zM9 13.5l2 2 4-4",
@@ -93,12 +91,3 @@ export function Icon({ name, size = 16, className, ...rest }: IconProps) {
     </svg>
   );
 }
-
-type NamedIconProps = Omit<IconProps, "name">;
-
-/** Semantic 16px icons for catalog surfaces (table page, explorer): same stroke set, fixed names. */
-export const TableIcon = (props: NamedIconProps) => <Icon name="table" {...props} />;
-export const ColumnsIcon = (props: NamedIconProps) => <Icon name="columns" {...props} />;
-export const RowsIcon = (props: NamedIconProps) => <Icon name="rows" {...props} />;
-export const DatabaseIcon = (props: NamedIconProps) => <Icon name="database" {...props} />;
-export const InfoIcon = (props: NamedIconProps) => <Icon name="info" {...props} />;

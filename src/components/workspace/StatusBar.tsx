@@ -18,6 +18,20 @@ function subscribeOnline(callback: () => void) {
   };
 }
 
+/** The editor's cursor readout. Its own component: the cursor changes on every move, the rest of the bar doesn't. */
+function CursorPosition() {
+  const workspacePage = useUiStore((s) => s.workspacePage);
+  const viewMode = useWorkspaceStore((s) => s.viewMode);
+  const cursor = useUiStore((s) => s.cursor);
+  if (workspacePage !== "workbench" || viewMode !== "sql" || !cursor) return null;
+  return (
+    <span className="hidden shrink-0 tabular-nums lg:inline" title="Cursor position">
+      Ln {cursor.line}, Col {cursor.column}
+      {cursor.selected > 0 && ` (${cursor.selected.toLocaleString()} selected)`}
+    </span>
+  );
+}
+
 /** A 24px status strip: engine, space and sync state on the left, last result and AI model on the right. */
 export default function StatusBar() {
   const dbReady = useWorkspaceStore((s) => s.dbReady);
@@ -36,7 +50,6 @@ export default function StatusBar() {
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   const aiLabel = useAiStore((s) => s.loaded ? modelLabel(s.provider, s.efforts[s.provider]) : null);
   const persistEnabled = useWorkspaceStore((s) => s.persistEnabled);
-  const workspacePage = useUiStore((s) => s.workspacePage);
   const [storage, setStorage] = useState<"server" | "browser" | null>(null);
 
   useEffect(() => {
@@ -44,8 +57,6 @@ export default function StatusBar() {
     void isServerBacked().then((server) => { if (active) setStorage(server ? "server" : "browser"); });
     return () => { active = false; };
   }, []);
-  const cursor = useUiStore((s) => s.cursor);
-  const viewMode = useWorkspaceStore((s) => s.viewMode);
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,12 +100,7 @@ export default function StatusBar() {
       </span>
 
       <span className="ml-auto" />
-      {workspacePage === "workbench" && viewMode === "sql" && cursor && (
-        <span className="hidden shrink-0 tabular-nums lg:inline" title="Cursor position">
-          Ln {cursor.line}, Col {cursor.column}
-          {cursor.selected > 0 && ` (${cursor.selected.toLocaleString()} selected)`}
-        </span>
-      )}
+      <CursorPosition />
       {run.isExecuting ? (
         <span className="shrink-0">Running…</span>
       ) : run.errorLine !== null ? (

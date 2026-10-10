@@ -60,6 +60,7 @@ export function computeRangeStats(
   };
 }
 
+/** Locale digits with at most four decimals (integers stay exact). */
 export const formatNumber = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 
 /** Tab-separated text of a range; values with tabs, quotes or newlines are quoted like a spreadsheet would. */

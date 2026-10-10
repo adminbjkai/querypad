@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useUiStore } from "@/stores/ui-store";
 import { Icon } from "@/components/ui/icons";
-import { SectionLabel } from "@/components/ui/primitives";
+import { SectionLabel, btn } from "@/components/ui/primitives";
+import { startFolder } from "@/components/workspace/NavRail";
 import FolderCard from "./FolderCard";
 import FolderDetail from "./FolderDetail";
 import LibraryRow from "./LibraryRow";
@@ -21,16 +22,20 @@ function FolderGrid() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="min-w-0 flex-1 text-[22px] font-semibold leading-7 tracking-[-0.01em] text-ink">Folders</h1>
+        <h1 className="qp-display min-w-0 flex-1 text-[30px] leading-9 text-ink">Folders</h1>
       </div>
 
       {empty ? (
-        <div className="mt-8 flex flex-col items-center rounded-xl border border-line bg-surface px-4 py-14 text-center">
+        <div className="mt-8 flex flex-col items-center rounded-lg border border-line bg-surface px-4 py-14 text-center">
           <span className="flex size-9 items-center justify-center rounded-lg bg-raised text-muted">
             <Icon name="folder" size={18} />
           </span>
           <p className="mt-3 text-[14px] font-medium text-ink">No folders yet</p>
-          <p className="mt-1 max-w-sm text-[13px] leading-5 text-muted">Folders keep saved queries and notebooks together. Use New folder above, or save a query from the editor.</p>
+          <p className="mt-1 max-w-sm text-[13px] leading-5 text-muted">Folders keep saved queries and notebooks together. Saving a query from the editor (Ctrl/⌘+S) also offers one.</p>
+          <button className={`${btn.primary} mt-4`} onClick={startFolder}>
+            <Icon name="folderPlus" size={16} />
+            Create a folder
+          </button>
         </div>
       ) : (
         <>
@@ -48,7 +53,7 @@ function FolderGrid() {
           )}
           <section aria-label="Unfiled" className="mt-8">
             <SectionLabel count={unfiled.length} className="mb-2">Unfiled</SectionLabel>
-            <div className="overflow-hidden rounded-xl border border-line bg-surface">
+            <div className="overflow-hidden rounded-lg border border-line bg-surface">
               {unfiled.length === 0 ? (
                 <p className="px-4 py-6 text-center text-[13px] text-muted">Everything is filed. Queries saved without a folder appear here.</p>
               ) : (

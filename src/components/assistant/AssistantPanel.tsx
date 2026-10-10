@@ -135,7 +135,7 @@ const MessageItem = memo(function MessageItem({ message, header }: { message: As
   if (message.role === "user") {
     return (
       <li className="flex justify-end" data-testid="assistant-user">
-        <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-3 py-2 text-[13px] leading-5 text-ink">{message.content}</p>
+        <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-lg rounded-br-sm bg-accent-soft px-3 py-2 text-[13px] leading-5 text-ink">{message.content}</p>
       </li>
     );
   }
@@ -425,7 +425,7 @@ export default function AssistantPanel() {
                 ))}
             </div>
           )}
-          <div className="rounded-2xl border border-line bg-surface shadow-sm transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
+          <div className="rounded-lg border border-line-strong bg-surface transition-shadow focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft">
             <textarea
               ref={inputRef}
               value={text}

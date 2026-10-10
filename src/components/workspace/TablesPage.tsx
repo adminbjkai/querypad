@@ -8,11 +8,8 @@ import { btn } from "@/components/ui/primitives";
 
 /** The Data › Tables page: the space's catalog (Snowsight "Databases"-style), one row per dataset. */
 export default function TablesPage() {
-  const schemaContext = useUiStore((s) => s.schemaContext);
-  const inSchema = (t: { schema?: string; database?: string }) =>
-    (t.database ?? "memory") === schemaContext.db && (t.schema ?? "main") === schemaContext.schema;
-  const tableCount = useWorkspaceStore((s) => s.tables.filter(inSchema).length);
-  const viewCount = useWorkspaceStore((s) => s.views.filter(inSchema).length);
+  const tableCount = useWorkspaceStore((s) => s.tables.length);
+  const viewCount = useWorkspaceStore((s) => s.views.length);
   const setDialog = useUiStore((s) => s.setDialog);
   const count =
     tableCount + viewCount === 0
@@ -23,17 +20,8 @@ export default function TablesPage() {
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-surface">
       {/* The page header carries "Add data" while there is data; the empty state carries it otherwise. */}
       <div className="shrink-0 px-5 pb-4 pt-5 sm:px-8">
-        <h1 className="flex items-center gap-2 text-[22px] font-semibold leading-7 tracking-[-0.01em] text-ink">
-          <Icon name="table" size={20} className="text-accent" />
-          Tables
-        </h1>
-        <p className="mt-1 text-[13px] text-muted">
-          {count}
-          {schemaContext.db === "memory" && schemaContext.schema === "main"
-            ? " in this space."
-            : <> in <span className="font-mono text-ink">{schemaContext.db}.{schemaContext.schema}</span>.</>}
-          {" "}Open one for its columns, rows and profile.
-        </p>
+        <h1 className="qp-display text-[30px] leading-9 text-ink">Tables</h1>
+        <p className="mt-1 text-[13px] text-muted">{count} in this space. Open one for its columns, rows and profile.</p>
       </div>
       {tableCount + viewCount === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6 pb-16 text-center">

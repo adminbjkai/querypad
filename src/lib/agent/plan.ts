@@ -1,4 +1,5 @@
 import { isReadOnlyStatement, leading } from "../duckdb/catalog-sql";
+import { stripSqlLiterals } from "../duckdb/sql-utils";
 
 /**
  * The Agent's plan protocol: the model answers with a sentence and ONE fenced ```json block
@@ -158,22 +159,13 @@ export function parsePlan(text: string): PlanReply {
   return { prose: found.rest, plan: { summary, steps } };
 }
 
-/** Replace comments and string literals with spaces so keyword checks see only SQL. */
-function code(sql: string): string {
-  return sql
-    .replace(/--[^\n]*/g, " ")
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/'(?:[^']|'')*'/g, "''")
-    .replace(/"(?:[^"]|"")*"/g, '""');
-}
-
 /**
  * Why a statement is dangerous (it destroys or rewrites data wholesale), or null: DROP, TRUNCATE,
  * DELETE or UPDATE without a WHERE, and ALTER … DROP. These always need the per-step click plus
  * a confirmation, whatever the approval setting.
  */
 export function dangerReason(sql: string): string | null {
-  const stripped = code(sql).replace(/;\s*$/, "");
+  const stripped = stripSqlLiterals(sql).replace(/;\s*$/, "");
   // The plan is model output: a step is gated as ONE statement, so several statements in one
   // step (`SELECT 1; DROP TABLE t`) can never ride on the first keyword's classification.
   if (stripped.includes(";")) return "contains several statements";
@@ -255,8 +247,6 @@ export function diffCatalog(before: CatalogSnapshot, after: CatalogSnapshot): Ca
     viewsRemoved: before.views.filter((v) => !afterViews.has(v)),
   };
 }
-
-export const emptyDiff = (): CatalogDiff => ({ tablesAdded: [], tablesRemoved: [], rowDeltas: [], viewsAdded: [], viewsRemoved: [] });
 
 /** One line per change, for the model and the summary card. */
 export function describeDiff(diff: CatalogDiff): string[] {

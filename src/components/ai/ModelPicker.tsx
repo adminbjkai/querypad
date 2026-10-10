@@ -88,7 +88,7 @@ export default function ModelPicker({ align = "right", compact = false }: { alig
         <div
           role="menu"
           aria-label="AI models"
-          className={`qp-pop absolute top-full z-50 mt-1 w-[320px] rounded-xl border border-line bg-surface p-1.5 shadow-pop ${
+          className={`qp-pop absolute top-full z-50 mt-1 w-[320px] rounded-lg border border-line bg-surface p-1.5 shadow-pop ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >

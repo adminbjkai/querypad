@@ -74,7 +74,7 @@ existing profiles; it does not maintain a second catalog or launch its own profi
 - Notebook cells: `NotebookView` keeps a local copy of the open notebook's cells and writes it
   to the store (`updateNotebookCells`) after a 300 ms typing pause; structural edits (add, move,
   convert, delete) are written at once, and running a cell, leaving the notebook or the space's
-  data being swapped out (`onBeforeSpaceData` in the workspace store, run by `flushPendingSave`)
+  data being swapped out (`onBeforeSpaceData` in the workspace store, run by `flushWorkspaceSave`)
   flushes whatever is pending. A store change the view did not push (another device) replaces the local
   copy unless an edit is still pending. Cell results live in a module-level map for the session
   only — they survive leaving and reopening the notebook, never a reload. `runCellSql` mirrors
@@ -100,7 +100,10 @@ local writes. Debounced saves capture their target space; switching flushes pend
 The `querypad_ns` cookie isolates server workspaces during tests. Clients poll every 3 s while
 someone is using the page and every 15 s once it has seen no activity for 60 s; the server
 parses each polled record (index, space revs, snippets) once per file version (inode, size,
-mtime).
+mtime). The poll response and every table file carry an `ETag` (`Cache-Control: private,
+no-cache`, `Vary: Cookie`, scoped to the namespace) and answer a matching `If-None-Match` with
+304; the client fetches them with `cache: "no-cache"`, so an unchanged poll or a reopened space
+revalidates instead of downloading every table again.
 
 State saves are debounced 400 ms (1200 ms while typing in the editor) and compared against
 the last written snapshot (`src/lib/persistence/snapshot.ts`): an unchanged record is not
@@ -121,7 +124,9 @@ storage access so blocked localStorage does not prevent the shell from rendering
 AI-generated SQL is checked against the live schema. Assistant automatic query execution
 uses the read-only gate. The Agent's steps are classified by `src/lib/agent/plan.ts` before
 anything runs; writes wait for approval and danger steps for a confirmation, and every run goes
-through `executeQuery` + `syncCatalog` like the user's own SQL. Local AI CLIs run in the host's
+through `executeQuery` + `syncCatalog` like the user's own SQL. A plan step may also create a
+notebook (`kind: "notebook"`); that write is approval-gated like the others and goes through the
+workspace store's `createNotebook` (`runNotebookStep`), after the space has finished loading (a 15 s timeout). Local AI CLIs run in the host's
 bubblewrap sandbox with tools disabled; only the server-side bridge module can reach them. Keep
 these boundaries intact.
 
@@ -144,8 +149,18 @@ The browser workspace is dynamically loaded without server rendering. Optional H
 page, pipeline, chart, assistant, and dialog surfaces load on demand; `/shared` imports the
 engine, store and share decoder after its shell renders. Results virtualize rows; filtering is
 deferred to keep text input responsive. Components that sit beside the editor (results grid,
-status bar, Assistant) select primitives or shallow slices from the store, so the tab record
-changing on every keystroke does not re-render them. Profiling and relationship discovery
+tab bar, status bar, Assistant) select primitives or shallow slices from the store, so the tab
+record changing on every keystroke does not re-render them; the status bar's cursor readout is
+its own small component.
+
+Query results stream: `executeQuery` runs earlier statements with `query`, then reads the last
+one through `collectResult`, which (for read-only statements) pulls Arrow record batches with
+`send` and keeps rows only up to the 10,000-row display cap while still counting every row.
+Writes, DDL and results with dictionary (ENUM) columns — whose streamed batches carry no
+dictionaries — use a plain `query`. DuckDB-Wasm allows one call on a connection at a time:
+`getConnection()` queues `query` calls, and `exclusive(fn)` gives a streamed read the connection
+to itself until it finishes (a query arriving mid-stream would end it early without an error).
+The engine logs warnings only. Profiling and relationship discovery
 remain shared work in the workspace store rather than per-component duplicate queries.
 
 Static engine assets are versioned and immutable-cached: `scripts/copy-duckdb-wasm.mjs`

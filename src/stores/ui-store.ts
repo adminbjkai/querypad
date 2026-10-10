@@ -49,6 +49,8 @@ interface UiState {
   sidebarPanel: SidebarPanel;
   setSidebarOpen: (open: boolean) => void;
   showPanel: (panel: SidebarPanel) => void;
+  /** Show a side panel, moving to the workbench first when the current page has no side panel. */
+  openPanel: (panel: SidebarPanel) => void;
   /** Open a panel, or close it when it is already the open one. */
   togglePanel: (panel: SidebarPanel) => void;
   /** Show or hide the side panel (from a page without one, this opens the workbench with it shown). */
@@ -88,9 +90,6 @@ interface UiState {
   designerOpen: boolean;
   setDesignerOpen: (open: boolean) => void;
   toggleDesigner: () => void;
-  /** Database and schema the worksheet is writing into. The explorer lists this one. */
-  schemaContext: { db: string; schema: string };
-  setSchemaContext: (schemaContext: { db: string; schema: string }) => void;
 
   /** Editor share of the vertical split, 0.15–0.85. */
   editorFraction: number;
@@ -188,6 +187,13 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   // The quick profile view belongs to the Tables panel; showing another panel closes it.
   showPanel: (sidebarPanel) => set((s) => ({ sidebarPanel, sidebarOpen: true, profileTable: sidebarPanel === "tables" ? s.profileTable : null })),
+  openPanel: (sidebarPanel) =>
+    set((s) => ({
+      sidebarPanel,
+      sidebarOpen: true,
+      profileTable: sidebarPanel === "tables" ? s.profileTable : null,
+      workspacePage: PANEL_PAGES.has(s.workspacePage) ? s.workspacePage : "workbench",
+    })),
   toggleSidePanel: () =>
     set((s) => (PANEL_PAGES.has(s.workspacePage) ? { sidebarOpen: !s.sidebarOpen } : { workspacePage: "workbench", sidebarOpen: true })),
   togglePanel: (panel) =>
@@ -233,8 +239,6 @@ export const useUiStore = create<UiState>((set, get) => ({
       const next = !s.designerOpen;
       return { designerOpen: next, ...(next ? { workspacePage: "workbench" as const } : {}) };
     }),
-  schemaContext: { db: "memory", schema: "main" },
-  setSchemaContext: (schemaContext) => set({ schemaContext }),
 
   explorerWidth: initialExplorerWidth(),
   setExplorerWidth: (explorerWidth) => {

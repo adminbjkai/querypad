@@ -1,5 +1,6 @@
-import { deleteSpaceFile, isDeleted, isSafeId, openSpaceFile, writeSpaceFile } from "@/lib/server-store/fs-store";
+import { deleteSpaceFile, isDeleted, isSafeId, openSpaceFile, spaceFileVersion, writeSpaceFile } from "@/lib/server-store/fs-store";
 import { crossSiteError, json, namespaceOf } from "@/lib/server-store/http";
+import { REVALIDATE_HEADERS, etag, isFresh, notModified } from "@/app/api/store/conditional";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +16,16 @@ async function target(params: Ctx["params"]) {
 export async function GET(req: Request, { params }: Ctx) {
   const t = await target(params);
   if (!t) return json({ error: "Bad file path." }, 400);
-  const stream = await openSpaceFile(namespaceOf(req), t.id, t.table);
+  const ns = namespaceOf(req);
+  // Tagged with the version the space record lists, so a device reloading unchanged bytes gets a 304.
+  const version = await spaceFileVersion(ns, t.id, t.table);
+  if (!version) return json({ error: "Not found." }, 404);
+  const tag = etag(ns, version);
+  if (isFresh(req, tag)) return notModified(tag);
+  const stream = await openSpaceFile(ns, t.id, t.table);
   if (!stream) return json({ error: "Not found." }, 404);
   return new Response(stream, {
-    headers: { "Content-Type": "application/octet-stream", "Cache-Control": "no-store" },
+    headers: { "Content-Type": "application/octet-stream", ...REVALIDATE_HEADERS, ETag: tag },
   });
 }
 
